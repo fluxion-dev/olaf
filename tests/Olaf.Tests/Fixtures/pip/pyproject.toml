@@ -1,0 +1,12 @@
+[project]
+name = "olaf-pip-fixture"
+version = "1.0.0"
+dependencies = [
+  "requests==2.31.0",
+  "flask>=3.0.0",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "2.31.0"
+rich = { version = "13.7.0" }

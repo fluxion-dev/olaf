@@ -1,0 +1,26 @@
+# olaf poetry.lock fixture (transitive closure)
+[[package]]
+name = "requests"
+version = "2.31.0"
+description = "Python HTTP for Humans."
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
+name = "urllib3"
+version = "2.2.1"
+description = "HTTP library with thread-safe connection pooling."
+optional = false
+python-versions = ">=3.8"
+
+[[package]]
+name = "certifi"
+version = "2024.2.2"
+description = "Python package for providing Mozilla's CA Bundle."
+optional = false
+python-versions = ">=3.6"
+
+[metadata]
+lock-version = "2.0"
+python-versions = "^3.11"
+content-hash = "olaf-fixture-hash"

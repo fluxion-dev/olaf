@@ -1,0 +1,8 @@
+# olaf pip fixture — pinned deps, comments, -r include, env markers
+requests==2.31.0
+flask==3.0.2 # web framework
+# a comment line should be ignored
+
+-r other-requirements.txt
+urllib3==2.2.1; python_version >= "3.8"
+dataclasses==0.8; python_version < "3.7"

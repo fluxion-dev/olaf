@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Newtonsoft.Json": {
+        "type": "Direct",
+        "requested": "[13.0.3, )",
+        "resolved": "13.0.3"
+      },
+      "System.Text.Json": {
+        "type": "Transitive",
+        "requested": "[8.0.0, )",
+        "resolved": "8.0.4"
+      }
+    }
+  }
+}

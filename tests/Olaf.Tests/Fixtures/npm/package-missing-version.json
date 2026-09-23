@@ -1,0 +1,8 @@
+{
+  "name": "olaf-npm-missing-version",
+  "version": "1.0.0",
+  "dependencies": {
+    "left-pad": "",
+    "no-version-pkg": null
+  }
+}
