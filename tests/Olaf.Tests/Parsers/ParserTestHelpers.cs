@@ -11,8 +11,20 @@ namespace Olaf.Tests.Parsers;
 /// </summary>
 internal static class ParserTestHelpers
 {
+    private static void EnsureParsersLoaded()
+    {
+        try
+        {
+            AppDomain.CurrentDomain.Load("Olaf.Parsers");
+        }
+        catch
+        {
+        }
+    }
+
     internal static IEcosystemParser ResolveParser(string ecosystem)
     {
+        EnsureParsersLoaded();
         var parser = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(a => SafeGetTypes(a))
             .Where(t => typeof(IEcosystemParser).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
@@ -39,6 +51,7 @@ internal static class ParserTestHelpers
 
     internal static IReadOnlyList<IEcosystemParser> ResolveAllParsers()
     {
+        EnsureParsersLoaded();
         var parsers = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(a => SafeGetTypes(a))
             .Where(t => typeof(IEcosystemParser).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
@@ -57,6 +70,7 @@ internal static class ParserTestHelpers
 
     internal static Type RequireRegistryType()
     {
+        EnsureParsersLoaded();
         var registry = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(a => SafeGetTypes(a))
             .FirstOrDefault(t => string.Equals(t.Name, "ParserRegistry", StringComparison.Ordinal));
