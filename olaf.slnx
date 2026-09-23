@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Olaf.Cli/Olaf.Cli.csproj" />
+    <Project Path="src/Olaf.Core/Olaf.Core.csproj" />
+    <Project Path="src/Olaf.Formatters/Olaf.Formatters.csproj" />
+    <Project Path="src/Olaf.Parsers/Olaf.Parsers.csproj" />
+    <Project Path="src/Olaf.Resolvers/Olaf.Resolvers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Olaf.Tests/Olaf.Tests.csproj" />
+  </Folder>
+</Solution>

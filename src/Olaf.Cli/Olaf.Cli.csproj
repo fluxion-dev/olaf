@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Olaf.Core\Olaf.Core.csproj" />
+    <ProjectReference Include="..\Olaf.Parsers\Olaf.Parsers.csproj" />
+    <ProjectReference Include="..\Olaf.Resolvers\Olaf.Resolvers.csproj" />
+    <ProjectReference Include="..\Olaf.Formatters\Olaf.Formatters.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
