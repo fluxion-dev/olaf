@@ -29,7 +29,7 @@ public sealed class CachingLicenseResolver : ILicenseResolver
 
         if (_offline)
         {
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "offline: cache-miss, no network in offline mode.");
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", "offline-cache-miss: no cached entry and no network in offline mode.");
         }
 
         try
@@ -52,14 +52,18 @@ public sealed class CachingLicenseResolver : ILicenseResolver
 
             return result;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TaskCanceledException ex)
         {
             if (Cache.TryGetValue(key, out var hit))
             {
                 return hit;
             }
 
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "timeout: request timed out.");
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: request timed out: {ex.Message}");
         }
         catch (HttpRequestException)
         {
@@ -68,10 +72,21 @@ public sealed class CachingLicenseResolver : ILicenseResolver
                 return hit;
             }
 
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "offline: no cached entry and no network.");
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", "offline-cache-miss: no cached entry and no network.");
+        }
+        catch (Exception ex)
+        {
+            if (Cache.TryGetValue(key, out var hit))
+            {
+                return hit;
+            }
+
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
     }
 
+    // Single home for ecosystem -> primary-resolver mapping. ClearlyDefinedFallbackResolver
+    // stays fallback-only (no CreatePrimary duplicate); primary+fallback orchestration lives in Program.cs.
     private ILicenseResolver? CreatePrimary(Dependency dependency)
     {
         if (dependency.Ecosystem.Equals("nuget", StringComparison.OrdinalIgnoreCase))

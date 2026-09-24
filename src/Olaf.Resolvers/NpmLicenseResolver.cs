@@ -22,7 +22,7 @@ public sealed class NpmLicenseResolver : ILicenseResolver
         try
         {
             var url = $"https://registry.npmjs.org/{Uri.EscapeDataString(dependency.Name)}/{Uri.EscapeDataString(dependency.Version)}";
-            using var response = await _http.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: npm package '{dependency.Name} {dependency.Version}' not found.");
@@ -50,9 +50,13 @@ public sealed class NpmLicenseResolver : ILicenseResolver
             var source = $"https://www.npmjs.com/package/{dependency.Name}/v/{dependency.Version}";
             return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "timeout: npm request timed out.");
+            throw;
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: npm request timed out: {ex.Message}");
         }
         catch (HttpRequestException ex)
         {
@@ -61,6 +65,10 @@ public sealed class NpmLicenseResolver : ILicenseResolver
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
     }
 
