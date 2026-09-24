@@ -13,17 +13,28 @@ public sealed class HtmlFormatter : ILicenseFormatter
         ArgumentNullException.ThrowIfNull(result);
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Olaf License Report</title></head><body>");
-        sb.Append("<table><thead><tr><th>Name</th><th>Version</th><th>License</th><th>Status</th></tr></thead><tbody>");
-        foreach (var l in result.Licenses)
+        sb.Append("<p>Total: ").Append(result.TotalCount)
+            .Append(" \u00b7 Resolved: ").Append(result.ResolvedCount)
+            .Append(" \u00b7 Unknown: ").Append(result.UnknownCount).Append("</p>");
+        sb.Append("<table><thead><tr><th>Ecosystem</th><th>Name</th><th>Version</th><th>SPDX</th><th>License</th><th>Source</th><th>Status</th><th>Reason</th></tr></thead><tbody>");
+        foreach (var l in FormatterSort.ByEcosystemNameVersion(result.Licenses))
         {
             sb.Append("<tr><td>")
+                .Append(WebUtility.HtmlEncode(l.Dependency.Ecosystem))
+                .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.Dependency.Name))
                 .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.Dependency.Version))
                 .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.SpdxId ?? l.Status))
                 .Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(l.LicenseText ?? string.Empty))
+                .Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(l.SourceUrl ?? string.Empty))
+                .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.Status))
+                .Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(l.Reason ?? string.Empty))
                 .Append("</td></tr>");
         }
 
