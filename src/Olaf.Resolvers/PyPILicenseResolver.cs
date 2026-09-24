@@ -23,7 +23,7 @@ public sealed class PyPILicenseResolver : ILicenseResolver
         try
         {
             var url = $"https://pypi.org/pypi/{Uri.EscapeDataString(dependency.Name)}/{Uri.EscapeDataString(dependency.Version)}/json";
-            using var response = await _http.GetAsync(url, cancellationToken).ConfigureAwait(false);
+            using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: PyPI package '{dependency.Name} {dependency.Version}' not found.");
@@ -61,9 +61,13 @@ public sealed class PyPILicenseResolver : ILicenseResolver
             var source = $"https://pypi.org/project/{dependency.Name}/{dependency.Version}/";
             return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "timeout: PyPI request timed out.");
+            throw;
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: PyPI request timed out: {ex.Message}");
         }
         catch (HttpRequestException ex)
         {
@@ -72,6 +76,10 @@ public sealed class PyPILicenseResolver : ILicenseResolver
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
     }
 

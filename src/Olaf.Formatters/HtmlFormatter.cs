@@ -1,0 +1,33 @@
+using System.Net;
+using System.Text;
+using Olaf.Core;
+
+namespace Olaf.Formatters;
+
+public sealed class HtmlFormatter : ILicenseFormatter
+{
+    public string Format => "html";
+
+    public string FormatResult(ScanResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var sb = new StringBuilder();
+        sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Olaf License Report</title></head><body>");
+        sb.Append("<table><thead><tr><th>Name</th><th>Version</th><th>License</th><th>Status</th></tr></thead><tbody>");
+        foreach (var l in result.Licenses)
+        {
+            sb.Append("<tr><td>")
+                .Append(WebUtility.HtmlEncode(l.Dependency.Name))
+                .Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(l.Dependency.Version))
+                .Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(l.SpdxId ?? l.Status))
+                .Append("</td><td>")
+                .Append(WebUtility.HtmlEncode(l.Status))
+                .Append("</td></tr>");
+        }
+
+        sb.Append("</tbody></table></body></html>");
+        return sb.ToString();
+    }
+}

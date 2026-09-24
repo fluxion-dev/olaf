@@ -444,3 +444,176 @@ public sealed class IsolationResolverTests
         Assert.True(result.SpdxId is null || result.SpdxId == "NOASSERTION");
     }
 }
+
+/// <summary>
+/// Phase D1: unknown-name offline must resolve to Unknown (never throw).
+/// Handler throws HttpRequestException("offline"); the caching resolver has no
+/// cached entry for npm/never-cached@9.9.9, so it must return Unknown with a
+/// reason mentioning the offline miss (offline-cache-miss via the caching
+/// decorator, or transport-error: offline bubbled from the inner resolver).
+/// Unknown results are never cached, so the fixed name stays deterministic.
+/// </summary>
+public sealed class OfflineUnknownResolverTests
+{
+    [Fact]
+    public async Task Should_ReturnUnknownWithOfflineReason_When_OfflineAndNoCacheHit()
+    {
+        var offlineHandler = new StubHttpMessageHandler((req, _) =>
+            throw new HttpRequestException("offline"));
+        using var http = ResolverTestHelpers.CreateClient(offlineHandler);
+        var resolver = ResolverTestHelpers.ResolveCachingResolver("npm", http);
+        var dep = new Dependency("npm", "never-cached", "9.9.9", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.True(
+            result.Reason.Contains("offline-cache-miss", StringComparison.OrdinalIgnoreCase)
+                || result.Reason.Contains("offline", StringComparison.OrdinalIgnoreCase)
+                || result.Reason.Contains("not-found", StringComparison.OrdinalIgnoreCase),
+            $"Reason should mention offline-cache-miss/offline/not-found but was: {result.Reason}");
+    }
+}
+
+/// <summary>
+/// Phase D2: a throwing transport must surface as Unknown, never crash the
+/// caller. Primary resolvers map InvalidOperationException to
+/// "parse-error: ..." (Reason always non-null and echoes the message);
+/// the caching/fallback decorators map unexpected errors to "resolver-error: ...".
+/// </summary>
+public sealed class ResolverErrorIsolationTests
+{
+    [Theory]
+    [InlineData("nuget")]
+    [InlineData("npm")]
+    [InlineData("pypi")]
+    public async Task Should_ReturnUnknown_When_ResolverThrows(string ecosystem)
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            throw new InvalidOperationException("boom"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver(ecosystem, http);
+        var dep = new Dependency(ecosystem, "any-pkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("boom", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+/// <summary>
+/// Phase D3: cooperative cancellation must propagate as
+/// OperationCanceledException (never swallowed into Unknown). The stub honors
+/// the token like a real transport would; resolvers rethrow when the caller's
+/// token is canceled.
+/// </summary>
+public sealed class CancellationResolverTests
+{
+    private static StubHttpMessageHandler TokenHonoringHandler()
+    {
+        return new StubHttpMessageHandler((req, ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return StubHttpMessageHandler.Json(new
+            {
+                name = "cancel-pkg",
+                version = "1.0.0",
+                license = "MIT",
+            });
+        });
+    }
+
+    [Theory]
+    [InlineData("nuget")]
+    [InlineData("npm")]
+    [InlineData("pypi")]
+    public async Task Should_ThrowOperationCanceled_When_TokenCanceled_Primary(string ecosystem)
+    {
+        using var http = ResolverTestHelpers.CreateClient(TokenHonoringHandler());
+        var resolver = ResolverTestHelpers.ResolveResolver(ecosystem, http);
+        var dep = new Dependency(ecosystem, "cancel-pkg", "1.0.0", false);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => resolver.ResolveAsync(dep, new CancellationToken(canceled: true)));
+    }
+
+    [Fact]
+    public async Task Should_ThrowOperationCanceled_When_TokenCanceled_Fallback()
+    {
+        using var http = ResolverTestHelpers.CreateClient(TokenHonoringHandler());
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("npm", http);
+        var dep = new Dependency("npm", "cancel-pkg", "1.0.0", false);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => resolver.ResolveAsync(dep, new CancellationToken(canceled: true)));
+    }
+
+    [Fact]
+    public async Task Should_ThrowOperationCanceled_When_TokenCanceled_Caching()
+    {
+        using var http = ResolverTestHelpers.CreateClient(TokenHonoringHandler());
+        var resolver = ResolverTestHelpers.ResolveCachingResolver("npm", http);
+        var dep = new Dependency("npm", "cancel-pkg-cached", "1.0.0", false);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => resolver.ResolveAsync(dep, new CancellationToken(canceled: true)));
+    }
+}
+
+/// <summary>
+/// Phase D4: the shared retry helper retries exactly once. Fail-once
+/// (HttpRequestException then valid payload) resolves; persistent 500 stays
+/// Unknown. Both cases issue exactly 2 HTTP calls.
+/// </summary>
+public sealed class RetryResolverTests
+{
+    [Fact]
+    public async Task Should_ResolveMit_When_TransientFailureThenSuccess()
+    {
+        var attempts = 0;
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            attempts++;
+            if (attempts == 1)
+            {
+                throw new HttpRequestException("transient transport failure");
+            }
+
+            return StubHttpMessageHandler.Json(new
+            {
+                name = "retry-pkg",
+                version = "1.0.0",
+                license = "MIT",
+            });
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("npm", http);
+        var dep = new Dependency("npm", "retry-pkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal(2, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_Always500()
+    {
+        var handler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.ServerError());
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("npm", http);
+        var dep = new Dependency("npm", "error-pkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.Equal(2, handler.CallCount);
+    }
+}

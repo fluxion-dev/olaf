@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Olaf.Core\Olaf.Core.csproj" />
+    <ProjectReference Include="..\..\src\Olaf.Formatters\Olaf.Formatters.csproj" />
     <ProjectReference Include="..\..\src\Olaf.Parsers\Olaf.Parsers.csproj" />
     <ProjectReference Include="..\..\src\Olaf.Resolvers\Olaf.Resolvers.csproj" />
   </ItemGroup>

@@ -16,47 +16,24 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
     {
         try
         {
-            var primary = CreatePrimary(dependency);
-            if (primary is not null)
-            {
-                var first = await primary.ResolveAsync(dependency, cancellationToken).ConfigureAwait(false);
-                if (first.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase) && first.SpdxId is not null)
-                {
-                    return first;
-                }
-            }
-
             return await QueryClearlyDefinedAsync(dependency, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "timeout: fallback request timed out.");
+            throw;
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: fallback request timed out: {ex.Message}");
         }
         catch (HttpRequestException ex)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"transport-error: {ex.Message}");
         }
-    }
-
-    private ILicenseResolver? CreatePrimary(Dependency dependency)
-    {
-        if (dependency.Ecosystem.Equals("nuget", StringComparison.OrdinalIgnoreCase))
+        catch (Exception ex)
         {
-            return new NuGetLicenseResolver(_http);
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
-
-        if (dependency.Ecosystem.Equals("npm", StringComparison.OrdinalIgnoreCase))
-        {
-            return new NpmLicenseResolver(_http);
-        }
-
-        if (dependency.Ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase)
-            || dependency.Ecosystem.Equals("pip", StringComparison.OrdinalIgnoreCase))
-        {
-            return new PyPILicenseResolver(_http);
-        }
-
-        return null;
     }
 
     private async Task<ResolvedLicense> QueryClearlyDefinedAsync(Dependency dependency, CancellationToken ct)
@@ -69,7 +46,7 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
 
         try
         {
-            using var response = await _http.GetAsync(definitionUrl, ct).ConfigureAwait(false);
+            using var response = await ResolverHttpRetry.GetAsync(_http, definitionUrl, ct).ConfigureAwait(false);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: no license for '{dependency.Name} {dependency.Version}' in registry or ClearlyDefined.");
@@ -90,9 +67,13 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
 
             return new ResolvedLicense(dependency, spdx, SpdxLicenseTexts.GetText(spdx), definitionUrl, "Resolved", null);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "timeout: ClearlyDefined request timed out.");
+            throw;
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: ClearlyDefined request timed out: {ex.Message}");
         }
         catch (HttpRequestException ex)
         {
@@ -101,6 +82,10 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
     }
 
