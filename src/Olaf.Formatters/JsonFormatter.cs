@@ -10,17 +10,28 @@ public sealed class JsonFormatter : ILicenseFormatter
     public string FormatResult(ScanResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var items = result.Licenses.Select(l => new
+        var items = FormatterSort.ByEcosystemNameVersion(result.Licenses)
+            .Select(l => new
+            {
+                ecosystem = l.Dependency.Ecosystem,
+                name = l.Dependency.Name,
+                version = l.Dependency.Version,
+                spdx = l.SpdxId,
+                licenseText = l.LicenseText,
+                sourceUrl = l.SourceUrl,
+                status = l.Status,
+                reason = l.Reason,
+            }).ToList();
+        var envelope = new
         {
-            ecosystem = l.Dependency.Ecosystem,
-            name = l.Dependency.Name,
-            version = l.Dependency.Version,
-            spdx = l.SpdxId,
-            licenseText = l.LicenseText,
-            sourceUrl = l.SourceUrl,
-            status = l.Status,
-            reason = l.Reason,
-        }).ToList();
-        return JsonSerializer.Serialize(items);
+            summary = new
+            {
+                total = result.TotalCount,
+                resolved = result.ResolvedCount,
+                unknown = result.UnknownCount,
+            },
+            licenses = items,
+        };
+        return JsonSerializer.Serialize(envelope);
     }
 }

@@ -6,10 +6,8 @@ using Olaf.Core;
 namespace Olaf.Tests.Formatters;
 
 /// <summary>
-/// TDD Red helpers for output formatters.
-/// The test assembly compiles while Olaf.Formatters is still empty:
-/// resolution is via reflection, missing impl throws NotImplementedException
-/// (the *right* Red failure, not a compile error). No formatter logic lives here.
+/// Shared helpers for output formatter tests.
+/// Resolution is via reflection against Olaf.Formatters.
 /// Contract under test: ILicenseFormatter.FormatResult(ScanResult) -> string.
 /// </summary>
 internal static class FormatterTestHelpers
@@ -29,7 +27,7 @@ internal static class FormatterTestHelpers
     /// Resolve an ILicenseFormatter for the given format. Matches on the
     /// <see cref="ILicenseFormatter.Format"/> property (case-insensitive),
     /// falling back to type-name convention (*JsonFormatter*, ...).
-    /// Throws NotImplementedException when the formatter is missing (Red).
+    /// Throws NotImplementedException when the formatter is missing.
     /// </summary>
     internal static ILicenseFormatter ResolveFormatter(string format)
     {
@@ -160,6 +158,125 @@ internal static class FormatterTestHelpers
             null),
     });
 
+    /// <summary>
+    /// Unsorted variant of <see cref="SampleScanResult"/> (mystery-pkg first).
+    /// Pins stable sort (ecosystem, name, version); asserted by sort-stability test.
+    /// </summary>
+    internal static ScanResult UnsortedSampleScanResult() => new(new List<ResolvedLicense>
+    {
+        new(
+            new Dependency("npm", "mystery-pkg", "1.0.0", false),
+            null,
+            null,
+            null,
+            "Unknown",
+            "not-found: no license for 'mystery-pkg 1.0.0'."),
+        new(
+            new Dependency("npm", "express", "4.18.2", false),
+            "MIT",
+            "MIT License\nPermission is hereby granted, free of charge,",
+            "https://example.com/express/LICENSE",
+            "Resolved",
+            null),
+    });
+
+    // Consistent report contract (8 fields) — wired into every mixed test.
+    internal static void AssertEightFieldsPresent(string output, string format)
+    {
+        Assert.NotNull(output);
+        switch (format.ToLowerInvariant())
+        {
+            case "json":
+            {
+                using var doc = JsonDocument.Parse(output);
+                var first = doc.RootElement.GetProperty("licenses").EnumerateArray().First();
+                foreach (var key in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason" })
+                {
+                    Assert.True(first.TryGetProperty(key, out _), $"JSON licenses[0] missing key '{key}'.");
+                }
+
+                break;
+            }
+
+            case "yaml":
+                foreach (var marker in new[] { "ecosystem:", "name:", "version:", "spdx:", "licenseText:", "sourceUrl:", "status:", "reason:" })
+                {
+                    Assert.Contains(marker, output, StringComparison.Ordinal);
+                }
+
+                break;
+            case "xml":
+            {
+                var doc = new XmlDocument();
+                doc.LoadXml(output);
+                foreach (var name in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason" })
+                {
+                    var nodes = doc.SelectNodes($"//{name}");
+                    Assert.NotNull(nodes);
+                    Assert.True(nodes.Count > 0, $"XML missing element '<{name}>'.");
+                }
+
+                break;
+            }
+
+            case "html":
+                foreach (var header in new[] { "<th>Ecosystem</th>", "<th>Name</th>", "<th>Version</th>", "<th>SPDX</th>", "<th>License</th>", "<th>Source</th>", "<th>Status</th>", "<th>Reason</th>" })
+                {
+                    Assert.Contains(header, output, StringComparison.Ordinal);
+                }
+
+                break;
+            default:
+                Assert.Fail($"Unknown format '{format}' in AssertEightFieldsPresent.");
+                break;
+        }
+    }
+
+    // Summary counts — wired into every mixed/empty test. Format is
+    // detected from the output shape (json object vs xml vs html vs yaml).
+    internal static void AssertSummaryCounts(string output, int total = 2, int resolved = 1, int unknown = 1)
+    {
+        Assert.NotNull(output);
+        var trimmed = output.TrimStart();
+        if (trimmed.StartsWith('{'))
+        {
+            using var doc = JsonDocument.Parse(output);
+            var summary = doc.RootElement.GetProperty("summary");
+            Assert.Equal(total, summary.GetProperty("total").GetInt32());
+            Assert.Equal(resolved, summary.GetProperty("resolved").GetInt32());
+            Assert.Equal(unknown, summary.GetProperty("unknown").GetInt32());
+        }
+        else if (trimmed.StartsWith('<'))
+        {
+            // HTML envelope first: summary rendered as paragraph text (not XML).
+            if (output.Contains("<html", StringComparison.OrdinalIgnoreCase)
+                || output.Contains("<!DOCTYPE", StringComparison.OrdinalIgnoreCase)
+                || output.Contains("<table", StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.Contains($"Total: {total}", output, StringComparison.Ordinal);
+                Assert.Contains($"Resolved: {resolved}", output, StringComparison.Ordinal);
+                Assert.Contains($"Unknown: {unknown}", output, StringComparison.Ordinal);
+                return;
+            }
+
+            var doc = new XmlDocument();
+            doc.LoadXml(output);
+            var summary = doc.SelectSingleNode("/report/summary");
+            Assert.NotNull(summary);
+            Assert.Equal(total.ToString(), summary.Attributes!["total"]!.Value);
+            Assert.Equal(resolved.ToString(), summary.Attributes!["resolved"]!.Value);
+            Assert.Equal(unknown.ToString(), summary.Attributes!["unknown"]!.Value);
+        }
+        else
+        {
+            // YAML envelope: summary mapping with total:/resolved:/unknown:.
+            Assert.Contains("summary:", output, StringComparison.Ordinal);
+            Assert.Contains($"total: {total}", output, StringComparison.Ordinal);
+            Assert.Contains($"resolved: {resolved}", output, StringComparison.Ordinal);
+            Assert.Contains($"unknown: {unknown}", output, StringComparison.Ordinal);
+        }
+    }
+
     private static ILicenseFormatter? TryCreate(Type type)
     {
         try
@@ -190,7 +307,7 @@ internal static class FormatterTestHelpers
 }
 
 /// <summary>
-/// TDD Red: JsonFormatter. No live network — ScanResult is constructed directly.
+/// JsonFormatter: no live network — ScanResult is constructed directly.
 /// </summary>
 public sealed class JsonFormatterTests
 {
@@ -208,26 +325,55 @@ public sealed class JsonFormatterTests
         Assert.Contains("mystery-pkg", output, StringComparison.Ordinal);
         Assert.Contains("Unknown", output, StringComparison.Ordinal);
         Assert.Contains("Permission is hereby granted", output, StringComparison.Ordinal);
+
+        // Envelope (summary + licenses) with 8-column rows.
+        var summary = doc.RootElement.GetProperty("summary");
+        Assert.Equal(2, summary.GetProperty("total").GetInt32());
+        Assert.Equal(1, summary.GetProperty("resolved").GetInt32());
+        Assert.Equal(1, summary.GetProperty("unknown").GetInt32());
+        var licenses = doc.RootElement.GetProperty("licenses").EnumerateArray().ToList();
+        Assert.Equal(2, licenses.Count);
+        var first = licenses[0];
+        foreach (var key in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason" })
+        {
+            Assert.True(first.TryGetProperty(key, out _), $"licenses[0] missing key '{key}'.");
+        }
+
+        Assert.Equal("npm", first.GetProperty("ecosystem").GetString());
+        Assert.Equal("https://example.com/express/LICENSE", first.GetProperty("sourceUrl").GetString());
+        Assert.Equal("not-found: no license for 'mystery-pkg 1.0.0'.", licenses[1].GetProperty("reason").GetString());
+
+        FormatterTestHelpers.AssertEightFieldsPresent(output, "json");
+        FormatterTestHelpers.AssertSummaryCounts(output);
     }
 
     [Fact]
     public void Should_ProduceEmptyArray_When_ScanResultEmpty()
     {
+        // Empty result is an envelope with zero summary counts and empty
+        // licenses, NOT a root array.
         var formatter = FormatterTestHelpers.ResolveFormatter("json");
 
         var output = formatter.FormatResult(ScanResult.Empty);
 
         using var doc = JsonDocument.Parse(output); // throws if not valid JSON
-        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
-        Assert.Equal(0, doc.RootElement.GetArrayLength());
+        Assert.Equal(JsonValueKind.Object, doc.RootElement.ValueKind);
+        var summary = doc.RootElement.GetProperty("summary");
+        Assert.Equal(0, summary.GetProperty("total").GetInt32());
+        Assert.Equal(0, summary.GetProperty("resolved").GetInt32());
+        Assert.Equal(0, summary.GetProperty("unknown").GetInt32());
+        var licenses = doc.RootElement.GetProperty("licenses");
+        Assert.Equal(JsonValueKind.Array, licenses.ValueKind);
+        Assert.Equal(0, licenses.GetArrayLength());
+
+        FormatterTestHelpers.AssertSummaryCounts(output, total: 0, resolved: 0, unknown: 0);
     }
 }
 
 /// <summary>
-/// TDD Red: YamlFormatter. Structural assertions only (no extra YAML dep):
+/// YamlFormatter: structural assertions only (no extra YAML dep):
 /// output must be non-empty multi-line text with mapping markers carrying
-/// every field of the mixed fixture. A real YAML parse check belongs to the
-/// Green phase once a YAML library is referenced.
+/// every field of the mixed fixture.
 /// </summary>
 public sealed class YamlFormatterTests
 {
@@ -247,6 +393,18 @@ public sealed class YamlFormatterTests
         Assert.Contains("mystery-pkg", output, StringComparison.Ordinal);
         Assert.Contains("Unknown", output, StringComparison.Ordinal);
         Assert.Contains("Permission is hereby granted", output, StringComparison.Ordinal);
+
+        // Envelope summary + 8-column row markers.
+        Assert.Contains("summary:", output, StringComparison.Ordinal);
+        Assert.Contains("total: 2", output, StringComparison.Ordinal);
+        Assert.Contains("resolved: 1", output, StringComparison.Ordinal);
+        Assert.Contains("unknown: 1", output, StringComparison.Ordinal);
+        Assert.Contains("ecosystem:", output, StringComparison.Ordinal);
+        Assert.Contains("sourceUrl:", output, StringComparison.Ordinal);
+        Assert.Contains("reason:", output, StringComparison.Ordinal);
+
+        FormatterTestHelpers.AssertEightFieldsPresent(output, "yaml");
+        FormatterTestHelpers.AssertSummaryCounts(output);
     }
 
     [Fact]
@@ -258,11 +416,19 @@ public sealed class YamlFormatterTests
 
         Assert.NotNull(output);
         Assert.DoesNotContain("express", output, StringComparison.Ordinal);
+        // Empty envelope parses (summary zeros, no license rows).
+        Assert.Contains("summary:", output, StringComparison.Ordinal);
+        Assert.Contains("total: 0", output, StringComparison.Ordinal);
+        Assert.Contains("resolved: 0", output, StringComparison.Ordinal);
+        Assert.Contains("unknown: 0", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("ecosystem:", output, StringComparison.Ordinal);
+
+        FormatterTestHelpers.AssertSummaryCounts(output, total: 0, resolved: 0, unknown: 0);
     }
 }
 
 /// <summary>
-/// TDD Red: XmlFormatter. Well-formedness is verified with XmlDocument (in-box).
+/// XmlFormatter: well-formedness is verified with XmlDocument (in-box).
 /// </summary>
 public sealed class XmlFormatterTests
 {
@@ -281,6 +447,25 @@ public sealed class XmlFormatterTests
         Assert.Contains("MIT", output, StringComparison.Ordinal);
         Assert.Contains("mystery-pkg", output, StringComparison.Ordinal);
         Assert.Contains("Unknown", output, StringComparison.Ordinal);
+
+        // <summary> counts + 8 element names via SelectNodes.
+        Assert.Contains("<summary", output, StringComparison.Ordinal);
+        var summary = doc.SelectSingleNode("/report/summary");
+        Assert.NotNull(summary);
+        Assert.Equal("2", summary.Attributes!["total"]!.Value);
+        Assert.Equal("1", summary.Attributes!["resolved"]!.Value);
+        Assert.Equal("1", summary.Attributes!["unknown"]!.Value);
+        foreach (var name in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason" })
+        {
+            var nodes = doc.SelectNodes($"//{name}");
+            Assert.NotNull(nodes);
+            Assert.True(nodes.Count > 0, $"Missing element '<{name}>'.");
+        }
+
+        Assert.Equal(2, doc.SelectNodes("//license")!.Count);
+
+        FormatterTestHelpers.AssertEightFieldsPresent(output, "xml");
+        FormatterTestHelpers.AssertSummaryCounts(output);
     }
 
     [Fact]
@@ -294,11 +479,20 @@ public sealed class XmlFormatterTests
         doc.LoadXml(output); // empty must still be well-formed XML
         Assert.NotNull(doc.DocumentElement);
         Assert.DoesNotContain("express", output, StringComparison.Ordinal);
+        // Empty envelope well-formed with zero counts, no rows.
+        var summary = doc.SelectSingleNode("/report/summary");
+        Assert.NotNull(summary);
+        Assert.Equal("0", summary.Attributes!["total"]!.Value);
+        Assert.Equal("0", summary.Attributes!["resolved"]!.Value);
+        Assert.Equal("0", summary.Attributes!["unknown"]!.Value);
+        Assert.Equal(0, doc.SelectNodes("//license")!.Count);
+
+        FormatterTestHelpers.AssertSummaryCounts(output, total: 0, resolved: 0, unknown: 0);
     }
 }
 
 /// <summary>
-/// TDD Red: HtmlFormatter.
+/// HtmlFormatter.
 /// </summary>
 public sealed class HtmlFormatterTests
 {
@@ -317,6 +511,18 @@ public sealed class HtmlFormatterTests
         Assert.Contains("4.18.2", output, StringComparison.Ordinal);
         Assert.Contains("MIT", output, StringComparison.Ordinal);
         Assert.Contains("mystery-pkg", output, StringComparison.Ordinal);
+
+        // Full 8-column headers + summary + encoded sourceUrl/reason.
+        Assert.Contains("<th>Ecosystem</th>", output, StringComparison.Ordinal);
+        Assert.Contains("<th>Reason</th>", output, StringComparison.Ordinal);
+        Assert.Contains("Total: 2", output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: 1", output, StringComparison.Ordinal);
+        Assert.Contains("Unknown: 1", output, StringComparison.Ordinal);
+        Assert.Contains(System.Net.WebUtility.HtmlEncode("https://example.com/express/LICENSE"), output, StringComparison.Ordinal);
+        Assert.Contains(System.Net.WebUtility.HtmlEncode("not-found: no license for 'mystery-pkg 1.0.0'."), output, StringComparison.Ordinal);
+
+        FormatterTestHelpers.AssertEightFieldsPresent(output, "html");
+        FormatterTestHelpers.AssertSummaryCounts(output);
     }
 
     [Fact]
@@ -339,11 +545,34 @@ public sealed class HtmlFormatterTests
 
         Assert.Contains("<table", output, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("express", output, StringComparison.Ordinal);
+        // Empty envelope keeps table with zero-count summary.
+        Assert.Contains("Total: 0", output, StringComparison.Ordinal);
+
+        FormatterTestHelpers.AssertSummaryCounts(output, total: 0, resolved: 0, unknown: 0);
+    }
+
+    [Theory]
+    [InlineData("json")]
+    [InlineData("yaml")]
+    [InlineData("xml")]
+    [InlineData("html")]
+    public void Should_SortByEcosystemNameVersion_When_InputUnsorted(string format)
+    {
+        // Stable sort (ecosystem, name, version) — express before mystery-pkg in every format.
+        var formatter = FormatterTestHelpers.ResolveFormatter(format);
+
+        var output = formatter.FormatResult(FormatterTestHelpers.UnsortedSampleScanResult());
+
+        var express = output.IndexOf("express", StringComparison.Ordinal);
+        var mystery = output.IndexOf("mystery-pkg", StringComparison.Ordinal);
+        Assert.True(express >= 0, $"[{format}] missing 'express'.");
+        Assert.True(mystery >= 0, $"[{format}] missing 'mystery-pkg'.");
+        Assert.True(express < mystery, $"[{format}] expected 'express' before 'mystery-pkg'.");
     }
 }
 
 /// <summary>
-/// TDD Red: FormatterRegistry backs --format json|yaml|xml|html selection.
+/// FormatterRegistry backs --format json|yaml|xml|html selection.
 /// </summary>
 public sealed class FormatterRegistryTests
 {
@@ -369,7 +598,7 @@ public sealed class FormatterRegistryTests
         }
         catch (NotImplementedException)
         {
-            throw; // Red: registry missing — fail with NotImplemented, not a pass.
+            throw; // Registry missing — fail with NotImplemented, not a pass.
         }
         catch
         {
