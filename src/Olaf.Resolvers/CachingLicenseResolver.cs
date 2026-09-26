@@ -115,6 +115,12 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new CargoLicenseResolver(_http);
         }
 
+        if (dependency.Ecosystem.Equals("maven", StringComparison.OrdinalIgnoreCase)
+            || dependency.Ecosystem.Equals("gradle", StringComparison.OrdinalIgnoreCase))
+        {
+            return new MavenLicenseResolver(_http);
+        }
+
         return null;
     }
 }
