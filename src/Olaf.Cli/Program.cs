@@ -40,16 +40,27 @@ var quietOption = new Option<bool>("--quiet")
 {
     Description = "Suppress informational logging",
 };
+var allowOption = new Option<string?>("--allow")
+{
+    Description = "Comma-separated SPDX allow-list; strict-gate fails licenses not in the list",
+};
+var denyOption = new Option<string?>("--deny")
+{
+    Description = "Comma-separated SPDX deny-list; strict-gate fails licenses in the list",
+};
 
 var rootCommand = new RootCommand($"""
     olaf license scanner
     Scans {SupportedEcosystems} projects, resolves licenses, and writes a report to stdout or a file.
+    Strict policy gate: --strict fails (exit 1) on unknown licenses; --allow/--deny filter by SPDX (strict-gate semantics).
 
     Examples:
       olaf --input package.json
       olaf --input ./src --out report.json --format yaml
       olaf --input ./src --ecosystem npm
       olaf --input package.json --strict
+      olaf --input package.json --strict --allow MIT,Apache-2.0
+      olaf --input package.json --strict --deny GPL-2.0-only,GPL-3.0-only
       olaf --input ./src --out nested/dir/out.json
     """)
 {
@@ -58,6 +69,8 @@ var rootCommand = new RootCommand($"""
     outOption,
     forceOption,
     strictOption,
+    allowOption,
+    denyOption,
     ecosystemOption,
     verboseOption,
     quietOption,
@@ -73,8 +86,44 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var ecosystem = parseResult.GetValue(ecosystemOption);
     var verbose = parseResult.GetValue(verboseOption);
     var quiet = parseResult.GetValue(quietOption);
+    var allowRaw = parseResult.GetValue(allowOption);
+    var denyRaw = parseResult.GetValue(denyOption);
 
-    void Log(string message)
+    static HashSet<string> ParseSpdxSet(string? csv)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return set;
+        }
+
+        foreach (var entry in csv.Split(','))
+        {
+            var trimmed = entry.Trim();
+            if (trimmed.Length > 0)
+            {
+                set.Add(trimmed);
+            }
+        }
+
+        return set;
+    }
+
+    static bool IsSupportedEcosystem(string? ecosystem)
+    {
+        return ecosystem is not null
+            && (ecosystem.Equals("npm", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("nuget", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("pip", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase));
+    }
+
+    var allowed = ParseSpdxSet(allowRaw);
+    var denied = ParseSpdxSet(denyRaw);
+    var hasAllow = allowed.Count > 0;
+    var hasDeny = denied.Count > 0;
+
+    void LogVerbose(string message)
     {
         if (verbose && !quiet)
         {
@@ -94,11 +143,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         return 2;
     }
 
-    if (ecosystem is not null
-        && !ecosystem.Equals("npm", StringComparison.OrdinalIgnoreCase)
-        && !ecosystem.Equals("nuget", StringComparison.OrdinalIgnoreCase)
-        && !ecosystem.Equals("pip", StringComparison.OrdinalIgnoreCase)
-        && !ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase))
+    if (ecosystem is not null && !IsSupportedEcosystem(ecosystem))
     {
         Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip.");
         return 2;
@@ -132,7 +177,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         return 2;
     }
 
-    Log($"Scanning '{input}'... found {dependencies.Count} dependencies.");
+    LogVerbose($"Scanning '{input}'... found {dependencies.Count} dependencies.");
 
     using var http = new HttpClient
     {
@@ -200,7 +245,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var resolved = new List<ResolvedLicense>(results);
     foreach (var license in results)
     {
-        Log($"Resolved {license.Dependency.Ecosystem}:{license.Dependency.Name}@{license.Dependency.Version} -> {license.Status}");
+        LogVerbose($"Resolved {FormatDependency(license.Dependency)} -> {license.Status}");
     }
 
     var scanResult = new ScanResult(resolved);
@@ -232,9 +277,84 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         Console.Out.Write(output);
     }
 
-    if (strict && resolved.Any(r => r.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase)))
+    static bool IsStrictViolation(bool strict, List<ResolvedLicense> licenses)
     {
-        Console.Error.WriteLine("Strict mode: unknown licenses found.");
+        return strict && licenses.Any(r => r.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
+    }
+
+    static string EffectiveSpdx(ResolvedLicense license)
+    {
+        if (!string.IsNullOrWhiteSpace(license.SpdxId))
+        {
+            return license.SpdxId.Trim();
+        }
+
+        return "Unknown";
+    }
+
+    static string FormatDependency(Dependency dependency)
+    {
+        return $"{dependency.Ecosystem}:{dependency.Name}@{dependency.Version}";
+    }
+
+    static string FormatOffender(ResolvedLicense license)
+    {
+        return $"{FormatDependency(license.Dependency)} -> {EffectiveSpdx(license)}";
+    }
+
+    static bool IsPolicyOffender(ResolvedLicense license, bool enforceUnknown, HashSet<string> allowed, HashSet<string> denied)
+    {
+        var effective = EffectiveSpdx(license);
+        var isUnknown = license.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase);
+        var hasAllow = allowed.Count > 0;
+        var hasDeny = denied.Count > 0;
+        if (hasAllow && !allowed.Contains(effective))
+        {
+            return true;
+        }
+
+        if (hasDeny && denied.Contains(effective))
+        {
+            return true;
+        }
+
+        if (enforceUnknown && isUnknown && !(hasAllow && allowed.Contains(effective)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Default gate (no allow/deny): preserve exact strict message + exit 1.
+    if (!hasAllow && !hasDeny)
+    {
+        if (IsStrictViolation(strict, resolved))
+        {
+            Console.Error.WriteLine("Strict mode: unknown licenses found.");
+            return 1;
+        }
+
+        return 0;
+    }
+
+    // Allow/deny gate (report already written above — report-write-first order).
+    var policyEnforced = strict || hasAllow || hasDeny;
+    if (!strict)
+    {
+        Console.Error.WriteLine("Warning: --allow/--deny without --strict; applying policy gate.");
+    }
+
+    var offenders = resolved.Where(r => IsPolicyOffender(r, policyEnforced, allowed, denied)).ToList();
+    if (offenders.Count > 0)
+    {
+        Console.Error.WriteLine("Strict mode: policy gate violations found.");
+        foreach (var offender in offenders)
+        {
+            Console.Error.WriteLine(FormatOffender(offender));
+        }
+
+        Console.Error.WriteLine($"{offenders.Count} offender(s) found.");
         return 1;
     }
 
