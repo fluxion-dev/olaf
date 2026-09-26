@@ -4,18 +4,21 @@ using Olaf.Formatters;
 using Olaf.Parsers;
 using Olaf.Resolvers;
 
+const string SupportedFormats = "json|yaml|xml|html";
+const string SupportedEcosystems = "npm|nuget|pip";
+
 var inputOption = new Option<string?>("--input")
 {
     Description = "Input file or directory to scan",
 };
 var formatOption = new Option<string>("--format")
 {
-    Description = "Output format: json|yaml|xml|html",
+    Description = $"Output format: {SupportedFormats} (default: json)",
     DefaultValueFactory = _ => "json",
 };
 var outOption = new Option<string?>("--out")
 {
-    Description = "Output file path (default: stdout)",
+    Description = "Output file path (default: stdout; parent directories are created)",
 };
 var forceOption = new Option<bool>("--force")
 {
@@ -27,7 +30,7 @@ var strictOption = new Option<bool>("--strict")
 };
 var ecosystemOption = new Option<string?>("--ecosystem")
 {
-    Description = "Limit scan to ecosystem: npm|nuget|pip",
+    Description = $"Limit scan to ecosystem: {SupportedEcosystems} (pypi alias for pip)",
 };
 var verboseOption = new Option<bool>("--verbose")
 {
@@ -38,7 +41,17 @@ var quietOption = new Option<bool>("--quiet")
     Description = "Suppress informational logging",
 };
 
-var rootCommand = new RootCommand("olaf license scanner")
+var rootCommand = new RootCommand($"""
+    olaf license scanner
+    Scans {SupportedEcosystems} projects, resolves licenses, and writes a report to stdout or a file.
+
+    Examples:
+      olaf --input package.json
+      olaf --input ./src --out report.json --format yaml
+      olaf --input ./src --ecosystem npm
+      olaf --input package.json --strict
+      olaf --input ./src --out nested/dir/out.json
+    """)
 {
     inputOption,
     formatOption,
@@ -197,6 +210,11 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     {
         try
         {
+            if (Path.GetDirectoryName(outPath) is { Length: > 0 } parent)
+            {
+                Directory.CreateDirectory(parent);
+            }
+
             await File.WriteAllTextAsync(outPath, output, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)

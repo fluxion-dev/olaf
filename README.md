@@ -1,10 +1,24 @@
 # olaf
 
-License scanner scaffold (greenfield, no feature logic yet).
+License scanner: scans `npm|nuget|pip` projects, resolves licenses, writes a report to stdout or a file.
 
 ```bash
 dotnet run --project src/Olaf.Cli -- --help
+dotnet run --project src/Olaf.Cli -- --version
 ```
+
+## Usage
+
+```bash
+dotnet run --project src/Olaf.Cli -- --input package.json
+dotnet run --project src/Olaf.Cli -- --input ./src --out report.json --format yaml
+dotnet run --project src/Olaf.Cli -- --input ./src --ecosystem npm
+dotnet run --project src/Olaf.Cli -- --input package.json --strict
+dotnet run --project src/Olaf.Cli -- --input ./src --out nested/dir/out.json
+```
+
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html` (default `json`), `--out <file>` (default stdout), `--force`, `--strict`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+`--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 
 ## Reliability
 
@@ -38,4 +52,16 @@ Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `l
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
 ```
 
-Flags: `--format json|yaml|xml|html` (default `json`), `--ecosystem npm|nuget|pip`. Exit codes: `0` success, `1` `--strict` found unknown licenses, `2` usage/IO error (missing input, bad flag, unwritable `--out`).
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
+| `1` | `--strict` found unresolved/`Unknown` licenses |
+| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, scan/write failure |
+
+## Output contract
+
+- Report goes to stdout when `--out` is omitted (machine-parseable; e.g. stdout is pure JSON with `--format json`).
+- When `--out <file>` is given the report goes to the file and stdout stays empty.
+- Errors, the `--strict` notice, and `--verbose` logs go to stderr; `--version` prints to stdout.
