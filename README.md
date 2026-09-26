@@ -2,26 +2,43 @@
 
 License scanner: scans `npm|nuget|pip` projects, resolves licenses, writes a report to stdout or a file.
 
+Supported ecosystems: `npm|nuget|pip` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html`.
+Planned (#10): `txt|md` are NOT yet supported — `--format txt|md` exits `2` (`Unsupported format 'txt'. Supported: json|yaml|xml|html.`).
+
+## Tool install
+
 ```bash
-dotnet run --project src/Olaf.Cli -- --help
-dotnet run --project src/Olaf.Cli -- --version
+dotnet pack src/Olaf.Cli -c Release
+dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.1
+olaf --help
 ```
+
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 113 passing (`dotnet test`).
 
 ## Usage
 
 ```bash
+# stdout (default json)
 dotnet run --project src/Olaf.Cli -- --input package.json
+# file (parent dirs auto-created; fails if exists unless --force)
 dotnet run --project src/Olaf.Cli -- --input ./src --out report.json --format yaml
-dotnet run --project src/Olaf.Cli -- --input ./src --ecosystem npm
+# strict gate (exit 1 on Unknown)
 dotnet run --project src/Olaf.Cli -- --input package.json --strict
+# allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
-dotnet run --project src/Olaf.Cli -- --input package.json --strict --deny GPL-2.0-only
-dotnet run --project src/Olaf.Cli -- --input ./src --out nested/dir/out.json
 ```
 
 Flags: `--input <file|dir>`, `--format json|yaml|xml|html` (default `json`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
+
+`--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
+
+```text
+--format <format>        Output format: json|yaml|xml|html (default: json) [default: json]
+--ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip (pypi alias for pip)
+--strict                 Fail on unresolved or unknown licenses
+```
 
 ## Reliability
 
