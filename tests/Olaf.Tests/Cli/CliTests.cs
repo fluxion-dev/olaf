@@ -299,4 +299,69 @@ public sealed class CliEndToEndTests
 
         Assert.Equal(2, result.ExitCode);
     }
+
+    [Fact]
+    public void Should_Help_DocumentsAllFlagsAndExamples()
+    {
+        var result = CliTestHelpers.RunCli("--help");
+
+        Assert.Equal(0, result.ExitCode);
+        var combined = result.Stdout + result.Stderr;
+        Assert.Contains("--input", combined, StringComparison.Ordinal);
+        Assert.Contains("--format", combined, StringComparison.Ordinal);
+        Assert.Contains("--out", combined, StringComparison.Ordinal);
+        Assert.Contains("--force", combined, StringComparison.Ordinal);
+        Assert.Contains("--strict", combined, StringComparison.Ordinal);
+        Assert.Contains("--ecosystem", combined, StringComparison.Ordinal);
+        Assert.Contains("--verbose", combined, StringComparison.Ordinal);
+        Assert.Contains("--quiet", combined, StringComparison.Ordinal);
+        Assert.Contains("--version", combined, StringComparison.Ordinal);
+        Assert.Contains("Examples:", combined, StringComparison.Ordinal);
+        Assert.Contains("olaf --input", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_Version_PrintsVersionAndExitsZero()
+    {
+        var result = CliTestHelpers.RunCli("--version");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+        Assert.Contains(".", result.Stdout.Trim(), StringComparison.Ordinal);
+        Assert.True(string.IsNullOrEmpty(result.Stderr));
+    }
+
+    [Fact]
+    public void Should_Exit2_When_EcosystemUnsupported()
+    {
+        var input = CliTestHelpers.FixturePath("npm", "package.json");
+
+        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "maven");
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_CreateParentDirs_When_OutNestedMissing()
+    {
+        var tempDir = CliTestHelpers.CreateTempDir();
+        try
+        {
+            var input = CliTestHelpers.FixturePath("npm", "package.json");
+            var outFile = Path.Combine(tempDir, "a", "b", "out.json");
+
+            var result = CliTestHelpers.RunCli("--input", input, "--out", outFile);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.True(File.Exists(outFile));
+            var content = File.ReadAllText(outFile);
+            using var doc = JsonDocument.Parse(content);
+            Assert.True(string.IsNullOrWhiteSpace(result.Stdout));
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(tempDir);
+        }
+    }
 }
