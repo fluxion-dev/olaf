@@ -556,6 +556,9 @@ public sealed class HtmlFormatterTests
     [InlineData("yaml")]
     [InlineData("xml")]
     [InlineData("html")]
+    [InlineData("txt")]
+    [InlineData("md")]
+    [InlineData("markdown")]
     public void Should_SortByEcosystemNameVersion_When_InputUnsorted(string format)
     {
         // Stable sort (ecosystem, name, version) — express before mystery-pkg in every format.
@@ -581,12 +584,23 @@ public sealed class FormatterRegistryTests
     [InlineData("yaml")]
     [InlineData("xml")]
     [InlineData("html")]
+    [InlineData("txt")]
+    [InlineData("md")]
     public void Should_ResolveFormatter_When_FormatSupported(string format)
     {
         var formatter = FormatterTestHelpers.GetFormatterViaRegistry(format);
 
         Assert.NotNull(formatter);
         Assert.Equal(format, formatter.Format, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Should_ResolveMarkdownAlias_When_FormatIsMarkdown()
+    {
+        var formatter = FormatterTestHelpers.GetFormatterViaRegistry("markdown");
+
+        Assert.NotNull(formatter);
+        Assert.Equal("md", formatter.Format, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -606,5 +620,122 @@ public sealed class FormatterRegistryTests
         }
 
         Assert.Fail("Expected error for unsupported format 'toml'.");
+    }
+}
+
+/// <summary>
+/// TxtFormatter: human-readable per-package blocks with header summary.
+/// </summary>
+public sealed class TxtFormatterTests
+{
+    [Fact]
+    public void Should_ProduceBlocksWithSummary_When_ScanResultHasMixedLicenses()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("txt");
+
+        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
+
+        Assert.False(string.IsNullOrWhiteSpace(output));
+        // Header summary.
+        Assert.Contains("Total: 2", output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: 1", output, StringComparison.Ordinal);
+        Assert.Contains("Unknown: 1", output, StringComparison.Ordinal);
+        // Per-package blocks: name@version (ecosystem).
+        Assert.Contains("express@4.18.2 (npm)", output, StringComparison.Ordinal);
+        Assert.Contains("mystery-pkg@1.0.0 (npm)", output, StringComparison.Ordinal);
+        // SPDX + source + status/reason coverage (8-field contract in text form).
+        Assert.Contains("MIT", output, StringComparison.Ordinal);
+        Assert.Contains("https://example.com/express/LICENSE", output, StringComparison.Ordinal);
+        Assert.Contains("Resolved", output, StringComparison.Ordinal);
+        Assert.Contains("Unknown", output, StringComparison.Ordinal);
+        Assert.Contains("not-found: no license for 'mystery-pkg 1.0.0'.", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_FallbackToUnknown_When_SpdxIsNull()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("txt");
+
+        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
+
+        // mystery-pkg has null SpdxId — the SPDX line must fall back to Unknown.
+        var block = output.Substring(output.IndexOf("mystery-pkg@1.0.0", StringComparison.Ordinal));
+        Assert.Contains("SPDX: Unknown", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_ProduceHeaderOnly_When_ScanResultEmpty()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("txt");
+
+        var output = formatter.FormatResult(ScanResult.Empty);
+
+        Assert.Contains("Total: 0", output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: 0", output, StringComparison.Ordinal);
+        Assert.Contains("Unknown: 0", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("express", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("@", output, StringComparison.Ordinal);
+    }
+}
+
+/// <summary>
+/// MarkdownFormatter: # Third-Party Attribution header, summary, table plus
+/// per-package sections carrying all 8 fields.
+/// </summary>
+public sealed class MarkdownFormatterTests
+{
+    [Fact]
+    public void Should_ProduceAttributionDoc_When_ScanResultHasMixedLicenses()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("md");
+
+        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
+
+        Assert.False(string.IsNullOrWhiteSpace(output));
+        Assert.Contains("# Third-Party Attribution", output, StringComparison.Ordinal);
+        Assert.Contains("Total: 2", output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: 1", output, StringComparison.Ordinal);
+        Assert.Contains("Unknown: 1", output, StringComparison.Ordinal);
+        // Table headers cover the 8-field contract.
+        foreach (var header in new[] { "Ecosystem", "Name", "Version", "SPDX", "License", "Source", "Status", "Reason" })
+        {
+            Assert.Contains(header, output, StringComparison.Ordinal);
+        }
+
+        // Per-package sections.
+        Assert.Contains("## express@4.18.2 (npm)", output, StringComparison.Ordinal);
+        Assert.Contains("## mystery-pkg@1.0.0 (npm)", output, StringComparison.Ordinal);
+        Assert.Contains("MIT", output, StringComparison.Ordinal);
+        Assert.Contains("https://example.com/express/LICENSE", output, StringComparison.Ordinal);
+        Assert.Contains("not-found: no license for 'mystery-pkg 1.0.0'.", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_FallbackToUnknown_When_SpdxIsNull()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("md");
+
+        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
+
+        // mystery-pkg has null SpdxId — table row and section must show Unknown.
+        Assert.Contains("Unknown", output, StringComparison.Ordinal);
+        var section = output.Substring(output.IndexOf("## mystery-pkg@", StringComparison.Ordinal));
+        Assert.Contains("SPDX: Unknown", section, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_ProduceHeaderOnly_When_ScanResultEmpty()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("md");
+
+        var output = formatter.FormatResult(ScanResult.Empty);
+
+        Assert.Contains("# Third-Party Attribution", output, StringComparison.Ordinal);
+        Assert.Contains("Total: 0", output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: 0", output, StringComparison.Ordinal);
+        Assert.Contains("Unknown: 0", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("express", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("##", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("| npm |", output, StringComparison.Ordinal);
     }
 }

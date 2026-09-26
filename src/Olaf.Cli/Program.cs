@@ -4,7 +4,7 @@ using Olaf.Formatters;
 using Olaf.Parsers;
 using Olaf.Resolvers;
 
-const string SupportedFormats = "json|yaml|xml|html";
+const string SupportedFormats = "json|yaml|xml|html|txt|md";
 const string SupportedEcosystems = "npm|nuget|pip";
 
 var inputOption = new Option<string?>("--input")
@@ -156,7 +156,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     }
     catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
     {
-        Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html.");
+        Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md.");
         return 2;
     }
 

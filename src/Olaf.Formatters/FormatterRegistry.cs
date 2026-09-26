@@ -13,7 +13,10 @@ public sealed class FormatterRegistry
             "yaml" => new YamlFormatter(),
             "xml" => new XmlFormatter(),
             "html" => new HtmlFormatter(),
-            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html.", nameof(format)),
+            "txt" => new TxtFormatter(),
+            "md" => new MarkdownFormatter(),
+            "markdown" => new MarkdownFormatter(),
+            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md.", nameof(format)),
         };
     }
 }

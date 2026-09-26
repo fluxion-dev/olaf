@@ -145,6 +145,44 @@ public sealed class CliEndToEndTests
         Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Should_OutputTxtToStdout_When_FormatTxt()
+    {
+        var input = CliTestHelpers.FixturePath("npm", "package.json");
+
+        var result = CliTestHelpers.RunCli("--input", input, "--format", "txt");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+        Assert.Contains("Total:", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("express@", result.Stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_OutputMarkdownToStdout_When_FormatMd()
+    {
+        var input = CliTestHelpers.FixturePath("npm", "package.json");
+
+        var result = CliTestHelpers.RunCli("--input", input, "--format", "md");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+        Assert.Contains("# Third-Party Attribution", result.Stdout, StringComparison.Ordinal);
+        Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_OutputMarkdownToStdout_When_FormatMarkdownAlias()
+    {
+        var input = CliTestHelpers.FixturePath("npm", "package.json");
+
+        var result = CliTestHelpers.RunCli("--input", input, "--format", "markdown");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+        Assert.Contains("# Third-Party Attribution", result.Stdout, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
