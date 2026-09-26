@@ -1,0 +1,8 @@
+platform :ios, '16.0'
+source 'https://cdn.cocoapods.org/'
+
+target 'OlafFixture' do
+  pod 'Alamofire', '~> 5.8'
+  pod "SnapKit", "5.6.0"
+  pod 'SwiftyJSON'
+end

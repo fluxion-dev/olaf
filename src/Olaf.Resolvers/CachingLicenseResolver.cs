@@ -132,6 +132,16 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new BundlerLicenseResolver(_http);
         }
 
+        if (dependency.Ecosystem.Equals("swift", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SwiftLicenseResolver(_http);
+        }
+
+        if (dependency.Ecosystem.Equals("cocoapods", StringComparison.OrdinalIgnoreCase))
+        {
+            return new CocoaPodsLicenseResolver(_http);
+        }
+
         return null;
     }
 }
