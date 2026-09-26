@@ -105,6 +105,16 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new PyPILicenseResolver(_http);
         }
 
+        if (dependency.Ecosystem.Equals("go", StringComparison.OrdinalIgnoreCase))
+        {
+            return new GoLicenseResolver(_http);
+        }
+
+        if (dependency.Ecosystem.Equals("cargo", StringComparison.OrdinalIgnoreCase))
+        {
+            return new CargoLicenseResolver(_http);
+        }
+
         return null;
     }
 }

@@ -1,8 +1,8 @@
 # olaf
 
-License scanner: scans `npm|nuget|pip` projects, resolves licenses, writes a report to stdout or a file.
+License scanner: scans `npm|nuget|pip|go|cargo` projects, resolves licenses, writes a report to stdout or a file.
 
-Supported ecosystems: `npm|nuget|pip` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md` (`markdown` alias for `md`).
+Supported ecosystems: `npm|nuget|pip|go|cargo` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md` (`markdown` alias for `md`).
 
 ## Tool install
 
@@ -12,7 +12,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 128 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 165 passing (`dotnet test`).
 
 ## Usage
 
@@ -30,7 +30,7 @@ dotnet run --project src/Olaf.Cli -- --input package.json --format md
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json`; `markdown` alias for `md`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json`; `markdown` alias for `md`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip|go|cargo` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
 
@@ -38,7 +38,7 @@ Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json
 
 ```text
 --format <format>        Output format: json|yaml|xml|html|txt|md (default: json) [default: json]
---ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip (pypi alias for pip)
+--ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip|go|cargo (pypi alias for pip)
 --strict                 Fail on unresolved or unknown licenses
 ```
 
@@ -52,7 +52,7 @@ Every `licenses` entry has the same 8 fields (rows sorted by ecosystem, name, ve
 
 | Field | Meaning |
 |---|---|
-| `ecosystem` | `npm`, `nuget`, or `pip` |
+| `ecosystem` | `npm`, `nuget`, `pip`, `go`, or `cargo` |
 | `name` | Package name |
 | `version` | Version spec from the manifest |
 | `spdx` | SPDX id, or null when unresolved |
@@ -76,6 +76,10 @@ Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `l
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format md
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cargo --format json
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --ecosystem go --format json
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cargo --ecosystem cargo --format json
 ```
 
 ## Exit codes
