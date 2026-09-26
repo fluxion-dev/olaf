@@ -91,14 +91,29 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
 
     private static string? BuildDefinitionUrl(Dependency dependency)
     {
-        var name = Uri.EscapeDataString(dependency.Name);
         var version = Uri.EscapeDataString(dependency.Version);
         var eco = dependency.Ecosystem.ToLowerInvariant();
+        if (eco == "composer")
+        {
+            // ClearlyDefined composer coordinates: provider packagist, namespace vendor.
+            var parts = dependency.Name.Split('/', 2);
+            if (parts.Length != 2 || parts[0].Length == 0 || parts[1].Length == 0)
+            {
+                return null;
+            }
+
+            var vendor = Uri.EscapeDataString(parts[0]);
+            var pkg = Uri.EscapeDataString(parts[1]);
+            return $"https://api.clearlydefined.io/definitions/composer/packagist/{vendor}/{pkg}/{version}";
+        }
+
+        var name = Uri.EscapeDataString(dependency.Name);
         return eco switch
         {
             "npm" => $"https://api.clearlydefined.io/definitions/npm/npmjs/-/{name}/{version}",
             "nuget" => $"https://api.clearlydefined.io/definitions/nuget/nugetio/-/{name}/{version}",
             "pypi" or "pip" => $"https://api.clearlydefined.io/definitions/pypi/pypi/-/{name}/{version}",
+            "bundler" or "gem" => $"https://api.clearlydefined.io/definitions/gem/rubygems/-/{name}/{version}",
             _ => null,
         };
     }

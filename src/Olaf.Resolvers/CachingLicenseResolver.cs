@@ -121,6 +121,17 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new MavenLicenseResolver(_http);
         }
 
+        if (dependency.Ecosystem.Equals("composer", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ComposerLicenseResolver(_http);
+        }
+
+        if (dependency.Ecosystem.Equals("bundler", StringComparison.OrdinalIgnoreCase)
+            || dependency.Ecosystem.Equals("gem", StringComparison.OrdinalIgnoreCase))
+        {
+            return new BundlerLicenseResolver(_http);
+        }
+
         return null;
     }
 }

@@ -1,0 +1,16 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rails (7.0.8)
+      actionpack (= 7.0.8)
+    actionpack (7.0.8)
+    rspec (3.12.0)
+    puma (6.4.2)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rails (~> 7.0.0)
+  rspec (~> 3.12)
+  puma
