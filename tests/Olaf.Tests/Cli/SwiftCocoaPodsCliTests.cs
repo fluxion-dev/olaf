@@ -63,11 +63,11 @@ public sealed class SwiftCocoaPodsCliTests
     }
 
     [Fact]
-    public void Should_Exit2WithSupportedList_When_EcosystemInvalidVcpkg()
+    public void Should_Exit2WithSupportedList_When_EcosystemInvalidSpm()
     {
         var input = CliTestHelpers.FixturePath("swift", "Package.swift");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "vcpkg");
+        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "spm");
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
@@ -76,11 +76,11 @@ public sealed class SwiftCocoaPodsCliTests
     }
 
     [Fact]
-    public void Should_Exit2WithSupportedList_When_EcosystemInvalidConan()
+    public void Should_Exit2WithSupportedList_When_EcosystemInvalidConda()
     {
         var input = CliTestHelpers.FixturePath("cocoapods", "Podfile");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "conan");
+        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "conda");
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);

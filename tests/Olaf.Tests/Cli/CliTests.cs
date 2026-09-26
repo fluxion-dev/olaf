@@ -516,7 +516,7 @@ public sealed class CliEndToEndTests
     {
         var input = CliTestHelpers.FixturePath("npm", "package.json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "vcpkg");
+        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "spm");
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);

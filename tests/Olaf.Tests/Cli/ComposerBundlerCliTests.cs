@@ -57,7 +57,7 @@ public sealed class ComposerBundlerCliTests
     {
         var input = CliTestHelpers.FixturePath("composer", "composer.json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "vcpkg");
+        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "conda");
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
