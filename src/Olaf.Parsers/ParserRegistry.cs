@@ -12,7 +12,7 @@ public sealed class ParserRegistry
     }
 
     public ParserRegistry()
-        : this(new IEcosystemParser[] { new NpmParser(), new NuGetParser(), new PipParser() })
+        : this(new IEcosystemParser[] { new NpmParser(), new NuGetParser(), new PipParser(), new GoParser(), new CargoParser() })
     {
     }
 

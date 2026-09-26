@@ -5,7 +5,7 @@ using Olaf.Parsers;
 using Olaf.Resolvers;
 
 const string SupportedFormats = "json|yaml|xml|html|txt|md";
-const string SupportedEcosystems = "npm|nuget|pip";
+const string SupportedEcosystems = "npm|nuget|pip|go|cargo";
 
 var inputOption = new Option<string?>("--input")
 {
@@ -115,7 +115,9 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
             && (ecosystem.Equals("npm", StringComparison.OrdinalIgnoreCase)
                 || ecosystem.Equals("nuget", StringComparison.OrdinalIgnoreCase)
                 || ecosystem.Equals("pip", StringComparison.OrdinalIgnoreCase)
-                || ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase));
+                || ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("go", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("cargo", StringComparison.OrdinalIgnoreCase));
     }
 
     var allowed = ParseSpdxSet(allowRaw);
@@ -145,7 +147,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     if (ecosystem is not null && !IsSupportedEcosystem(ecosystem))
     {
-        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip.");
+        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo.");
         return 2;
     }
 
