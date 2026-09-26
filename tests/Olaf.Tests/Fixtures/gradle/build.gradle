@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.guava:guava:32.1.2-jre'
+    api "org.apache.commons:commons-lang3:3.14.0"
+    testImplementation 'junit:junit:4.13.2'
+    runtimeOnly("org.slf4j:slf4j-simple:2.0.9")
+    // implementation 'org.example:commented-out:9.9.9'
+    implementation libs.guava // version-catalog accessor: no pinned version here
+}

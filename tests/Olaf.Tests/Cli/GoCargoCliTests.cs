@@ -67,7 +67,7 @@ public sealed class GoCargoCliTests
     {
         var input = CliTestHelpers.FixturePath("go", "go.mod");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "maven");
+        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "swift");
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
