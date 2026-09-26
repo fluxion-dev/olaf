@@ -4,6 +4,8 @@ License scanner: scans `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swi
 
 Supported ecosystems: `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md` (`markdown` alias for `md`).
 
+Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference lock>`requirements.txt`>`pyproject.toml`>`environment.yml`; conda entries reported as `pip`).
+
 ## Tool install
 
 ```bash
@@ -12,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 314 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 327 passing (`dotnet test`).
 
 ## Usage
 

@@ -12,17 +12,42 @@ public sealed class PipParser : IEcosystemParser
         var name = Path.GetFileName(fileName);
         return string.Equals(name, "requirements.txt", StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, "pyproject.toml", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "poetry.lock", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(name, "poetry.lock", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "uv.lock", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "environment.yml", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "environment.yaml", StringComparison.OrdinalIgnoreCase);
     }
 
     public IReadOnlyList<Dependency> Parse(string inputPath)
     {
         if (Directory.Exists(inputPath))
         {
-            var lockPath = Path.Combine(inputPath, "poetry.lock");
-            if (File.Exists(lockPath))
+            // Lock > requirements > pyproject > environment: first present tier wins.
+            var poetryPath = Path.Combine(inputPath, "poetry.lock");
+            var uvPath = Path.Combine(inputPath, "uv.lock");
+            var hasPoetry = File.Exists(poetryPath);
+            var hasUv = File.Exists(uvPath);
+            if (hasPoetry || hasUv)
             {
-                return ParsePoetryLock(lockPath);
+                var merged = new List<Dependency>();
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var lockPath in new[] { poetryPath, uvPath })
+                {
+                    if (!File.Exists(lockPath))
+                    {
+                        continue;
+                    }
+
+                    foreach (var dep in ParseTomlPackageLock(lockPath))
+                    {
+                        if (seen.Add(dep.Name))
+                        {
+                            merged.Add(dep);
+                        }
+                    }
+                }
+
+                return merged;
             }
 
             var reqPath = Path.Combine(inputPath, "requirements.txt");
@@ -35,6 +60,18 @@ public sealed class PipParser : IEcosystemParser
             if (File.Exists(tomlPath))
             {
                 return ParsePyproject(tomlPath);
+            }
+
+            var envYml = Path.Combine(inputPath, "environment.yml");
+            if (File.Exists(envYml))
+            {
+                return ParseEnvironmentYml(envYml);
+            }
+
+            var envYaml = Path.Combine(inputPath, "environment.yaml");
+            if (File.Exists(envYaml))
+            {
+                return ParseEnvironmentYml(envYaml);
             }
 
             var candidate = Directory.GetFiles(inputPath).FirstOrDefault(CanHandle);
@@ -52,14 +89,21 @@ public sealed class PipParser : IEcosystemParser
     private IReadOnlyList<Dependency> ParseFile(string path)
     {
         var name = Path.GetFileName(path);
-        if (string.Equals(name, "poetry.lock", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(name, "poetry.lock", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "uv.lock", StringComparison.OrdinalIgnoreCase))
         {
-            return ParsePoetryLock(path);
+            return ParseTomlPackageLock(path);
         }
 
         if (string.Equals(name, "pyproject.toml", StringComparison.OrdinalIgnoreCase))
         {
             return ParsePyproject(path);
+        }
+
+        if (string.Equals(name, "environment.yml", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "environment.yaml", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParseEnvironmentYml(path);
         }
 
         return ParseRequirements(path);
@@ -337,6 +381,11 @@ public sealed class PipParser : IEcosystemParser
 
     private static IReadOnlyList<Dependency> ParsePoetryLock(string path)
     {
+        return ParseTomlPackageLock(path);
+    }
+
+    private static IReadOnlyList<Dependency> ParseTomlPackageLock(string path)
+    {
         try
         {
             if (!File.Exists(path))
@@ -407,5 +456,142 @@ public sealed class PipParser : IEcosystemParser
         {
             return Array.Empty<Dependency>();
         }
+    }
+
+    private static IReadOnlyList<Dependency> ParseEnvironmentYml(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return Array.Empty<Dependency>();
+            }
+
+            var deps = new List<Dependency>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var inDependencies = false;
+            var inPipSection = false;
+            var pipIndent = -1;
+
+            void Add(string name, string version)
+            {
+                if (string.IsNullOrWhiteSpace(name)
+                    || string.Equals(name, "python", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, "pip", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                if (seen.Add(name))
+                {
+                    deps.Add(new Dependency("pip", name, version, IsTransitive: false));
+                }
+            }
+
+            foreach (var raw in File.ReadAllLines(path))
+            {
+                var trimmed = raw.Trim();
+                if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+                {
+                    continue;
+                }
+
+                var indent = raw.Length - raw.TrimStart().Length;
+                if (indent == 0)
+                {
+                    inDependencies = string.Equals(trimmed, "dependencies:", StringComparison.Ordinal);
+                    inPipSection = false;
+                    continue;
+                }
+
+                if (!inDependencies)
+                {
+                    continue;
+                }
+
+                if (!trimmed.StartsWith('-'))
+                {
+                    continue;
+                }
+
+                var entry = trimmed.Substring(1).Trim().Trim('\'', '"');
+                if (entry.Length == 0)
+                {
+                    continue;
+                }
+
+                if (string.Equals(entry, "pip:", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry, "pip", StringComparison.OrdinalIgnoreCase))
+                {
+                    inPipSection = true;
+                    pipIndent = indent;
+                    continue;
+                }
+
+                if (inPipSection && indent > pipIndent)
+                {
+                    var (pipName, pipVersion) = SplitRequirement(entry);
+                    if (!string.IsNullOrWhiteSpace(pipName))
+                    {
+                        Add(pipName, pipVersion);
+                    }
+
+                    continue;
+                }
+
+                inPipSection = false;
+                var (condaName, condaVersion) = SplitCondaSpec(entry);
+                if (!string.IsNullOrWhiteSpace(condaName))
+                {
+                    Add(condaName, condaVersion);
+                }
+            }
+
+            return deps;
+        }
+        catch (IOException)
+        {
+            return Array.Empty<Dependency>();
+        }
+    }
+
+    internal static (string Name, string Version) SplitCondaSpec(string spec)
+    {
+        var s = spec.Trim();
+        var match = Regex.Match(s, @"^([A-Za-z0-9_.\-]+)\s*(.*)$");
+        if (!match.Success)
+        {
+            return (s, "*");
+        }
+
+        var name = match.Groups[1].Value.Trim();
+        var rest = match.Groups[2].Value.Trim();
+        if (rest.Length == 0)
+        {
+            return (name, "*");
+        }
+
+        // Conda single '=' pins (requests=2.31.0); '=='/' ' and ranges pass through trimmed.
+        if (rest.StartsWith("==", StringComparison.Ordinal))
+        {
+            rest = rest.Substring(2).Trim();
+        }
+        else if (rest.StartsWith('='))
+        {
+            rest = rest.Substring(1).Trim();
+        }
+
+        if (rest.Length == 0)
+        {
+            return (name, "*");
+        }
+
+        var comma = rest.IndexOf(',');
+        if (comma >= 0)
+        {
+            rest = rest.Substring(0, comma).Trim();
+        }
+
+        return (name, rest.Length == 0 ? "*" : rest);
     }
 }

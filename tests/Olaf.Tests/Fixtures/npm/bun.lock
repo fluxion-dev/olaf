@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 0,
+  "workspaces": {
+    "": {
+      "name": "olaf-npm-fixture",
+      "dependencies": {
+        "express": "^4.18.2"
+      }
+    }
+  },
+  "packages": {
+    "express": ["express@4.18.2", "https://registry.npmjs.org/", {}, "sha512-olaf-bun-fixture-express"],
+    "debug": ["debug@4.3.4", "https://registry.npmjs.org/", {}, "sha512-olaf-bun-fixture-debug"]
+  }
+}
