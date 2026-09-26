@@ -114,6 +114,8 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
             "nuget" => $"https://api.clearlydefined.io/definitions/nuget/nugetio/-/{name}/{version}",
             "pypi" or "pip" => $"https://api.clearlydefined.io/definitions/pypi/pypi/-/{name}/{version}",
             "bundler" or "gem" => $"https://api.clearlydefined.io/definitions/gem/rubygems/-/{name}/{version}",
+            "vcpkg" => $"https://api.clearlydefined.io/definitions/vcpkg/vcpkgio/-/{name}/{version}",
+            "conan" => $"https://api.clearlydefined.io/definitions/conan/conancenter/-/{name}/{version}",
             _ => null,
         };
     }

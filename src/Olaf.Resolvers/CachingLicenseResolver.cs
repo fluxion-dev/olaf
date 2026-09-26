@@ -142,6 +142,16 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new CocoaPodsLicenseResolver(_http);
         }
 
+        if (dependency.Ecosystem.Equals("vcpkg", StringComparison.OrdinalIgnoreCase))
+        {
+            return new VcpkgLicenseResolver(_http);
+        }
+
+        if (dependency.Ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ConanLicenseResolver(_http);
+        }
+
         return null;
     }
 }

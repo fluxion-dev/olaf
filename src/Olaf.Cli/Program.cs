@@ -5,7 +5,7 @@ using Olaf.Parsers;
 using Olaf.Resolvers;
 
 const string SupportedFormats = "json|yaml|xml|html|txt|md";
-const string SupportedEcosystems = "npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods";
+const string SupportedEcosystems = "npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan";
 
 var inputOption = new Option<string?>("--input")
 {
@@ -123,7 +123,9 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
                 || ecosystem.Equals("composer", StringComparison.OrdinalIgnoreCase)
                 || ecosystem.Equals("bundler", StringComparison.OrdinalIgnoreCase)
                 || ecosystem.Equals("swift", StringComparison.OrdinalIgnoreCase)
-                || ecosystem.Equals("cocoapods", StringComparison.OrdinalIgnoreCase));
+                || ecosystem.Equals("cocoapods", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("vcpkg", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase));
     }
 
     var allowed = ParseSpdxSet(allowRaw);
@@ -153,7 +155,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     if (ecosystem is not null && !IsSupportedEcosystem(ecosystem))
     {
-        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods.");
+        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan.");
         return 2;
     }
 
