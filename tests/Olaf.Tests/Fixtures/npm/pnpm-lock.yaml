@@ -1,0 +1,36 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+
+importers:
+
+  .:
+    dependencies:
+      express:
+        specifier: ^4.18.2
+        version: 4.18.2
+      debug:
+        specifier: ~4.3.4
+        version: 4.3.4
+
+packages:
+
+  express@4.18.2:
+    resolution: {integrity: sha512-olaf-pnpm-fixture-express}
+
+  debug@4.3.4:
+    resolution: {integrity: sha512-olaf-pnpm-fixture-debug}
+
+  '@scope/tool@1.2.3':
+    resolution: {integrity: sha512-olaf-pnpm-fixture-scoped}
+
+snapshots:
+
+  express@4.18.2:
+    dependencies:
+      debug: 4.3.4
+
+  debug@4.3.4: {}
+
+  '@scope/tool@1.2.3': {}

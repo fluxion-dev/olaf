@@ -1,0 +1,10 @@
+name: olaf-pip-fixture
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - requests=2.31.0
+  - flask
+  - pip:
+    - rich==13.7.0
+    - uvicorn>=0.20
