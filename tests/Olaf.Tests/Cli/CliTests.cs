@@ -290,6 +290,146 @@ public sealed class CliEndToEndTests
         Assert.Equal(2, result.ExitCode);
     }
 
+    /// <summary>
+    /// Policy gate (--allow/--deny, issue #5): all cases use the phantom
+    /// fixture whose single dependency never resolves, so the effective SPDX
+    /// is always "Unknown" whether resolvers go over the network (404) or
+    /// stay offline (cache-miss) — no live network required.
+    /// Implemented behavior (verified via dotnet run): --allow/--deny imply
+    /// the gate even without --strict (with a warning on stderr); an
+    /// allow-list containing "Unknown" exempts unknown licenses.
+    /// QA note: enforcing without --strict goes beyond a strict-only reading
+    /// of the issue — flag if the spec intended --strict to be required.
+    /// </summary>
+    [Theory]
+    [InlineData(true, "MIT", null, 1)] // allow-list excludes Unknown -> violation
+    [InlineData(true, "Unknown", null, 0)] // Unknown explicitly allowed
+    [InlineData(true, "MIT,Unknown", null, 0)] // multi-entry allow-list
+    [InlineData(true, null, "Unknown", 1)] // deny-list hits Unknown
+    [InlineData(false, null, "Unknown", 1)] // enforced without --strict
+    [InlineData(false, "Unknown", null, 0)] // allow passes without --strict
+    [InlineData(true, null, "MIT", 1)] // deny misses, Unknown-fallback still fails
+    public void Should_PolicyGate_When_AllowDeny(bool strict, string? allow, string? deny, int expectedExit)
+    {
+        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
+        try
+        {
+            var args = new List<string> { "--input", fixtureDir, "--format", "json" };
+            if (strict)
+            {
+                args.Add("--strict");
+            }
+
+            if (allow is not null)
+            {
+                args.Add("--allow");
+                args.Add(allow);
+            }
+
+            if (deny is not null)
+            {
+                args.Add("--deny");
+                args.Add(deny);
+            }
+
+            var result = CliTestHelpers.RunCli([.. args]);
+
+            Assert.Equal(expectedExit, result.ExitCode);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(fixtureDir);
+        }
+    }
+
+    [Fact]
+    public void Should_PolicyGate_DenyPresentSpdx_OnNpmFixture()
+    {
+        // MIT is the SPDX the npm fixture would resolve to; --deny MIT fails
+        // (exit 1) whether the sandbox resolves it (direct deny match) or
+        // stays Unknown (unknown-fallback enforcement) — deterministic either
+        // way. Stderr must name the offender, not just the count.
+        var input = CliTestHelpers.FixturePath("npm", "package.json");
+
+        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--deny", "MIT");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("express", result.Stderr, StringComparison.Ordinal);
+        Assert.Contains("policy gate violations", result.Stderr, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("offender(s) found", result.Stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_PolicyGate_Warn_When_AllowDenyWithoutStrict()
+    {
+        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
+        try
+        {
+            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--deny", "Unknown");
+
+            Assert.Equal(1, result.ExitCode);
+            Assert.Contains("Warning: --allow/--deny without --strict", result.Stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(fixtureDir);
+        }
+    }
+
+    [Fact]
+    public void Should_PolicyGate_ReportOffenderDetails_InStderr()
+    {
+        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
+        try
+        {
+            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict", "--deny", "Unknown");
+
+            Assert.Equal(1, result.ExitCode);
+            Assert.Contains("this-package-definitely-does-not-exist-olaf-xyz", result.Stderr, StringComparison.Ordinal);
+            Assert.Contains("-> Unknown", result.Stderr, StringComparison.Ordinal);
+            Assert.Contains("1 offender(s) found", result.Stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(fixtureDir);
+        }
+    }
+
+    [Fact]
+    public void Should_PolicyGate_TrimAndCaseInsensitiveCsv()
+    {
+        // " mit , Unknown " must parse as {MIT, Unknown} -> Unknown allowed -> 0.
+        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
+        try
+        {
+            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict", "--allow", " mit , Unknown ");
+
+            Assert.Equal(0, result.ExitCode);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(fixtureDir);
+        }
+    }
+
+    [Fact]
+    public void Should_PolicyGate_EmptyAllow_FallsBackToStrictGate()
+    {
+        // Empty --allow carries no entries, so the default strict message/contract applies.
+        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
+        try
+        {
+            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict", "--allow", string.Empty);
+
+            Assert.Equal(1, result.ExitCode);
+            Assert.Contains("Strict mode: unknown licenses found.", result.Stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(fixtureDir);
+        }
+    }
+
     [Fact]
     public void Should_Exit2_When_FormatUnsupported()
     {
@@ -312,6 +452,8 @@ public sealed class CliEndToEndTests
         Assert.Contains("--out", combined, StringComparison.Ordinal);
         Assert.Contains("--force", combined, StringComparison.Ordinal);
         Assert.Contains("--strict", combined, StringComparison.Ordinal);
+        Assert.Contains("--allow", combined, StringComparison.Ordinal);
+        Assert.Contains("--deny", combined, StringComparison.Ordinal);
         Assert.Contains("--ecosystem", combined, StringComparison.Ordinal);
         Assert.Contains("--verbose", combined, StringComparison.Ordinal);
         Assert.Contains("--quiet", combined, StringComparison.Ordinal);

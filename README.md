@@ -14,11 +14,14 @@ dotnet run --project src/Olaf.Cli -- --input package.json
 dotnet run --project src/Olaf.Cli -- --input ./src --out report.json --format yaml
 dotnet run --project src/Olaf.Cli -- --input ./src --ecosystem npm
 dotnet run --project src/Olaf.Cli -- --input package.json --strict
+dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
+dotnet run --project src/Olaf.Cli -- --input package.json --strict --deny GPL-2.0-only
 dotnet run --project src/Olaf.Cli -- --input ./src --out nested/dir/out.json
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html` (default `json`), `--out <file>` (default stdout), `--force`, `--strict`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html` (default `json`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
+`--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
 
 ## Reliability
 
@@ -57,7 +60,7 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/packa
 | Code | Meaning |
 |---|---|
 | `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
-| `1` | `--strict` found unresolved/`Unknown` licenses |
+| `1` | `--strict` found unresolved/`Unknown` licenses, or `--allow`/`--deny` policy-gate offenders |
 | `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, scan/write failure |
 
 ## Output contract
