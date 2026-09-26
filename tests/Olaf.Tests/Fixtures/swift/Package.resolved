@@ -1,0 +1,32 @@
+{
+  "pins" : [
+    {
+      "identity" : "alamofire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire.git",
+      "state" : {
+        "revision" : "3a8c1ed236786e2e85c56a2462326bcab368a5d92",
+        "version" : "5.8.1"
+      }
+    },
+    {
+      "identity" : "snapkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/SnapKit/SnapKit.git",
+      "state" : {
+        "revision" : "7c6bf5ff570aab8c6db7b7b6e0d4d1a58c32931",
+        "version" : "5.6.0"
+      }
+    },
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections.git",
+      "state" : {
+        "revision" : "2e6641db4fca01a5e85381daf2d0c448a0f2e41",
+        "version" : "1.0.5"
+      }
+    }
+  ],
+  "version" : 2
+}
