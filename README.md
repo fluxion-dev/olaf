@@ -2,8 +2,7 @@
 
 License scanner: scans `npm|nuget|pip` projects, resolves licenses, writes a report to stdout or a file.
 
-Supported ecosystems: `npm|nuget|pip` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html`.
-Planned (#10): `txt|md` are NOT yet supported — `--format txt|md` exits `2` (`Unsupported format 'txt'. Supported: json|yaml|xml|html.`).
+Supported ecosystems: `npm|nuget|pip` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md` (`markdown` alias for `md`).
 
 ## Tool install
 
@@ -13,7 +12,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 113 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 128 passing (`dotnet test`).
 
 ## Usage
 
@@ -24,18 +23,21 @@ dotnet run --project src/Olaf.Cli -- --input package.json
 dotnet run --project src/Olaf.Cli -- --input ./src --out report.json --format yaml
 # strict gate (exit 1 on Unknown)
 dotnet run --project src/Olaf.Cli -- --input package.json --strict
+# attribution report (human-readable text / markdown)
+dotnet run --project src/Olaf.Cli -- --input package.json --format txt
+dotnet run --project src/Olaf.Cli -- --input package.json --format md
 # allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html` (default `json`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json`; `markdown` alias for `md`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip` (`pypi` alias for `pip`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
 
 `--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
 
 ```text
---format <format>        Output format: json|yaml|xml|html (default: json) [default: json]
+--format <format>        Output format: json|yaml|xml|html|txt|md (default: json) [default: json]
 --ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip (pypi alias for pip)
 --strict                 Fail on unresolved or unknown licenses
 ```
@@ -65,11 +67,15 @@ Summary shape per format:
 - YAML: `summary:` with `total`/`resolved`/`unknown` plus a `licenses:` list with the same 8 keys.
 - XML: `<report><summary total="…" resolved="…" unknown="…"/><licenses><license>` with the 8 fields as child elements.
 - HTML: `<p>Total: … · Resolved: … · Unknown: …</p>` plus an 8-column table (Ecosystem, Name, Version, SPDX, License, Source, Status, Reason; the SPDX cell falls back to status when `spdx` is null).
+- TXT: `Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …` plus one `name@version (ecosystem)` block per package (SPDX falls back to `Unknown`, plus source/status/reason lines).
+- MD (`markdown` alias): `# Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …`, an 8-column markdown table, plus one `## name@version (ecosystem)` section per package carrying all 8 fields.
 
 Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `licenses` list, XML emits `<licenses />`, HTML emits an empty `<tbody>`.
 
 ```bash
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format md
 ```
 
 ## Exit codes
