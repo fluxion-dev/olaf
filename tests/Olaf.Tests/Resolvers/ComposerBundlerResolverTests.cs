@@ -133,6 +133,23 @@ public sealed class ComposerResolverTests
     }
 
     [Fact]
+    public async Task Should_ReturnUnknown_When_PackagistBodyMalformed()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text("this is not json{{{"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new ComposerLicenseResolver(http);
+        var dep = new Dependency("composer", "monolog/monolog", "3.5.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Should_ReturnUnknown_When_EcosystemMismatch()
     {
         var handler = new StubHttpMessageHandler((req, _) =>
@@ -253,6 +270,23 @@ public sealed class BundlerResolverTests
         Assert.NotNull(result.Reason);
         Assert.Contains("transport-error", result.Reason, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, handler.CallCount); // retried exactly once
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_RubyGemsBodyMalformed()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text("this is not json{{{"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new BundlerLicenseResolver(http);
+        var dep = new Dependency("bundler", "rails", "7.0.8", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
