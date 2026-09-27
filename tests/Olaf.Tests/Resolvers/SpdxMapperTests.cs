@@ -147,6 +147,13 @@ namespace Olaf.Tests.Resolvers
         }
 
         [Fact]
+        public void Normalize_EclipsePublicLicenseLongForm_ReturnsEPL()
+        {
+            Assert.Equal("EPL-1.0", SpdxMapper.Normalize("Eclipse Public License 1.0"));
+            Assert.Equal("EPL-2.0", SpdxMapper.Normalize("Eclipse Public License 2.0"));
+        }
+
+        [Fact]
         public void FromLicenseText_NullOrEmpty_ReturnsNull()
         {
             Assert.Null(SpdxMapper.FromLicenseText(null));
