@@ -95,14 +95,14 @@ public sealed class HtmlReportE2ETests
             resolved: scan.ResolvedCount,
             unknown: scan.UnknownCount);
 
-        // Table rows: 3 body rows x 8 columns = 24 td cells.
+        // Table rows: 3 body rows x 9 columns = 27 td cells.
         var tbodyStart = output.IndexOf("<tbody>", StringComparison.Ordinal);
         var tbodyEnd = output.IndexOf("</tbody>", StringComparison.Ordinal);
         Assert.True(tbodyStart >= 0, "HTML output missing '<tbody>'.");
         Assert.True(tbodyEnd > tbodyStart, "HTML output missing '</tbody>'.");
         var tbody = output.Substring(tbodyStart, tbodyEnd - tbodyStart);
         Assert.Equal(3, CountOccurrences(tbody, "<tr>"));
-        Assert.Equal(24, CountOccurrences(tbody, "<td>"));
+        Assert.Equal(27, CountOccurrences(tbody, "<td>"));
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class HtmlReportE2ETests
     {
         var (scan, output) = await BuildRealHtmlReportAsync();
 
-        foreach (var header in new[] { "<th>Ecosystem</th>", "<th>Name</th>", "<th>Version</th>", "<th>SPDX</th>", "<th>License</th>", "<th>Source</th>", "<th>Status</th>", "<th>Reason</th>" })
+        foreach (var header in new[] { "<th>Ecosystem</th>", "<th>Name</th>", "<th>Version</th>", "<th>SPDX</th>", "<th>License</th>", "<th>Source</th>", "<th>Status</th>", "<th>Reason</th>", "<th>Direct</th>" })
         {
             Assert.Contains(header, output, StringComparison.Ordinal);
         }

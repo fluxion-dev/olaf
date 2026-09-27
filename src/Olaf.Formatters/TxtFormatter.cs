@@ -16,7 +16,7 @@ public sealed class TxtFormatter : ILicenseFormatter
         foreach (var l in FormatterSort.ByEcosystemNameVersion(result.Licenses))
         {
             sb.AppendLine();
-            sb.AppendLine($"{l.Dependency.Name}@{l.Dependency.Version} ({l.Dependency.Ecosystem})");
+            sb.AppendLine($"{l.Dependency.Name}@{l.Dependency.Version} ({l.Dependency.Ecosystem}) direct={(l.Dependency.Direct ? "true" : "false")}");
             sb.AppendLine($"  SPDX: {EffectiveSpdx(l)}");
             if (!string.IsNullOrWhiteSpace(l.SourceUrl))
             {

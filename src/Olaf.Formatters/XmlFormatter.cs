@@ -25,7 +25,8 @@ public sealed class XmlFormatter : ILicenseFormatter
                     new XElement("licenseText", l.LicenseText ?? string.Empty),
                     new XElement("sourceUrl", l.SourceUrl ?? string.Empty),
                     new XElement("status", l.Status),
-                    new XElement("reason", l.Reason ?? string.Empty)))));
+                    new XElement("reason", l.Reason ?? string.Empty),
+                    new XElement("direct", l.Dependency.Direct ? "true" : "false")))));
         var doc = new XDocument(new XDeclaration("1.0", "utf-8", null), root);
         return doc.ToString();
     }

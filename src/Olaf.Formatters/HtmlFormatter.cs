@@ -16,7 +16,7 @@ public sealed class HtmlFormatter : ILicenseFormatter
         sb.Append("<p>Total: ").Append(result.TotalCount)
             .Append(" \u00b7 Resolved: ").Append(result.ResolvedCount)
             .Append(" \u00b7 Unknown: ").Append(result.UnknownCount).Append("</p>");
-        sb.Append("<table><thead><tr><th>Ecosystem</th><th>Name</th><th>Version</th><th>SPDX</th><th>License</th><th>Source</th><th>Status</th><th>Reason</th></tr></thead><tbody>");
+        sb.Append("<table><thead><tr><th>Ecosystem</th><th>Name</th><th>Version</th><th>SPDX</th><th>License</th><th>Source</th><th>Status</th><th>Reason</th><th>Direct</th></tr></thead><tbody>");
         foreach (var l in FormatterSort.ByEcosystemNameVersion(result.Licenses))
         {
             sb.Append("<tr><td>")
@@ -35,6 +35,8 @@ public sealed class HtmlFormatter : ILicenseFormatter
                 .Append(WebUtility.HtmlEncode(l.Status))
                 .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.Reason ?? string.Empty))
+                .Append("</td><td>")
+                .Append(l.Dependency.Direct ? "true" : "false")
                 .Append("</td></tr>");
         }
 

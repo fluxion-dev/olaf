@@ -21,6 +21,7 @@ public sealed class JsonFormatter : ILicenseFormatter
                 sourceUrl = l.SourceUrl,
                 status = l.Status,
                 reason = l.Reason,
+                direct = l.Dependency.Direct,
             }).ToList();
         var envelope = new
         {

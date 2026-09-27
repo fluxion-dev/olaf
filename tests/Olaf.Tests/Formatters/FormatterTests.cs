@@ -240,6 +240,54 @@ internal static class FormatterTestHelpers
         }
     }
 
+    // Direct-field contract (issue #66) — additive `direct` surface on every
+    // format, appended LAST. Wired into every direct-field test; the legacy
+    // AssertEightFieldsPresent above stays subset-safe and untouched.
+    internal static void AssertDirectFieldPresent(string output, string format)
+    {
+        Assert.NotNull(output);
+        switch (format.ToLowerInvariant())
+        {
+            case "json":
+            {
+                using var doc = JsonDocument.Parse(output);
+                var first = doc.RootElement.GetProperty("licenses").EnumerateArray().First();
+                Assert.True(first.TryGetProperty("direct", out var direct), "JSON licenses[0] missing key 'direct'.");
+                Assert.True(
+                    direct.ValueKind == JsonValueKind.True || direct.ValueKind == JsonValueKind.False,
+                    "JSON licenses[0]['direct'] must be a boolean.");
+                break;
+            }
+
+            case "yaml":
+                Assert.Contains("direct:", output, StringComparison.Ordinal);
+                break;
+            case "xml":
+            {
+                var doc = new XmlDocument();
+                doc.LoadXml(output);
+                var nodes = doc.SelectNodes("//direct");
+                Assert.NotNull(nodes);
+                Assert.True(nodes.Count > 0, "XML missing element '<direct>'.");
+                break;
+            }
+
+            case "html":
+                Assert.Contains("<th>Direct</th>", output, StringComparison.Ordinal);
+                break;
+            case "txt":
+                Assert.Contains("direct=", output, StringComparison.Ordinal);
+                break;
+            case "md":
+            case "markdown":
+                Assert.Contains("| Direct |", output, StringComparison.Ordinal);
+                break;
+            default:
+                Assert.Fail($"Unknown format '{format}' in AssertDirectFieldPresent.");
+                break;
+        }
+    }
+
     // Summary counts — wired into every mixed/empty test. Format is
     // detected from the output shape (json object vs xml vs html vs yaml).
     internal static void AssertSummaryCounts(string output, int total = 2, int resolved = 1, int unknown = 1)

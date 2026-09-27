@@ -52,6 +52,14 @@ var denyOption = new Option<string?>("--deny")
 {
     Description = "Comma-separated SPDX deny-list; strict-gate fails licenses in the list",
 };
+var directOnlyOption = new Option<bool>("--direct-only")
+{
+    Description = "Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)",
+};
+var includeTransitiveOption = new Option<bool>("--include-transitive")
+{
+    Description = "Explicitly include transitive dependencies (same as default: report all)",
+};
 
 var rootCommand = new RootCommand($"""
     olaf license scanner
@@ -66,6 +74,11 @@ var rootCommand = new RootCommand($"""
       olaf --input package.json --strict --allow MIT,Apache-2.0
       olaf --input package.json --strict --deny GPL-2.0-only,GPL-3.0-only
       olaf --input ./src --out nested/dir/out.json
+      olaf --input package.json --direct-only
+      olaf --input package.json --include-transitive
+    Transitive filter: neither flag (or --include-transitive) reports all
+    dependencies; --direct-only reports direct dependencies only. Both flags
+    together is a conflict (exit 2). Strict/allow/deny gates see the FILTERED set.
     """)
 {
     inputOption,
@@ -75,6 +88,8 @@ var rootCommand = new RootCommand($"""
     strictOption,
     allowOption,
     denyOption,
+    directOnlyOption,
+    includeTransitiveOption,
     ecosystemOption,
     maxImageMbOption,
     verboseOption,
@@ -94,6 +109,8 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var quiet = parseResult.GetValue(quietOption);
     var allowRaw = parseResult.GetValue(allowOption);
     var denyRaw = parseResult.GetValue(denyOption);
+    var directOnly = parseResult.GetValue(directOnlyOption);
+    var includeTransitive = parseResult.GetValue(includeTransitiveOption);
 
     static HashSet<string> ParseSpdxSet(string? csv)
     {
@@ -165,6 +182,12 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     if (ecosystem is not null && !IsSupportedEcosystem(ecosystem))
     {
         Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm.");
+        return 2;
+    }
+
+    if (directOnly && includeTransitive)
+    {
+        Console.Error.WriteLine("Conflicting flags: --direct-only and --include-transitive cannot be used together.");
         return 2;
     }
 
@@ -288,6 +311,16 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     var results = await Task.WhenAll(tasks).ConfigureAwait(false);
     var resolved = new List<ResolvedLicense>(results);
+    // Transitive filter (post-scan/pre-format): --direct-only keeps direct
+    // dependencies only; neither flag or --include-transitive keeps all.
+    // Strict/allow/deny gates below see the FILTERED set; ScanResult counts
+    // recompute from the filtered set.
+    if (directOnly)
+    {
+        resolved = resolved.Where(r => r.Dependency.Direct).ToList();
+        LogVerbose($"Transitive filter (--direct-only): reporting {resolved.Count} of {results.Length} resolved licenses.");
+    }
+
     foreach (var license in results)
     {
         LogVerbose($"Resolved {FormatDependency(license.Dependency)} -> {license.Status}");

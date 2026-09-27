@@ -21,6 +21,7 @@ public sealed class YamlFormatter : ILicenseFormatter
                 ["sourceUrl"] = l.SourceUrl,
                 ["status"] = l.Status,
                 ["reason"] = l.Reason,
+                ["direct"] = l.Dependency.Direct ? "true" : "false",
             }).ToList();
         var doc = new Dictionary<string, object?>
         {
