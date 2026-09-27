@@ -188,7 +188,11 @@ public sealed class NpmParser : IEcosystemParser
                         : prop.Name;
                     if (name.Contains('/'))
                     {
-                        continue;
+                        // Allow scoped packages like "@scope/name" but skip invalid paths like "foo/bar"
+                        if (!name.StartsWith("@", StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
                     }
 
                     if (prop.Value.ValueKind != JsonValueKind.Object)
