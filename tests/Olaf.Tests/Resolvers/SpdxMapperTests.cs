@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using Xunit;
 using Olaf.Resolvers;
 
 namespace Olaf.Tests.Resolvers
