@@ -1,0 +1,7 @@
+# Shared B4 license-shape carrier (issues #67/#68/#69): one synth fixture dir
+# for the cdx-probe additive cases AND the spdx-probe (3rd consumer).
+# End-to-end license shapes (live registry):
+#   python-dateutil 2.8.2 -> "Dual License" (multi-word: cdx name / spdx NOASSERTION)
+# Exact CanHandle filenames: package.json (npm), requirements.txt (pip).
+# olaf-nonexistent-pkg-xyz 404s -> Unknown arm everywhere (offline-safe).
+python-dateutil==2.8.2

@@ -2,7 +2,7 @@
 
 License scanner: scans `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` projects, resolves licenses, writes a report to stdout or a file.
 
-Supported ecosystems: `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml` (`markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `cyclonedx` stays JSON).
+Supported ecosystems: `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (`markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias, `cyclonedx` stays JSON).
 
 Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `Pipfile.lock|requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference `Pipfile.lock` authoritative-first (empty lock falls through to poetry/uv tier), then `poetry.lock`/`uv.lock` merged > `requirements.txt` > `pyproject.toml` > `environment.yml|environment.yaml`; `Pipfile.lock` entries `IsTransitive=false`; `hashes[]` validated but parsed-but-deferred — not stored on the report; conda entries reported as `pip`); `go` handles `go.mod|go.sum` (2 lines per module in `go.sum` deduped to one dep; `// indirect` + present in `go.sum` → transitive, `// indirect` + absent → direct fallback, `go.mod`-only dir keeps legacy `// indirect` → transitive, `go.sum`-only dir yields all-transitive deps; `h1:` hashes syntactically validated but parsed-but-deferred — not stored on the 9-field report, SBOM enrichment follow-up). `apk` handles `installed` (`lib/apk/db/installed`: blank-line-separated stanzas with `P:`/`V:` fields; versions verbatim including `-r0`; `L:` (declared license) + `A:` (arch) validated-but-deferred — presence never breaks parsing, values not stored, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `dpkg` handles `status` (`var/lib/dpkg/status`: blank-line-separated stanzas with `Package:`/`Version:` fields; versions verbatim including epoch; `Architecture:` validated-but-deferred — same terms, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `rpm` handles `Packages` text dumps (`var/lib/rpm/Packages` or `usr/lib/sysimage/rpm/Packages`: one `name-ver-rel.arch` NVRA line per package, `rpm -qa` default output; arch stripped after the last `.`, version is `ver-rel` joined verbatim; binary (BerkeleyDB) input yields empty, never throws; entries `IsTransitive=false`; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `container` scans image tarballs (`*.tar|*.tar.gz|*.tgz` with top-level `manifest.json`/`index.json` markers) and exploded OCI/docker-save layout dirs (`manifest.json|index.json|oci-layout` plus layer blobs) and reports the image's packages as `apk`/`dpkg`/`rpm` entries (`IsTransitive=false`; layers apply bottom→top with OCI whiteouts — basename prefix `.wh.`, `.wh..wh..opq` clears the directory — and topmost layer wins for the same package; absolute/`..` entries and symlinks/hardlinks are skipped; RPM `Packages` text dumps are routed to the `rpm` parser while BINARY rpm bytes still yield empty (binary format deferred to issue #70); uncompressed bytes are capped by `--max-image-mb`, default `1024`; corrupt/truncated tarballs and non-image tars fail with exit `2`, never silent empty).
 
@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 628 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 644 passing (`dotnet test`).
 
 ## Usage
 
@@ -32,13 +32,15 @@ dotnet run --project src/Olaf.Cli -- --input package.json --format md
 dotnet run --project src/Olaf.Cli -- --input package.json --format cyclonedx-json
 # CycloneDX SBOM as XML (spec 1.5, same data as JSON; `cyclonedx` stays JSON)
 dotnet run --project src/Olaf.Cli -- --input package.json --format cyclonedx-xml
+# SPDX SBOM (spec 2.3; `spdx-json` has no alias)
+dotnet run --project src/Olaf.Cli -- --input package.json --format spdx-json
 # direct-only filter (report direct dependencies only; counts recompute on the filtered set)
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json --direct-only
 # allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
 Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set.
@@ -46,7 +48,7 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 `--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
 
 ```text
---format <format>        Output format: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml (default: json) [default: json]
+--format <format>        Output format: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json (default: json) [default: json]
 --ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm (pypi alias for pip)
 --max-image-mb <max-image-mb>  Cap container-image scan at N megabytes uncompressed handled (default: 1024; must be > 0)
 --strict                 Fail on unresolved or unknown licenses
@@ -140,8 +142,9 @@ Summary shape per format:
 - MD (`markdown` alias): `# Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …`, a 9-column markdown table (`| Direct |` last), plus one `## name@version (ecosystem)` section per package carrying all 9 fields (`- Direct: true|false` last).
 - CycloneDX JSON (`cyclonedx-json`, `cyclonedx` alias): CycloneDX 1.5 SBOM — see `### CycloneDX JSON export` below.
 - CycloneDX XML (`cyclonedx-xml`, no alias): same CycloneDX 1.5 data as JSON, XML-encoded — see `### CycloneDX XML export` below.
+- SPDX JSON (`spdx-json`, no alias): SPDX 2.3 SBOM — see `### SPDX JSON export` below.
 
-Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `licenses` list, XML emits `<licenses />`, HTML emits an empty `<tbody>`, CycloneDX JSON emits an empty `components` array (envelope + `olaf:*` zero counts still present), CycloneDX XML emits `<components />` (envelope + `olaf:*` zero counts still present).
+Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `licenses` list, XML emits `<licenses />`, HTML emits an empty `<tbody>`, CycloneDX JSON emits an empty `components` array (envelope + `olaf:*` zero counts still present), CycloneDX XML emits `<components />` (envelope + `olaf:*` zero counts still present), SPDX JSON emits empty `packages` with a single self-`DESCRIBES` relationship (`SPDXRef-DOCUMENT` → `SPDXRef-DOCUMENT`), `documentDescribes: ["SPDXRef-DOCUMENT"]`, and the `olaf:total=0/resolved=0/unknown=0` counts comment still present.
 
 ### CycloneDX JSON export
 
@@ -165,12 +168,28 @@ Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `l
 - Properties carry values as element text (`<property name="olaf:total">3</property>`), not attributes — same `olaf:total` / `olaf:resolved` / `olaf:unknown` counts (filtered-set aware) plus per-component `olaf:status`, `olaf:reason`, `olaf:sourceUrl` (only when a source URL exists) on `Unknown` rows.
 - Escaping is owned by `XElement`/`XmlWriter` — values are never pre-encoded (double-escape ban), so `&<>"'` round-trip through a parse-back. Invalid XML control chars (e.g. `\u0001`) are stripped, never thrown.
 
+### SPDX JSON export
+
+`--format spdx-json` (no alias; `spdx` is rejected with exit `2`) emits an SPDX 2.3 SBOM (`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"olaf-scan",…}`):
+
+- `spdxVersion` is `SPDX-2.3`, `dataLicense` is `CC0-1.0`, `SPDXID` is the pinned literal `SPDXRef-DOCUMENT`, `name` is the constant `olaf-scan`. `documentNamespace` is `https://olaf.example/sbom/<uuid>`, fresh on every run; `creationInfo.created` is an ISO-8601 UTC timestamp and `creationInfo.creators` is `["Tool: olaf <assembly>"]` (never golden-match namespace/created in tests).
+- `packages[]` is sorted `ecosystem → name → version`, one entry per license row with child order pinned: `SPDXID`, `name`, `versionInfo`, `supplier`, `downloadLocation`, `filesAnalyzed`, `licenseConcluded`, `licenseDeclared`, `copyrightText`, `externalRefs`.
+- `SPDXID` is positional (`SPDXRef-Package-1..N` in sort order): the `bom-ref` charset (`eco:name@ver`) is illegal for SPDXID, and positional IDs avoid sanitize collisions.
+- `licenseConcluded`: single-token SPDX ids pass through, SPDX expressions with `AND`/`OR`/`WITH` (parens allowed) pass through; everything else — `Unknown`/`NONE`/`NOASSERTION`/null/empty/whitespace or multi-word text (e.g. `My Custom License`) — collapses to `NOASSERTION` (never `NONE`, never `""`, never an `Unknown` string leak). `licenseDeclared` always mirrors `licenseConcluded` (the resolver raw string no longer exists at the formatter layer, so no model change).
+- `copyrightText`, `supplier`, and `downloadLocation` are the literal `NOASSERTION` on every package (pre-issue #72: no copyright scraping; `SourceUrl` is never copied — a registry page is not a download URI). Copyright scraping is owned by issue #72.
+- `externalRefs` is unconditional: every package (even `Unknown`) carries one `PACKAGE-MANAGER`/`purl` entry (same purl rule as CycloneDX; never throws).
+- `filesAnalyzed` is always `false`.
+- Relationships are flat-list honest (no tree is inferred): every package gets BOTH `DESCRIBES` and `CONTAINS` from `SPDXRef-DOCUMENT` (`relationships` count is `2 × packages`, referentially closed); `documentDescribes` lists every package `SPDXID`. An empty scan carries a single self-`DESCRIBES` (`SPDXRef-DOCUMENT` → `SPDXRef-DOCUMENT`) with `documentDescribes: ["SPDXRef-DOCUMENT"]`.
+- Counts ride in `comment` (`olaf:total=<n>/resolved=<n>/unknown=<n>`, always equal to the `ScanResult` counts, so `--direct-only` filtering is reflected).
+- SPDX 2.3 only: no 3.0 profile/context fields are emitted. A future SPDX-3.0 formatter ships as a separate format, not an extension — this output stays valid 2.3 input for converters (v3.0-ready in that sense, not by emitting 3.0 fields).
+
 ```bash
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format md
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format cyclonedx-json
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format cyclonedx-xml
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format spdx-json
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cargo --format json
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --ecosystem go --format json

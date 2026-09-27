@@ -1,34 +1,36 @@
 #!/usr/bin/env bash
 # format-matrix-dump.sh — CLI format matrix on committed npm fixture (issue #3).
-# Runs: for f in json yaml xml html txt md cyclonedx-json cyclonedx-xml; do
+# Runs: for f in json yaml xml html txt md cyclonedx-json cyclonedx-xml spdx-json; do
 #   dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format $f; done
 # then checks each output for 8 fields + direct (9th) + summary counts; HTML additionally
 # requires <table> and HTML-encoded cell output; cyclonedx-json asserts the
 # CycloneDX envelope (bomFormat/specVersion/components); cyclonedx-xml asserts the
 # CycloneDX XML envelope (<bom/xmlns bom/1.5/metadata/components) + <scope>
-# element + olaf: counts props + well-formedness (python xml parse).
+# element + olaf: counts props + well-formedness (python xml parse); spdx-json
+# asserts the SPDX envelope (spdxVersion==SPDX-2.3/dataLicense==CC0-1.0/packages/
+# relationships) + DESCRIBES+CONTAINS relationships + olaf: counts comment.
 # NOTE: empty-components case not applicable — the CLI exits 2 ("No manifests
 # found") on manifest-less input before any formatter runs, so every matrix
 # scan carries ≥1 component.
 # Offline-safe: never passes --strict; resolver network failures degrade to
 # Unknown with exit 0 (deterministic continue in Program.cs).
 # Rules: repo-relative, idempotent (stdout only, temp files cleaned), no secrets.
-VERSION="0.4.1"
+VERSION="0.5.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
-FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml"
+FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml spdx-json"
 FIXTURE_REL="tests/Olaf.Tests/Fixtures/npm"
 PROJECT_REL="src/Olaf.Cli"
 WORKDIR=""
 KEEP_TEMP=0
 
 usage() {
-  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|all] [--timeout <secs>] [--workdir <dir>] [--keep-temp] [--help] [--version]"
+  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json|all] [--timeout <secs>] [--workdir <dir>] [--keep-temp] [--help] [--version]"
   echo ""
   echo "CLI format matrix on the committed npm fixture (offline-safe, non-strict)."
   echo "Runs 'dotnet run --project $PROJECT_REL -- --input $FIXTURE_REL --format <f>'"
-  echo "for each format (default: all eight) with 'timeout <secs>s' per scan"
+  echo "for each format (default: all nine) with 'timeout <secs>s' per scan"
   echo "(default: 60), then verifies:"
   echo "  - 8 fields present (ecosystem,name,version,spdx,licenseText,sourceUrl,status,reason"
   echo "    or per-format equivalents: <th> headers for html, <elements> for xml, keys for yaml,"
@@ -40,6 +42,8 @@ usage() {
   echo "  - cyclonedx-json additionally asserts bomFormat==CycloneDX + specVersion==1.5"
   echo "  - cyclonedx-xml additionally asserts <bom + xmlns bom/1.5 + <metadata>/<components>"
   echo "    + well-formedness (python xml parse)"
+  echo "  - spdx-json additionally asserts spdxVersion==SPDX-2.3 + dataLicense==CC0-1.0"
+  echo "    + packages/relationships + DESCRIBES+CONTAINS"
   echo ""
   echo "Options:"
   echo "  --format <f>   single format or 'all' (default: all)"
@@ -71,9 +75,9 @@ while [[ $# -gt 0 ]]; do
     --format)
       [[ $# -lt 2 ]] && { echo "Missing value for --format." >&2; exit 2; }
       case "$2" in
-        json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml) FORMATS="$2" ;;
-        all) FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml" ;;
-        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|all." >&2; exit 2 ;;
+        json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json) FORMATS="$2" ;;
+        all) FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml spdx-json" ;;
+        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json|all." >&2; exit 2 ;;
       esac
       shift 2
       ;;
@@ -255,6 +259,17 @@ PY
         pass "$f" "well-formed XML (python xml parse OK)"
       else
         fail "$f" "not well-formed XML (python xml parse failed)"
+      fi
+      ;;
+    spdx-json)
+      if check_contains "$f" "$OUT" "envelope" '"spdxVersion"' '"SPDX-2.3"' '"dataLicense"' '"CC0-1.0"' '"SPDXRef-DOCUMENT"' '"packages"' '"relationships"'; then
+        pass "$f" "envelope spdxVersion==SPDX-2.3 + dataLicense==CC0-1.0 + SPDXRef-DOCUMENT + packages/relationships present"
+      fi
+      if check_contains "$f" "$OUT" "relationships" '"DESCRIBES"' '"CONTAINS"'; then
+        pass "$f" "relationships DESCRIBES+CONTAINS present"
+      fi
+      if check_contains "$f" "$OUT" "counts" '"comment"' 'olaf:total=' '/resolved=' '/unknown='; then
+        pass "$f" "summary counts (olaf:total/resolved/unknown comment) present"
       fi
       ;;
 
