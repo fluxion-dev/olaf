@@ -1,0 +1,14 @@
+Package: bash
+Status: install ok installed
+Architecture: amd64
+Version: 2:5.2-5
+Description: GNU Bourne Again SHell
+ continued description line starting with a space
+
+Package: coreutils
+Status: install ok installed
+Architecture: amd64
+Version: 9.4-1
+Description: GNU core utilities
+	tab-continued description line
+

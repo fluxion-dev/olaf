@@ -26,6 +26,14 @@ public sealed class ContainerImageCliTests
         };
     }
 
+    private static IReadOnlyDictionary<string, string> RpmLayer(params string[] nvra)
+    {
+        return new Dictionary<string, string>
+        {
+            ["var/lib/rpm/Packages"] = ImageFixtureBuilder.RpmPackages(nvra),
+        };
+    }
+
     [Fact]
     public void Should_ExitZero_When_DockerImageTar()
     {
@@ -83,21 +91,14 @@ public sealed class ContainerImageCliTests
     }
 
     [Fact]
-    public void Should_Exit2_When_EcosystemRpm()
+    public void Should_ExitZero_When_EcosystemRpmStandalone()
     {
-        // RPM parsing is deferred to #65: the literal must stay rejected.
-        var image = BuildDockerImage(new[] { ApkLayer(("rpm-guard", "1.0-r0")) });
-        try
-        {
-            var result = CliTestHelpers.RunCli("--input", image, "--ecosystem", "rpm");
+        // RPM text-dump parsing shipped in #65: --ecosystem rpm is accepted.
+        var path = CliTestHelpers.FixturePath("rpm", "Packages");
+        var result = CliTestHelpers.RunCli("--input", path, "--format", "json", "--ecosystem", "rpm");
 
-            Assert.Equal(2, result.ExitCode);
-            Assert.Contains("Unsupported ecosystem", result.Stderr, StringComparison.Ordinal);
-        }
-        finally
-        {
-            CliTestHelpers.DeleteTempDir(Path.GetDirectoryName(image)!);
-        }
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("bash", result.Stdout, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -225,5 +226,31 @@ public sealed class ContainerImageCliTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("--max-image-mb", result.Stdout + result.Stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Should_ExitZero_When_ImageContainsRpmLayer()
+    {
+        var image = BuildDockerImage(new[] { RpmLayer("cli-rpm-tool-1.0-1.x86_64") });
+        try
+        {
+            var result = CliTestHelpers.RunCli("--input", image, "--format", "json");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("cli-rpm-tool", result.Stdout, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(Path.GetDirectoryName(image)!);
+        }
+    }
+
+    [Fact]
+    public void Should_DocumentRpm_When_Help()
+    {
+        var result = CliTestHelpers.RunCli("--help");
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("rpm", result.Stdout + result.Stderr, StringComparison.Ordinal);
     }
 }

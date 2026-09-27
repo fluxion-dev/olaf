@@ -478,4 +478,57 @@ public sealed class ContainerImageParserTests
         Assert.NotEmpty(deps);
         Assert.All(deps, d => Assert.DoesNotContain("container", d.Ecosystem, StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Should_ScanRpmTextLayers_When_RpmDbPresent()
+    {
+        // Text rpm layers route to RpmParser; the top layer wins for the same
+        // package via overlay overwrite; both rpm suffixes are recognized.
+        var parser = ParserTestHelpers.ResolveParser("container");
+        var path = ImageFixtureBuilder.BuildDockerImageTar(
+            NewImagePath(),
+            new[]
+            {
+                new Dictionary<string, string>
+                {
+                    ["var/lib/rpm/Packages"] = ImageFixtureBuilder.RpmPackages("overlay-tool-1.0-1.x86_64"),
+                },
+                new Dictionary<string, string>
+                {
+                    ["var/lib/rpm/Packages"] = ImageFixtureBuilder.RpmPackages(
+                        "overlay-tool-2.0-1.x86_64",
+                        "overlay-other-3.0-2.noarch"),
+                    ["usr/lib/sysimage/rpm/Packages"] = ImageFixtureBuilder.RpmPackages("sysimage-tool-9.9-9.x86_64"),
+                },
+            });
+
+        var deps = parser.Parse(path);
+        var rpm = deps.Where(d => d.Ecosystem == "rpm").ToDictionary(d => d.Name, d => d.Version);
+
+        Assert.Equal(3, rpm.Count);
+        Assert.Equal("2.0-1", rpm["overlay-tool"]);
+        Assert.Equal("3.0-2", rpm["overlay-other"]);
+        Assert.Equal("9.9-9", rpm["sysimage-tool"]);
+    }
+
+    [Fact]
+    public void Should_ReturnEmptyRpm_When_RpmLayerIsBinary()
+    {
+        // Binary BerkeleyDB bytes yield [], never throw (deferred to #70) —
+        // extends (not replaces) the neighbor-passthrough coverage above.
+        var parser = ParserTestHelpers.ResolveParser("container");
+        var path = ImageFixtureBuilder.BuildDockerImageTar(
+            NewImagePath(),
+            new[]
+            {
+                new Dictionary<string, string>
+                {
+                    ["var/lib/rpm/Packages"] = "\0binary\0rpm\0bytes\0",
+                },
+            });
+
+        var deps = parser.Parse(path);
+
+        Assert.Empty(deps);
+    }
 }
