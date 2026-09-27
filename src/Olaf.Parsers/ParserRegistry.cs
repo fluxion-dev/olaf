@@ -57,7 +57,8 @@ public sealed class ParserRegistry
 
         // Group by directory; call parser.Parse(dir) ONCE per parser per dir so each
         // parser applies its lock preference (npm: lock > manifest, nuget: lock >
-        // config > csproj, pip: lock > requirements > pyproject) and never double-counts.
+        // config > csproj, pip: Pipfile.lock authoritative-first, then poetry/uv merged >
+        // requirements > pyproject > environment) and never double-counts.
         var parseWork = candidateFiles
             .GroupBy(f => Path.GetDirectoryName(f) ?? path)
             .SelectMany(g => parsers

@@ -141,6 +141,36 @@ public sealed class ParserRegistryTests
     }
 
     [Fact]
+    public void Should_PreferPipfileLock_When_PipfileLockPoetryLockAndRequirementsCoexist()
+    {
+        var dir = ParserTestHelpers.CreateTempDir();
+        try
+        {
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("pip", "Pipfile.lock"), dir, "Pipfile.lock");
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("pip", "poetry.lock"), dir, "poetry.lock");
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("pip", "requirements.txt"), dir, "requirements.txt");
+
+            var deps = new ParserRegistry().Scan(dir);
+            var pip = deps.Where(d => d.Ecosystem == "pip").ToDictionary(d => d.Name, d => d.Version);
+
+            // Triple-lock: Pipfile.lock wins outright, no double-count (7 deps).
+            Assert.Equal(7, pip.Count);
+            Assert.Equal("2.31.0", pip["requests"]);
+            Assert.Equal("7.4.0", pip["pytest"]);
+            Assert.Equal("1.0.0", pip["shared-pkg"]);
+            Assert.DoesNotContain("certifi", pip.Keys);
+            Assert.DoesNotContain("flask", pip.Keys);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Should_ReturnEmptyWithoutThrow_When_RegistryScansMalformedManifest()
     {
         var dir = ParserTestHelpers.CreateTempDir();
