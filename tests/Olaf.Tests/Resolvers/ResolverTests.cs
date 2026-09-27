@@ -248,6 +248,135 @@ public sealed class PyPIResolverTests
         Assert.Null(result.SpdxId);
         Assert.NotNull(result.Reason);
     }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_OfflineTransportFails()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            throw new HttpRequestException("offline mode: no network"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
+        var dep = new Dependency("pypi", "requests", "2.31.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("transport-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, handler.CallCount); // retried exactly once
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_PyPI500()
+    {
+        var handler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.ServerError());
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
+        var dep = new Dependency("pypi", "requests", "2.31.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("registry-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, handler.CallCount); // 500 is transient: retried exactly once
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_PyPIBodyMalformed()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text("this is not json{{{"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
+        var dep = new Dependency("pypi", "requests", "2.31.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("parse-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_PyPIHasNoUsableLicense()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new
+            {
+                info = new
+                {
+                    name = "requests",
+                    version = "2.31.0",
+                    license = "",
+                    classifiers = Array.Empty<string>(),
+                },
+            }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
+        var dep = new Dependency("pypi", "requests", "2.31.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Should_ResolveSpdx_When_PyPIProvidesLicenseExpression()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new
+            {
+                info = new
+                {
+                    name = "expr-pkg",
+                    version = "1.0.0",
+                    license = "",
+                    license_expression = "MIT",
+                    classifiers = Array.Empty<string>(),
+                },
+            }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
+        var dep = new Dependency("pypi", "expr-pkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+    }
+
+    [Fact]
+    public async Task Should_ResolveSpdx_When_PipAliasEcosystem()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new
+            {
+                info = new
+                {
+                    name = "requests",
+                    version = "2.31.0",
+                    license = "MIT",
+                    classifiers = Array.Empty<string>(),
+                },
+            }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
+        var dep = new Dependency("pip", "requests", "2.31.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+    }
 }
 
 public sealed class FallbackResolverTests
