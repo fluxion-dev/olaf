@@ -1,39 +1,43 @@
 #!/usr/bin/env bash
 # format-matrix-dump.sh — CLI format matrix on committed npm fixture (issue #3).
-# Runs: for f in json yaml xml html txt md cyclonedx-json; do
+# Runs: for f in json yaml xml html txt md cyclonedx-json cyclonedx-xml; do
 #   dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format $f; done
 # then checks each output for 8 fields + direct (9th) + summary counts; HTML additionally
 # requires <table> and HTML-encoded cell output; cyclonedx-json asserts the
-# CycloneDX envelope (bomFormat/specVersion/components).
+# CycloneDX envelope (bomFormat/specVersion/components); cyclonedx-xml asserts the
+# CycloneDX XML envelope (<bom/xmlns bom/1.5/metadata/components) + <scope>
+# element + olaf: counts props + well-formedness (python xml parse).
 # NOTE: empty-components case not applicable — the CLI exits 2 ("No manifests
 # found") on manifest-less input before any formatter runs, so every matrix
 # scan carries ≥1 component.
 # Offline-safe: never passes --strict; resolver network failures degrade to
 # Unknown with exit 0 (deterministic continue in Program.cs).
 # Rules: repo-relative, idempotent (stdout only, temp files cleaned), no secrets.
-VERSION="0.3.0"
+VERSION="0.4.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
-FORMATS="json yaml xml html txt md cyclonedx-json"
+FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml"
 FIXTURE_REL="tests/Olaf.Tests/Fixtures/npm"
 PROJECT_REL="src/Olaf.Cli"
 
 usage() {
-  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|all] [--timeout <secs>] [--help] [--version]"
+  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|all] [--timeout <secs>] [--help] [--version]"
   echo ""
   echo "CLI format matrix on the committed npm fixture (offline-safe, non-strict)."
   echo "Runs 'dotnet run --project $PROJECT_REL -- --input $FIXTURE_REL --format <f>'"
-  echo "for each format (default: all seven) with 'timeout <secs>s' per scan"
+  echo "for each format (default: all eight) with 'timeout <secs>s' per scan"
   echo "(default: 60), then verifies:"
   echo "  - 8 fields present (ecosystem,name,version,spdx,licenseText,sourceUrl,status,reason"
   echo "    or per-format equivalents: <th> headers for html, <elements> for xml, keys for yaml,"
   echo "    SPDX:/Status: lines for txt, | table | headers for md, components[] for cyclonedx-json)"
   echo "  - 9th field 'direct' present (json \"direct\" / yaml direct: / xml <direct> / html <th>Direct</th>"
-  echo "    / txt direct= / md | Direct | / cyclonedx-json scope required|optional)"
+  echo "    / txt direct= / md | Direct | / cyclonedx-json scope required|optional / cyclonedx-xml <scope>required|optional</scope>)"
   echo "  - summary counts present (total/resolved/unknown or per-format equivalent)"
   echo "  - html additionally contains <table> and HTML-encoded cell output"
   echo "  - cyclonedx-json additionally asserts bomFormat==CycloneDX + specVersion==1.5"
+  echo "  - cyclonedx-xml additionally asserts <bom + xmlns bom/1.5 + <metadata>/<components>"
+  echo "    + well-formedness (python xml parse)"
   echo ""
   echo "Options:"
   echo "  --format <f>   single format or 'all' (default: all)"
@@ -62,9 +66,9 @@ while [[ $# -gt 0 ]]; do
     --format)
       [[ $# -lt 2 ]] && { echo "Missing value for --format." >&2; exit 2; }
       case "$2" in
-        json|yaml|xml|html|txt|md|cyclonedx-json) FORMATS="$2" ;;
-        all) FORMATS="json yaml xml html txt md cyclonedx-json" ;;
-        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|txt|md|cyclonedx-json|all." >&2; exit 2 ;;
+        json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml) FORMATS="$2" ;;
+        all) FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml" ;;
+        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|all." >&2; exit 2 ;;
       esac
       shift 2
       ;;
@@ -197,6 +201,26 @@ for f in $FORMATS; do
       fi
       if check_contains "$f" "$OUT" "counts" '"olaf:total"' '"olaf:resolved"' '"olaf:unknown"'; then
         pass "$f" "summary counts (olaf:total/resolved/unknown props) present"
+      fi
+      ;;
+    cyclonedx-xml)
+      if check_contains "$f" "$OUT" "envelope" '<bom' 'bom/1.5' '<metadata>' '<components>'; then
+        pass "$f" "envelope <bom + xmlns bom/1.5 + <metadata>/<components> present"
+      fi
+      if check_contains "$f" "$OUT" "direct-scope" '<scope>'; then
+        pass "$f" "9th field 'direct' via <scope>required|optional</scope> present"
+      fi
+      if check_contains "$f" "$OUT" "counts" 'olaf:total' 'olaf:resolved' 'olaf:unknown'; then
+        pass "$f" "summary counts (olaf:total/resolved/unknown props) present"
+      fi
+      if python3 - "$OUT" <<'PY' 2>/dev/null
+import sys, xml.etree.ElementTree as ET
+ET.parse(sys.argv[1])
+PY
+      then
+        pass "$f" "well-formed XML (python xml parse OK)"
+      else
+        fail "$f" "not well-formed XML (python xml parse failed)"
       fi
       ;;
 
