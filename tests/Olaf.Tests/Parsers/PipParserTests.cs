@@ -109,4 +109,161 @@ public sealed class PipParserTests
             Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    [Fact]
+    public void Should_Handle_File_When_CanHandlePipfileLock()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+
+        Assert.True(parser.CanHandle("Pipfile.lock"));
+        Assert.True(parser.CanHandle("PIPFILE.LOCK"));
+        Assert.True(parser.CanHandle("/some/dir/Pipfile.lock"));
+        Assert.False(parser.CanHandle("Pipfile"));
+    }
+
+    [Fact]
+    public void Should_StripVersionMarker_When_PipfileLockHasVersionedDeps()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var deps = parser.Parse(path);
+
+        var byName = deps.ToDictionary(d => d.Name, d => d.Version);
+        Assert.Equal("2.31.0", byName["requests"]);
+        Assert.Equal("7.4.0", byName["pytest"]);
+        Assert.All(deps, d =>
+        {
+            Assert.False(d.IsTransitive);
+            Assert.True(d.Direct);
+        });
+    }
+
+    [Fact]
+    public void Should_IgnoreExtrasMarkersHashes_When_PipfileLockVersioned()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var deps = parser.Parse(path);
+
+        var requests = deps.Single(d => d.Name == "requests");
+        // extras (security), markers (python_version) and hashes must not leak into version.
+        Assert.Equal("2.31.0", requests.Version);
+        Assert.DoesNotContain("security", requests.Version);
+        Assert.DoesNotContain("markers", requests.Version);
+        Assert.DoesNotContain("sha256", requests.Version);
+        Assert.DoesNotContain("==", requests.Version);
+    }
+
+    [Fact]
+    public void Should_ReturnWildcard_When_PipfileLockHasGitRef()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var deps = parser.Parse(path);
+
+        var git = deps.Single(d => d.Name == "my-git-dep");
+        Assert.Equal("*", git.Version);
+        Assert.False(git.IsTransitive);
+        Assert.True(git.Direct);
+    }
+
+    [Fact]
+    public void Should_ReturnWildcard_When_PipfileLockHasPathFileEditable()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var byName = parser.Parse(path).ToDictionary(d => d.Name, d => d.Version);
+
+        Assert.Equal("*", byName["my-local"]);
+        Assert.Equal("*", byName["my-file"]);
+        Assert.Equal("*", byName["my-editable"]);
+    }
+
+    [Fact]
+    public void Should_IncludeDevelopOnly_When_PipfileLockHasDevelopSection()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var deps = parser.Parse(path);
+
+        Assert.Contains(deps, d => d.Name == "pytest" && d.Version == "7.4.0");
+    }
+
+    [Fact]
+    public void Should_PreferDefault_When_PipfileLockDefaultDevelopCollide()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var byName = parser.Parse(path).ToDictionary(d => d.Name, d => d.Version);
+
+        // shared-pkg exists in both sections: default (1.0.0) wins over develop (2.0.0).
+        Assert.Equal("1.0.0", byName["shared-pkg"]);
+    }
+
+    [Fact]
+    public void Should_ReturnSingleFileSet_When_PipfileLockParsed()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var path = ParserTestHelpers.FixturePath("pip", "Pipfile.lock");
+
+        var deps = parser.Parse(path);
+
+        Assert.Equal(7, deps.Count);
+        Assert.DoesNotContain(deps, d => d.Name == "_meta");
+        Assert.All(deps, d => Assert.Equal("pip", d.Ecosystem));
+        Assert.All(deps, d =>
+        {
+            Assert.False(d.IsTransitive);
+            Assert.True(d.Direct);
+        });
+    }
+
+    [Fact]
+    public void Should_ReturnEmptyWithoutThrow_When_PipfileLockMalformed()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var dir = ParserTestHelpers.CreateTempDir();
+        try
+        {
+            var bad = Path.Combine(dir, "Pipfile.lock");
+            File.WriteAllText(bad, "{ not valid json !!!");
+
+            var deps = parser.Parse(bad);
+
+            Assert.NotNull(deps);
+            Assert.Empty(deps);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Should_ReturnEmpty_When_PipfileLockMissingOrEmptySections()
+    {
+        var parser = ParserTestHelpers.ResolveParser("pip");
+        var dir = ParserTestHelpers.CreateTempDir();
+        try
+        {
+            var metaOnly = Path.Combine(dir, "Pipfile.lock");
+            File.WriteAllText(metaOnly, """{"_meta": {"pipfile-spec": 6}}""");
+
+            Assert.Empty(parser.Parse(metaOnly));
+
+            File.WriteAllText(metaOnly, """{"default": {}, "develop": {}}""");
+
+            Assert.Empty(parser.Parse(metaOnly));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Olaf.Core;
 
@@ -15,13 +16,28 @@ public sealed class PipParser : IEcosystemParser
             || string.Equals(name, "poetry.lock", StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, "uv.lock", StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, "environment.yml", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "environment.yaml", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(name, "environment.yaml", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "Pipfile.lock", StringComparison.OrdinalIgnoreCase);
     }
 
     public IReadOnlyList<Dependency> Parse(string inputPath)
     {
         if (Directory.Exists(inputPath))
         {
+            // Pipfile.lock is authoritative: resolved lock output wins outright with
+            // no companion fallback (no Pipfile-presence check). Return immediately
+            // when non-empty so co-present poetry.lock/uv.lock/requirements are never
+            // double-counted.
+            var pipfileLockPath = Path.Combine(inputPath, "Pipfile.lock");
+            if (File.Exists(pipfileLockPath))
+            {
+                var pipfileDeps = ParsePipfileLock(pipfileLockPath);
+                if (pipfileDeps.Count > 0)
+                {
+                    return pipfileDeps;
+                }
+            }
+
             // Lock > requirements > pyproject > environment: first present tier wins.
             var poetryPath = Path.Combine(inputPath, "poetry.lock");
             var uvPath = Path.Combine(inputPath, "uv.lock");
@@ -89,6 +105,11 @@ public sealed class PipParser : IEcosystemParser
     private IReadOnlyList<Dependency> ParseFile(string path)
     {
         var name = Path.GetFileName(path);
+        if (string.Equals(name, "Pipfile.lock", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParsePipfileLock(path);
+        }
+
         if (string.Equals(name, "poetry.lock", StringComparison.OrdinalIgnoreCase)
             || string.Equals(name, "uv.lock", StringComparison.OrdinalIgnoreCase))
         {
@@ -382,6 +403,84 @@ public sealed class PipParser : IEcosystemParser
     private static IReadOnlyList<Dependency> ParsePoetryLock(string path)
     {
         return ParseTomlPackageLock(path);
+    }
+
+    private static IReadOnlyList<Dependency> ParsePipfileLock(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return Array.Empty<Dependency>();
+            }
+
+            var text = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(text);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return Array.Empty<Dependency>();
+            }
+
+            // default wins on collision: insert default first, develop only if absent.
+            var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var section in new[] { "default", "develop" })
+            {
+                if (!doc.RootElement.TryGetProperty(section, out var sectionEl)
+                    || sectionEl.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                foreach (var entry in sectionEl.EnumerateObject())
+                {
+                    if (byName.ContainsKey(entry.Name) || entry.Value.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+
+                    var version = "*";
+                    if (entry.Value.TryGetProperty("version", out var versionEl)
+                        && versionEl.ValueKind == JsonValueKind.String)
+                    {
+                        var raw = (versionEl.GetString() ?? string.Empty).Trim();
+                        if (raw.Length > 0)
+                        {
+                            var stripped = raw.TrimStart('=');
+                            version = stripped.Length == 0 ? "*" : stripped;
+                        }
+                    }
+                    // No version key (git/file/path/editable) → "*" (resolved VCS/local ref).
+
+                    // Validate hashes[] holds strings, then discard — Dependency carries no hash field.
+                    if (entry.Value.TryGetProperty("hashes", out var hashesEl)
+                        && hashesEl.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var hashEl in hashesEl.EnumerateArray())
+                        {
+                            _ = hashEl.ValueKind == JsonValueKind.String ? hashEl.GetString() : null;
+                        }
+                    }
+
+                    byName[entry.Name] = version;
+                }
+            }
+
+            return byName.Select(kv => new Dependency("pip", kv.Key, kv.Value, IsTransitive: false)).ToList();
+        }
+        catch (JsonException)
+        {
+            // Malformed lock → empty; registry does not swallow Json.
+            return Array.Empty<Dependency>();
+        }
+        catch (IOException)
+        {
+            // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            return Array.Empty<Dependency>();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Array.Empty<Dependency>();
+        }
     }
 
     private static IReadOnlyList<Dependency> ParseTomlPackageLock(string path)

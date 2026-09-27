@@ -133,4 +133,40 @@ public sealed class PipExtendedLockTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public void Should_PreferPipfileLock_When_PipfileLockPoetryLockAndRequirementsCoexist()
+    {
+        var dir = ParserTestHelpers.CreateTempDir();
+        try
+        {
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("pip", "Pipfile.lock"), dir, "Pipfile.lock");
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("pip", "poetry.lock"), dir, "poetry.lock");
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("pip", "requirements.txt"), dir, "requirements.txt");
+
+            var deps = ParserTestHelpers.ResolveParser("pip").Parse(dir);
+            var byName = deps.ToDictionary(d => d.Name, d => d.Version);
+
+            // Authoritative lock wins outright: 7 Pipfile.lock deps, no double-count.
+            Assert.Equal(7, deps.Count);
+            Assert.Equal("2.31.0", byName["requests"]);
+            Assert.Equal("7.4.0", byName["pytest"]);
+            Assert.Equal("*", byName["my-git-dep"]);
+            // poetry.lock-exclusive dep absent; requirements-only dep absent.
+            Assert.DoesNotContain("certifi", byName.Keys);
+            Assert.DoesNotContain("flask", byName.Keys);
+            Assert.All(deps, d =>
+            {
+                Assert.False(d.IsTransitive);
+                Assert.True(d.Direct);
+            });
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }

@@ -1,0 +1,54 @@
+{
+  "_meta": {
+    "pipfile-spec": 6,
+    "requires": {},
+    "sources": []
+  },
+  "default": {
+    "requests": {
+      "version": "==2.31.0",
+      "hashes": [
+        "sha256:abcdef0000000000000000000000000000000000000000000000000000000001",
+        "sha256:abcdef0000000000000000000000000000000000000000000000000000000002"
+      ],
+      "markers": "python_version >= '3.8'",
+      "extras": [
+        "security"
+      ]
+    },
+    "shared-pkg": {
+      "version": "==1.0.0",
+      "hashes": [
+        "sha256:abcdef0000000000000000000000000000000000000000000000000000000003"
+      ]
+    },
+    "my-git-dep": {
+      "git": "https://github.com/org/repo.git",
+      "ref": "v1.2.3"
+    },
+    "my-local": {
+      "path": "./vendor/pkg"
+    },
+    "my-file": {
+      "file": "https://files.example.com/pkg-1.0.tar.gz"
+    },
+    "my-editable": {
+      "path": ".",
+      "editable": true
+    }
+  },
+  "develop": {
+    "pytest": {
+      "version": "==7.4.0",
+      "hashes": [
+        "sha256:abcdef0000000000000000000000000000000000000000000000000000000004"
+      ]
+    },
+    "shared-pkg": {
+      "version": "==2.0.0",
+      "hashes": [
+        "sha256:abcdef0000000000000000000000000000000000000000000000000000000005"
+      ]
+    }
+  }
+}
