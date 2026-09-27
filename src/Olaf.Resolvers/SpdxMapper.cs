@@ -35,13 +35,22 @@ internal static class SpdxMapper
             "mit" or "mit license" or "the mit license" => "MIT",
             "apache 2.0" or "apache-2.0" or "apache license 2.0" or "apache license, version 2.0"
                 or "apache software license" or "apache license" or "apache" => "Apache-2.0",
+            "apache 1.1" or "apache-1.1" or "apache license 1.1" or "apache license, version 1.1"
+                or "apache software license 1.1" => "Apache-1.1",
             "isc" or "isc license" => "ISC",
             "bsd-2-clause" or "bsd 2-clause" or "bsd simplified" => "BSD-2-Clause",
             "bsd-3-clause" or "bsd 3-clause" or "bsd new" or "bsd revised" => "BSD-3-Clause",
+            "bsd-4-clause" or "bsd 4-clause" or "bsd original" => "BSD-4-Clause",
+            "gpl-1.0-only" or "gplv1" or "gpl-1.0" => "GPL-1.0-only",
             "gpl-2.0-only" or "gplv2" or "gpl-2.0" => "GPL-2.0-only",
             "gpl-3.0-only" or "gplv3" or "gpl-3.0" => "GPL-3.0-only",
-            "lgpl-2.1-only" or "lgpl-2.1" => "LGPL-2.1-only",
-            "lgpl-3.0-only" or "lgpl-3.0" => "LGPL-3.0-only",
+            "agpl-1.0-only" or "agplv1" or "agpl-1.0" => "AGPL-1.0-only",
+            "agpl-3.0-only" or "agplv3" or "agpl-3.0" => "AGPL-3.0-only",
+            "lgpl-2.0-only" or "lgplv2" or "lgpl-2.0" => "LGPL-2.0-only",
+            "lgpl-2.1-only" or "lgplv2.1" or "lgpl-2.1" => "LGPL-2.1-only",
+            "lgpl-3.0-only" or "lgplv3" or "lgpl-3.0" => "LGPL-3.0-only",
+            "mpl-1.0" or "mozilla public license 1.0" => "MPL-1.0",
+            "mpl-1.1" or "mpl-1.1" or "mozilla public license 1.1" => "MPL-1.1",
             "mpl-2.0" or "mozilla public license 2.0" => "MPL-2.0",
             "cddl-1.0" => "CDDL-1.0",
             "epl-1.0" => "EPL-1.0",
@@ -49,6 +58,7 @@ internal static class SpdxMapper
             "unlicense" or "the unlicense" => "Unlicense",
             "cc0-1.0" or "cc0" => "CC0-1.0",
             "artistic-2.0" => "Artistic-2.0",
+            "aal" or "attribution assurance license" => "AAL",
             _ => trimmed,
         };
     }
@@ -72,6 +82,11 @@ internal static class SpdxMapper
             || lower.Contains("mit-license") || lower.Contains("mitlicense"))
         {
             return "MIT";
+        }
+
+        if (lower.Contains("gnu.org/licenses/agpl") || lower.Contains("agpl"))
+        {
+            return "AGPL-3.0-only";
         }
 
         if (lower.Contains("gpl-3") || lower.Contains("gnu.org/licenses/gpl"))
@@ -104,6 +119,16 @@ internal static class SpdxMapper
             return "Unlicense";
         }
 
+        if (lower.Contains("opensource.org/licenses/aal") || lower.Contains("aal"))
+        {
+            return "AAL";
+        }
+
+        if (lower.Contains("bsd-original") || lower.Contains("bsd-4"))
+        {
+            return "BSD-4-Clause";
+        }
+
         return null;
     }
 
@@ -125,6 +150,11 @@ internal static class SpdxMapper
             return "Apache-2.0";
         }
 
+        if (lower.Contains("bsd 4") || lower.Contains("bsd-4") || lower.Contains("bsd original") || lower.Contains("original bsd"))
+        {
+            return "BSD-4-Clause";
+        }
+
         if (lower.Contains("bsd license") || lower.Contains("bsd-3") || lower.Contains("bsd 3"))
         {
             return "BSD-3-Clause";
@@ -140,9 +170,19 @@ internal static class SpdxMapper
             return "MPL-2.0";
         }
 
+        if (lower.Contains("affero") || lower.Contains("agpl"))
+        {
+            return "AGPL-3.0-only";
+        }
+
         if (lower.Contains("gpl"))
         {
             return "GPL-3.0-only";
+        }
+
+        if (lower.Contains("attribution assurance") || lower.Contains("aal"))
+        {
+            return "AAL";
         }
 
         return null;
