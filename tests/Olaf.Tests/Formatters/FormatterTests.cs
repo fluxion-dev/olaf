@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using System.Text.Json;
 using System.Xml;
@@ -582,8 +583,8 @@ public sealed class HtmlFormatterTests
         Assert.Contains("Total: 2", output, StringComparison.Ordinal);
         Assert.Contains("Resolved: 1", output, StringComparison.Ordinal);
         Assert.Contains("Unknown: 1", output, StringComparison.Ordinal);
-        Assert.Contains(System.Net.WebUtility.HtmlEncode("https://example.com/express/LICENSE"), output, StringComparison.Ordinal);
-        Assert.Contains(System.Net.WebUtility.HtmlEncode("not-found: no license for 'mystery-pkg 1.0.0'."), output, StringComparison.Ordinal);
+        Assert.Contains(WebUtility.HtmlEncode("https://example.com/express/LICENSE"), output, StringComparison.Ordinal);
+        Assert.Contains(WebUtility.HtmlEncode("not-found: no license for 'mystery-pkg 1.0.0'."), output, StringComparison.Ordinal);
 
         FormatterTestHelpers.AssertEightFieldsPresent(output, "html");
         FormatterTestHelpers.AssertSummaryCounts(output);
@@ -597,7 +598,7 @@ public sealed class HtmlFormatterTests
         var output = formatter.FormatResult(FormatterTestHelpers.EscapingScanResult());
 
         Assert.DoesNotContain("<script>", output, StringComparison.Ordinal);
-        Assert.Contains(System.Net.WebUtility.HtmlEncode("evil<script>&\"pkg"), output, StringComparison.Ordinal);
+        Assert.Contains(WebUtility.HtmlEncode("evil<script>&\"pkg"), output, StringComparison.Ordinal);
     }
 
     [Fact]

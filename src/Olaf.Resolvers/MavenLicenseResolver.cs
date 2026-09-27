@@ -103,19 +103,13 @@ public sealed class MavenLicenseResolver : ILicenseResolver
 
     internal static (string? GroupId, string? ArtifactId) SplitName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (!MavenCoordinates.TrySplit(name, out var rawGroup, out var rawArtifact))
         {
             return (null, null);
         }
 
-        var sep = name.IndexOf(':');
-        if (sep <= 0 || sep == name.Length - 1)
-        {
-            return (null, null);
-        }
-
-        var groupId = name.Substring(0, sep).Trim();
-        var artifactId = name.Substring(sep + 1).Trim();
+        var groupId = rawGroup!.Trim();
+        var artifactId = rawArtifact!.Trim();
         if (groupId.Length == 0 || artifactId.Length == 0 || artifactId.Contains(':'))
         {
             return (null, null);

@@ -23,3 +23,4 @@ Wave 5a hardening (binding):
 Wave 5b hardening (binding, threshold-HIT):
 - Fixture-filename assertion: every planned fixture path must match a real CanHandle/registry lookup (exact filename, not just directory), verified by a discovery `ls`/glob snapshot cited in the plan before freeze.
 - Plan-table sum-check: itemized test rows must sum to the pinned planned-new total before plan freeze (e.g. rows `3+2+1 = 6 planned-new`); mismatch blocks freeze.
+- Step file-tags: each serial-plan Step row gains a `Files:` column with `path:anchor-line` pinned at base SHA (e.g. `new: src/Olaf.Formatters/CycloneDxFormatter.cs; reg: FormatterRegistry.cs:<line>; tests: ...Tests.cs:<lines> [N]`); tester verifies `git diff --stat` matches the tagged set before running; untagged files in diff = stop-and-ask.

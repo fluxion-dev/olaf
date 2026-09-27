@@ -1,7 +1,7 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Olaf.Core;
+using Olaf.Formatters;
 using Olaf.Tests.Cli;
 
 namespace Olaf.Tests.Formatters;
@@ -383,13 +383,8 @@ public sealed class CycloneDxFormatterTests
         Assert.Equal("cyclonedx-json", alias.Format, StringComparer.OrdinalIgnoreCase);
 
         // toml still throws; the message names the new format.
-        // Registry resolves via reflection, so the ArgumentException surfaces
-        // wrapped in TargetInvocationException — unwrap before asserting.
-        var thrown = Assert.ThrowsAny<Exception>(() => FormatterTestHelpers.GetFormatterViaRegistry("toml"));
-        var message = thrown is TargetInvocationException wrapper && wrapper.InnerException is not null
-            ? wrapper.InnerException.Message
-            : thrown.Message;
-        Assert.Contains("cyclonedx-json", message, StringComparison.Ordinal);
+        var thrown = Assert.Throws<ArgumentException>(() => new FormatterRegistry().GetFormatter("toml"));
+        Assert.Contains("cyclonedx-json", thrown.Message, StringComparison.Ordinal);
     }
 
     [Fact]

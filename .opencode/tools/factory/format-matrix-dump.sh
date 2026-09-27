@@ -1,33 +1,39 @@
 #!/usr/bin/env bash
 # format-matrix-dump.sh — CLI format matrix on committed npm fixture (issue #3).
-# PROTOTYPE (do NOT promote yet — promote on 2nd reuse per factory-toolbuilder).
-# Runs: for f in json yaml xml html; do
+# Runs: for f in json yaml xml html txt md cyclonedx-json; do
 #   dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format $f; done
 # then checks each output for 8 fields + direct (9th) + summary counts; HTML additionally
-# requires <table> and HTML-encoded cell output.
+# requires <table> and HTML-encoded cell output; cyclonedx-json asserts the
+# CycloneDX envelope (bomFormat/specVersion/components).
+# NOTE: empty-components case not applicable — the CLI exits 2 ("No manifests
+# found") on manifest-less input before any formatter runs, so every matrix
+# scan carries ≥1 component.
 # Offline-safe: never passes --strict; resolver network failures degrade to
 # Unknown with exit 0 (deterministic continue in Program.cs).
 # Rules: repo-relative, idempotent (stdout only, temp files cleaned), no secrets.
-VERSION="0.2.0"
+VERSION="0.3.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
-FORMATS="json yaml xml html"
+FORMATS="json yaml xml html txt md cyclonedx-json"
 FIXTURE_REL="tests/Olaf.Tests/Fixtures/npm"
 PROJECT_REL="src/Olaf.Cli"
 
 usage() {
-  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|all] [--timeout <secs>] [--help] [--version]"
+  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|all] [--timeout <secs>] [--help] [--version]"
   echo ""
   echo "CLI format matrix on the committed npm fixture (offline-safe, non-strict)."
   echo "Runs 'dotnet run --project $PROJECT_REL -- --input $FIXTURE_REL --format <f>'"
-  echo "for each format (default: all four) with 'timeout <secs>s' per scan"
+  echo "for each format (default: all seven) with 'timeout <secs>s' per scan"
   echo "(default: 60), then verifies:"
   echo "  - 8 fields present (ecosystem,name,version,spdx,licenseText,sourceUrl,status,reason"
-  echo "    or per-format equivalents: <th> headers for html, <elements> for xml, keys for yaml)"
-  echo "  - 9th field 'direct' present (json \"direct\" / yaml direct: / xml <direct> / html <th>Direct</th>)"
+  echo "    or per-format equivalents: <th> headers for html, <elements> for xml, keys for yaml,"
+  echo "    SPDX:/Status: lines for txt, | table | headers for md, components[] for cyclonedx-json)"
+  echo "  - 9th field 'direct' present (json \"direct\" / yaml direct: / xml <direct> / html <th>Direct</th>"
+  echo "    / txt direct= / md | Direct | / cyclonedx-json scope required|optional)"
   echo "  - summary counts present (total/resolved/unknown or per-format equivalent)"
   echo "  - html additionally contains <table> and HTML-encoded cell output"
+  echo "  - cyclonedx-json additionally asserts bomFormat==CycloneDX + specVersion==1.5"
   echo ""
   echo "Options:"
   echo "  --format <f>   single format or 'all' (default: all)"
@@ -56,9 +62,9 @@ while [[ $# -gt 0 ]]; do
     --format)
       [[ $# -lt 2 ]] && { echo "Missing value for --format." >&2; exit 2; }
       case "$2" in
-        json|yaml|xml|html) FORMATS="$2" ;;
-        all) FORMATS="json yaml xml html" ;;
-        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|all." >&2; exit 2 ;;
+        json|yaml|xml|html|txt|md|cyclonedx-json) FORMATS="$2" ;;
+        all) FORMATS="json yaml xml html txt md cyclonedx-json" ;;
+        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|txt|md|cyclonedx-json|all." >&2; exit 2 ;;
       esac
       shift 2
       ;;
@@ -164,6 +170,36 @@ for f in $FORMATS; do
         pass "$f" "9th field 'direct' present"
       fi
       ;;
+    txt)
+      if check_contains "$f" "$OUT" "fields" 'SPDX:' 'Status:' \
+        && check_contains "$f" "$OUT" "counts" 'Total:' 'Resolved:' 'Unknown:'; then
+        pass "$f" "fields + summary counts present"
+      fi
+      if check_contains "$f" "$OUT" "direct" 'direct='; then
+        pass "$f" "9th field 'direct=' present"
+      fi
+      ;;
+    md)
+      if check_contains "$f" "$OUT" "fields/headers" '| Ecosystem |' '| Name |' '| Version |' '| SPDX |' '| License |' '| Source |' '| Status |' '| Reason |' \
+        && check_contains "$f" "$OUT" "counts" 'Total:' 'Resolved:' 'Unknown:'; then
+        pass "$f" "8 | headers | + summary counts present"
+      fi
+      if check_contains "$f" "$OUT" "direct-header" '| Direct |'; then
+        pass "$f" "9th header | Direct | present"
+      fi
+      ;;
+    cyclonedx-json)
+      if check_contains "$f" "$OUT" "envelope" '"bomFormat"' '"CycloneDX"' '"specVersion"' '"1.5"' '"components"'; then
+        pass "$f" "envelope bomFormat==CycloneDX + specVersion==1.5 + components present"
+      fi
+      if check_contains "$f" "$OUT" "direct-scope" '"scope"'; then
+        pass "$f" "9th field 'direct' via scope required|optional present"
+      fi
+      if check_contains "$f" "$OUT" "counts" '"olaf:total"' '"olaf:resolved"' '"olaf:unknown"'; then
+        pass "$f" "summary counts (olaf:total/resolved/unknown props) present"
+      fi
+      ;;
+
     html)
       if check_contains "$f" "$OUT" "fields/headers" '<th>Ecosystem</th>' '<th>Name</th>' '<th>Version</th>' '<th>SPDX</th>' '<th>License</th>' '<th>Source</th>' '<th>Status</th>' '<th>Reason</th>' \
         && check_contains "$f" "$OUT" "counts" 'Total:' 'Resolved:' 'Unknown:'; then

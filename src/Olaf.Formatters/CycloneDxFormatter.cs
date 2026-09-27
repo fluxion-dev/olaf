@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -105,9 +106,9 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
             ["component"] = new Dictionary<string, string?> { ["type"] = "application", ["name"] = "olaf-scan" },
             ["properties"] = new[]
             {
-                new Dictionary<string, string?> { ["name"] = "olaf:total", ["value"] = result.TotalCount.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-                new Dictionary<string, string?> { ["name"] = "olaf:resolved", ["value"] = result.ResolvedCount.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-                new Dictionary<string, string?> { ["name"] = "olaf:unknown", ["value"] = result.UnknownCount.ToString(System.Globalization.CultureInfo.InvariantCulture) },
+                new Dictionary<string, string?> { ["name"] = "olaf:total", ["value"] = result.TotalCount.ToString(CultureInfo.InvariantCulture) },
+                new Dictionary<string, string?> { ["name"] = "olaf:resolved", ["value"] = result.ResolvedCount.ToString(CultureInfo.InvariantCulture) },
+                new Dictionary<string, string?> { ["name"] = "olaf:unknown", ["value"] = result.UnknownCount.ToString(CultureInfo.InvariantCulture) },
             },
         };
         var envelope = new Dictionary<string, object?>
@@ -127,11 +128,10 @@ internal static class CycloneDxPurl
 {
     internal static bool TrySplitMavenCoordinates(string name, out string group, out string coordinates)
     {
-        var separator = name.IndexOf(':');
-        if (separator >= 0)
+        if (MavenCoordinates.TrySplit(name, out var groupPart, out var artifactPart))
         {
-            group = name[..separator];
-            coordinates = name[..separator] + "/" + name[(separator + 1)..];
+            group = groupPart!;
+            coordinates = groupPart + "/" + artifactPart;
             return true;
         }
 

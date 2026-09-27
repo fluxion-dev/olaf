@@ -230,13 +230,12 @@ public sealed class GradleParser : IEcosystemParser
         var group = ExtractInlineField(v, "group");
         var name = ExtractInlineField(v, "name");
         var module = ExtractInlineField(v, "module");
-        if (module is not null)
+        if (module is not null && MavenCoordinates.TrySplit(module, out var moduleGroup, out var moduleName))
         {
-            var sep = module.IndexOf(':');
-            if (sep > 0)
+            if (moduleGroup!.Length > 0)
             {
-                group ??= module.Substring(0, sep).Trim();
-                name ??= module.Substring(sep + 1).Trim();
+                group ??= moduleGroup.Trim();
+                name ??= moduleName!.Trim();
             }
         }
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Olaf.Core;
+using Olaf.Parsers;
 using Olaf.Tests.Parsers;
 
 namespace Olaf.Tests.Formatters;
@@ -53,11 +54,11 @@ public sealed class TransitiveCoverageTests
             ParserTestHelpers.FixturePath("npm", "package-lock.json"), "package-lock.json");
         try
         {
-            var manifestDeps = new Olaf.Parsers.ParserRegistry().Scan(manifestDir);
+            var manifestDeps = new ParserRegistry().Scan(manifestDir);
             Assert.NotEmpty(manifestDeps);
             Assert.All(manifestDeps, d => Assert.True(d.Direct, $"Expected manifest dep '{d.Name}' to be direct."));
 
-            var lockDeps = new Olaf.Parsers.ParserRegistry().Scan(lockDir);
+            var lockDeps = new ParserRegistry().Scan(lockDir);
             Assert.NotEmpty(lockDeps);
             Assert.All(lockDeps, d => Assert.False(d.Direct, $"Expected lock dep '{d.Name}' to be transitive."));
         }
