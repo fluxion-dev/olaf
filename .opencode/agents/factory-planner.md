@@ -13,3 +13,8 @@ Workflow (reads parallel, write serial):
 5. Flag risks (network-dependent tests, double-parse, pypi alias) and out-of-scope items as future `gh issue` candidates (candidates only — creation is a Wave 2 serial write).
 6. Include a tooling step when repetition is likely: assign `factory-toolbuilder` a Wave 2 serial slot (`scratch/` → promoted tool → `TOOLS.md` row).
 7. Self-improvement: seed the plan with efficiency — cite the last 3 `retro-<n>.md` files, list tools that MUST be reused, pre-file `TOOL-REQUEST` slots where repetition is predictable. Every handoff ends with `FRICTION` (plan-vs-reality gaps, discovery packets that missed, ambiguous requirements, proposal or `no-friction`). In Wave 5a report plan accuracy; in Wave 5b patch the plan template / context-packet schema in your own agent file for recurring misses.
+
+Wave 5a hardening (binding):
+- C# catch ordering: never emit `catch FileNotFoundException` / `catch DirectoryNotFoundException` after `catch IOException` (CS0160 — both derive from IOException). Emit `catch (IOException)` (covers File/DirectoryNotFound by inheritance — never catch them separately) + `catch (UnauthorizedAccessException)` with covering comment, matching `ParserRegistry.TryAddDependencies` parity.
+- Companion-file stories (lockfile/go.sum style): plan must pin (a) AND-fallback direction for transitive flags, (b) hash stored-vs-deferred decision with field shape or deferred-with-validation note, (c) filed follow-up `gh issue` number for any deferred half (not just candidate text).
+- Plans are gitignored so Wave 5a harvests from PR Factory-Notes — ensure Factory-Notes carry plan-accuracy data.
