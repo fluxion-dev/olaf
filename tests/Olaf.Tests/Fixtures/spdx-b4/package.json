@@ -1,0 +1,8 @@
+{
+  "name": "olaf-spdx-b4-fixture",
+  "version": "1.0.0",
+  "dependencies": {
+    "font-awesome": "4.7.0",
+    "olaf-nonexistent-pkg-xyz": "0.0.0-does-not-exist"
+  }
+}

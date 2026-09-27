@@ -11,13 +11,15 @@
 #   B3 scope<->direct mapping (<scope>required</scope> iff direct=true, optional iff direct=false)
 #   B4 licenses: EffectiveSpdx single-token->licenses/license/id, multi-word->name,
 #      Unknown->no <licenses> child (+ olaf:status/reason <property> props)
+#      + shared spdx-b4 synth (font-awesome expr + python-dateutil multi-word + phantom
+#      Unknown end-to-end; explicit pins SKIP when the live-registry value is degraded)
 #   B5 purl well-formed (pkg:<type>/...@version) + bom-ref unique ({eco}:{name}@{ver}[-N])
 #   B6 --direct-only subset on go synth + both-flags conflict exit 2
 #   B7 unknown-format (toml) exit 2 + --help lists cyclonedx-xml
 #   R1 format-matrix regression untouched (json/yaml/xml/html markers MATRIX OK)
 # Offline-safe: never passes --strict; resolver failures degrade to Unknown, exit 0.
 # Rules: repo-relative, idempotent (mktemp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.1.1"
 set -euo pipefail
 
 # ---- Canonical root resolution (factory depth: ../../.. per parser-coverage-probe.sh) ----
@@ -340,6 +342,45 @@ if [[ -s "$WORKDIR/go-json.stdout" && -s "$WORKDIR/go-cdx.stdout" ]]; then
   if [[ "$GJ" == "2" ]]; then pass "B2 go scan count 2"; else fail_msg "B2 go scan count $GJ (want 2)"; fi
   if wellformed_gate "B0/go" "$WORKDIR/go-cdx.stdout"; then
     cdx_xml_check "B1-B5/go" "$WORKDIR/go-cdx.stdout" "$WORKDIR/go-json.stdout"
+  fi
+fi
+
+# ---- B4 shared spdx-b4 synth (font-awesome expr + dateutil multi-word + phantom Unknown, end-to-end) ----
+B4FX="$ROOT/tests/Olaf.Tests/Fixtures/spdx-b4"
+[[ -d "$B4FX" ]] || fail_msg "B4 fixture not found: $B4FX"
+if [[ -d "$B4FX" ]]; then
+  run_scan "b4-json" "$B4FX" "json"
+  [[ "$RC" -eq 0 ]] && pass "B4 b4-json exit 0" || fail_msg "B4 b4-json exit $RC"
+  run_scan "b4-cdx" "$B4FX" "cyclonedx-xml"
+  [[ "$RC" -eq 0 ]] && pass "B4 b4-cdx exit 0" || fail_msg "B4 b4-cdx exit $RC"
+  if [[ -s "$WORKDIR/b4-json.stdout" && -s "$WORKDIR/b4-cdx.stdout" ]]; then
+    B4C="$(dep_count "$WORKDIR/b4-json.stdout")"
+    if [[ "$B4C" == "3" ]]; then pass "B4 spdx-b4 scan count 3"; else fail_msg "B4 spdx-b4 scan count $B4C (want 3)"; fi
+    if wellformed_gate "B0/spdx-b4" "$WORKDIR/b4-cdx.stdout"; then
+      cdx_xml_check "B4/spdx-b4" "$WORKDIR/b4-cdx.stdout" "$WORKDIR/b4-json.stdout"
+    fi
+    # Explicit multi-word pin (guarded: SKIP when the live-registry value is degraded offline).
+    DU_SPDX="$(dep_field "$WORKDIR/b4-json.stdout" "python-dateutil" "spdx")"
+    if [[ "$DU_SPDX" == "Dual License" ]]; then
+      if python3 - "$WORKDIR/b4-cdx.stdout" <<'PY' 2>/dev/null
+import sys, xml.etree.ElementTree as ET
+NS = "http://cyclonedx.org/schema/bom/1.5"
+def q(t): return f"{{{NS}}}{t}"
+def text(el, tag):
+    c = el.find(q(tag))
+    return c.text.strip() if c is not None and c.text else ""
+root = ET.parse(sys.argv[1]).getroot()
+compmap = {}
+for c in root.find(q("components")).findall(q("component")):
+    compmap[text(c, "name")] = c
+lic = compmap["python-dateutil"].find(q("licenses")).find(q("license"))
+assert text(lic, "name") == "Dual License", ET.tostring(lic, encoding="unicode")
+PY
+      then pass "B4 multi-word end-to-end: python-dateutil license/name='Dual License'";
+      else fail_msg "B4 multi-word end-to-end: python-dateutil license shape wrong"; fi
+    else
+      echo "SKIP: B4 python-dateutil multi-word pin (ref spdx='$DU_SPDX', live value degraded)"
+    fi
   fi
 fi
 

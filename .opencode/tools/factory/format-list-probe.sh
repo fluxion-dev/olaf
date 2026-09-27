@@ -6,21 +6,21 @@
 #      arms (plus the `markdown` alias arm, which is NOT in the const)
 #   3. live `dotnet run -- --help` runtime text (must print const verbatim)
 #   4. README anchored lines (Supported-formats, Flags --format, --help
-#      excerpt): 8 primary tokens in order (FAIL on missing/misorder); an
+#      excerpt): 9 primary tokens in order (FAIL on missing/misorder); an
 #      absent `cyclonedx` alias token is WARN when an alias parenthetical on
 #      the same line documents it, else FAIL (all three carry the full
-#      9-token list on the accurate tree; the WARN branch covers future
+#      10-token list on the accurate tree; the WARN branch covers future
 #      alias-parenthetical-only wording)
 #   5. alias notes README-wide (markdown->md, cyclonedx->cyclonedx-json,
-#      cyclonedx-xml has no alias)
-#   6. format-matrix-dump.sh FORMATS allowlist (8 primaries in order; the
+#      cyclonedx-xml has no alias, spdx-json has no alias)
+#   6. format-matrix-dump.sh FORMATS allowlist (9 primaries in order; the
 #      `cyclonedx` alias omission is WARN — the alias duplicates the
 #      cyclonedx-json branch) + --format case acceptance per token
 # Rules: repo-relative, read-only (never edits src/docs), idempotent
 # (stdout only), no secrets. No temp files: live --help is captured in a
 # shell variable, so no --workdir/--keep-temp flags.
 # Template-based (_template 0.2.2 blocks: root resolution + pass/fail_msg).
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -50,15 +50,15 @@ usage() {
   echo "Usage: $(basename "$0") [--timeout <secs>] [--help] [--version]"
   echo ""
   echo "Supported-format list drift probe (read-only; never edits src/docs)."
-  echo "Verifies the canonical 9-token format list agrees across:"
+  echo "Verifies the canonical 10-token format list (9 primaries + cyclonedx alias) agrees across:"
   echo "  1. src/Olaf.Cli/Program.cs SupportedFormats const (canonical source)"
   echo "  2. FormatterRegistry error string + per-token switch arms (+ markdown alias arm)"
   echo "  3. live '--help' runtime text (must print the const verbatim)"
   echo "  4. README anchored lines (Supported-formats, Flags --format, --help excerpt):"
-  echo "     8 primary tokens in order (FAIL); missing 'cyclonedx' alias token is"
+  echo "     9 primary tokens in order (FAIL); missing 'cyclonedx' alias token is"
   echo "     WARN when an alias parenthetical documents it, else FAIL"
-  echo "  5. alias notes (markdown->md, cyclonedx->cyclonedx-json, cyclonedx-xml no alias)"
-  echo "  6. format-matrix-dump.sh FORMATS allowlist (8 primaries in order; alias WARN)"
+  echo "  5. alias notes (markdown->md, cyclonedx->cyclonedx-json, cyclonedx-xml/spdx-json no alias)"
+  echo "  6. format-matrix-dump.sh FORMATS allowlist (9 primaries in order; alias WARN)"
   echo ""
   echo "Options:"
   echo "  --timeout <n>  per-scan timeout in seconds for live --help (default: 180)"
@@ -156,7 +156,7 @@ if [[ -n "${CANON:-}" ]]; then
 fi
 
 echo "--- Check 2 (FAIL/WARN): README anchored lines carry tokens in order ---"
-PRIMARY="json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml"
+PRIMARY="json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json"
 PRIMARY_SP="${PRIMARY//|/ }"
 for anchor in "Supported formats:" "Flags:.*--format" "Output format:"; do
   line="$(grep -E "$anchor" "$README" | head -n 1 || true)"
@@ -171,7 +171,7 @@ for anchor in "Supported formats:" "Flags:.*--format" "Output format:"; do
   fi
   run_sp="${run//|/ }"
   if tokens_in_order "$run_sp" "$PRIMARY_SP"; then
-    pass "README [$anchor] 8 primaries in order [$run]"
+    pass "README [$anchor] 9 primaries in order [$run]"
     if grep -qE '(^|\|)cyclonedx(\||$)' <<<"$run"; then
       if [[ "$run" == *"cyclonedx-json|cyclonedx|cyclonedx-xml"* ]]; then
         pass "README [$anchor] cyclonedx alias token in canonical position"
@@ -206,6 +206,11 @@ if grep -qE 'cyclonedx-xml.{0,30}no alias' "$README"; then
 else
   fail_msg "cyclonedx-xml no-alias note missing from README"
 fi
+if grep -qE 'spdx-json.{0,30}no alias' "$README"; then
+  pass "spdx-json no-alias note present"
+else
+  fail_msg "spdx-json no-alias note missing from README"
+fi
 
 echo "--- Check 4 (FAIL/WARN): format-matrix-dump.sh allowlist ---"
 MFORMATS="$(grep -E '^FORMATS=' "$MATRIX" | head -n 1 | sed 's/^FORMATS="//; s/"$//' || true)"
@@ -213,7 +218,7 @@ if [[ -z "${MFORMATS:-}" ]]; then
   fail_msg "FORMATS= line missing in format-matrix-dump.sh"
 else
   if [[ "$MFORMATS" == "$PRIMARY_SP" ]]; then
-    pass "matrix FORMATS == 8 primaries in order"
+    pass "matrix FORMATS == 9 primaries in order"
   elif tokens_in_order "$MFORMATS" "$PRIMARY_SP"; then
     warn_msg "matrix FORMATS covers primaries but differs textually [$MFORMATS]"
   else

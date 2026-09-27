@@ -4,7 +4,7 @@ using Olaf.Formatters;
 using Olaf.Parsers;
 using Olaf.Resolvers;
 
-const string SupportedFormats = "json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml";
+const string SupportedFormats = "json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json";
 const string SupportedEcosystems = "npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm";
 
 var inputOption = new Option<string?>("--input")
@@ -69,6 +69,7 @@ var rootCommand = new RootCommand($"""
     Examples:
       olaf --input package.json
       olaf --input ./src --out report.json --format yaml
+      olaf --input package.json --format spdx-json
       olaf --input ./src --ecosystem npm
       olaf --input package.json --strict
       olaf --input package.json --strict --allow MIT,Apache-2.0
@@ -223,7 +224,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     }
     catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
     {
-        Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml.");
+        Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json.");
         return 2;
     }
 

@@ -19,7 +19,8 @@ public sealed class FormatterRegistry
             "cyclonedx-json" => new CycloneDxFormatter(),
             "cyclonedx" => new CycloneDxFormatter(),
             "cyclonedx-xml" => new CycloneDxXmlFormatter(),
-            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml.", nameof(format)),
+            "spdx-json" => new SpdxJsonFormatter(),
+            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json.", nameof(format)),
         };
     }
 }
