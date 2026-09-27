@@ -400,11 +400,6 @@ public sealed class PipParser : IEcosystemParser
         }
     }
 
-    private static IReadOnlyList<Dependency> ParsePoetryLock(string path)
-    {
-        return ParseTomlPackageLock(path);
-    }
-
     private static IReadOnlyList<Dependency> ParsePipfileLock(string path)
     {
         try

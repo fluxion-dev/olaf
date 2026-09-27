@@ -258,7 +258,7 @@ public sealed class GoParser : IEcosystemParser
     internal static (string? Name, string? Version, bool Indirect) SplitRequireLine(string line)
     {
         var text = line.Trim();
-        if (text.Length == 0 || text.StartsWith("//"))
+        if (text.Length == 0 || text.StartsWith("//", StringComparison.Ordinal))
         {
             return (null, null, false);
         }

@@ -87,7 +87,7 @@ public sealed class GradleParser : IEcosystemParser
             foreach (var rawLine in content.Split('\n'))
             {
                 var line = rawLine.Trim();
-                if (line.Length == 0 || line.StartsWith("//"))
+                if (line.Length == 0 || line.StartsWith("//", StringComparison.Ordinal))
                 {
                     continue;
                 }
