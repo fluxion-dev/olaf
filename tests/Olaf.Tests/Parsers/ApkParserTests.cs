@@ -70,4 +70,66 @@ public sealed class ApkParserTests
 
         Assert.Contains(deps, d => d.Ecosystem == "apk" && d.Name == "busybox" && d.Version == "1.36.1-r0");
     }
+
+    [Fact]
+    public void Should_IgnoreFoldedLines_When_ContinuationLooksLikeKeys()
+    {
+        // Folded continuations (leading space) must NOT false-match P:/V:.
+        var parser = ParserTestHelpers.ResolveParser("apk");
+        var path = ImageFixtureBuilder.WriteTempTextFile(
+            "installed",
+            "P:tricky\nV:2.0-r0\nA:x86_64\n continuation line\n P:fake\n V:9.9-r0\n\n");
+
+        var deps = parser.Parse(path);
+
+        var single = Assert.Single(deps);
+        Assert.Equal("tricky", single.Name);
+        Assert.Equal("2.0-r0", single.Version);
+    }
+
+    [Fact]
+    public void Should_ParseSuccessfully_When_LicensePresent()
+    {
+        // L: (declared license) is validated-but-deferred to #70: presence
+        // must not break parsing, value not stored.
+        var parser = ParserTestHelpers.ResolveParser("apk");
+        var path = ImageFixtureBuilder.WriteTempTextFile(
+            "installed",
+            ImageFixtureBuilder.ApkInstalledWithMeta(("lic-pkg", "3.1-r0", "MIT", "x86_64")));
+
+        var deps = parser.Parse(path);
+
+        var single = Assert.Single(deps);
+        Assert.Equal("lic-pkg", single.Name);
+        Assert.Equal("3.1-r0", single.Version);
+    }
+
+    [Fact]
+    public void Should_ParseSuccessfully_When_ArchPresent()
+    {
+        // A: (arch) is validated-but-deferred to #70: tolerated, not stored.
+        var parser = ParserTestHelpers.ResolveParser("apk");
+        var path = ImageFixtureBuilder.WriteTempTextFile(
+            "installed",
+            "P:arch-pkg\nV:1.0-r0\nA:aarch64\n\n");
+
+        var deps = parser.Parse(path);
+
+        var single = Assert.Single(deps);
+        Assert.Equal("arch-pkg", single.Name);
+        Assert.Equal("1.0-r0", single.Version);
+    }
+
+    [Fact]
+    public void Should_KeepReleaseSuffix_When_ScanningApkFixture()
+    {
+        var deps = new ParserRegistry().Scan(ParserTestHelpers.FixturePath("apk", "installed"));
+
+        Assert.Equal(3, deps.Count);
+        Assert.All(deps, d => Assert.Equal("apk", d.Ecosystem));
+        var byName = deps.ToDictionary(d => d.Name, d => d.Version);
+        Assert.Equal("1.2.5-r0", byName["musl"]);
+        Assert.Equal("1.36.1-r0", byName["busybox"]);
+        Assert.Equal("1.3.1-r0", byName["zlib"]);
+    }
 }

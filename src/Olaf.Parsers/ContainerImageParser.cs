@@ -7,13 +7,15 @@ namespace Olaf.Parsers;
 
 /// <summary>
 /// Container image parser (OCI/Docker tarball or exploded layout directory).
-/// Emits <c>apk</c>/<c>dpkg</c> <see cref="Dependency"/> records (<c>IsTransitive:false</c>);
+/// Emits <c>apk</c>/<c>dpkg</c>/<c>rpm</c> <see cref="Dependency"/> records (<c>IsTransitive:false</c>);
 /// the parser's own <see cref="Ecosystem"/> is <c>"container"</c> (a routing label only —
 /// nothing asserts <c>parser.Ecosystem == dep.Ecosystem</c>, verified by grep).
 /// Layer merge intentionally bypasses the registry's global first-wins dedup:
 /// within one image the dedup key is name-only per container DB path and the
 /// topmost layer wins (filesystem-overlay semantics).
-/// RPM <c>Packages</c> DB bytes are ignored (binary, deferred to issue #65) — never crash.
+/// RPM <c>Packages</c> text dumps (var/lib/rpm, usr/lib/sysimage/rpm) are routed
+/// to <c>RpmParser</c>; BINARY rpm bytes still yield <c>[]</c> (binary format
+/// deferred to issue #70) — never crash.
 /// </summary>
 public sealed class ContainerImageParser : IEcosystemParser
 {
@@ -112,6 +114,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Best-effort temp cleanup; never mask scan results.
+            // IOException covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         }
     }
 
@@ -561,9 +564,9 @@ public sealed class ContainerImageParser : IEcosystemParser
     }
 
     /// <summary>
-    /// Routes merged overlay DB files to the thin parsers. RPM <c>Packages</c>
-    /// binaries (var/lib/rpm) are deliberately ignored here — binary format
-    /// deferred to issue #65, never crash on them.
+    /// Routes merged overlay DB files to the thin parsers. BINARY rpm
+    /// <c>Packages</c> bytes still yield <c>[]</c> (binary format deferred to
+    /// issue #70) — never crash.
     /// </summary>
     internal static IReadOnlyList<Dependency> ScanOverlay(string overlayDir)
     {
@@ -571,12 +574,13 @@ public sealed class ContainerImageParser : IEcosystemParser
         var seen = new HashSet<(string Ecosystem, string Name)>();
         var apk = new ApkParser();
         var dpkg = new DpkgParser();
+        var rpm = new RpmParser();
 
         List<string> dbFiles;
         try
         {
             dbFiles = Directory.EnumerateFiles(overlayDir, "*", SearchOption.AllDirectories)
-                .Where(p => IsApkDb(overlayDir, p) || IsDpkgDb(overlayDir, p))
+                .Where(p => IsApkDb(overlayDir, p) || IsDpkgDb(overlayDir, p) || IsRpmDb(overlayDir, p))
                 .OrderBy(p => p, StringComparer.Ordinal)
                 .ToList();
         }
@@ -592,9 +596,20 @@ public sealed class ContainerImageParser : IEcosystemParser
 
         foreach (var dbFile in dbFiles)
         {
-            var deps = IsApkDb(overlayDir, dbFile)
-                ? apk.Parse(dbFile)
-                : dpkg.Parse(dbFile);
+            IReadOnlyList<Dependency> deps;
+            if (IsApkDb(overlayDir, dbFile))
+            {
+                deps = apk.Parse(dbFile);
+            }
+            else if (IsDpkgDb(overlayDir, dbFile))
+            {
+                deps = dpkg.Parse(dbFile);
+            }
+            else
+            {
+                deps = rpm.Parse(dbFile);
+            }
+
             foreach (var dep in deps)
             {
                 if (seen.Add((dep.Ecosystem, dep.Name)))
@@ -621,6 +636,13 @@ public sealed class ContainerImageParser : IEcosystemParser
     {
         var rel = Path.GetRelativePath(overlayDir, path).Replace(Path.DirectorySeparatorChar, '/');
         return rel.EndsWith("lib/dpkg/status", StringComparison.Ordinal);
+    }
+
+    private static bool IsRpmDb(string overlayDir, string path)
+    {
+        var rel = Path.GetRelativePath(overlayDir, path).Replace(Path.DirectorySeparatorChar, '/');
+        return rel.EndsWith("var/lib/rpm/Packages", StringComparison.Ordinal)
+            || rel.EndsWith("usr/lib/sysimage/rpm/Packages", StringComparison.Ordinal);
     }
 
     private IReadOnlyList<Dependency> ParseExplodedDirectory(string dir)
@@ -774,9 +796,11 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (UnauthorizedAccessException)
         {
+            // Lenient exploded-dir path: unreadable manifest blob yields no layers (see Parse).
         }
         catch (JsonException)
         {
+            // Lenient exploded-dir path: unparseable manifest blob yields no layers (see Parse).
         }
 
         return layers;

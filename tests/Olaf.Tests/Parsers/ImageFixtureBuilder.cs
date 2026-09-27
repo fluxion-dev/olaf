@@ -40,6 +40,109 @@ internal static class ImageFixtureBuilder
         return sb.ToString();
     }
 
+    /// <summary>
+    /// apk <c>installed</c> stanza with <c>L:</c> (declared license) + <c>A:</c> (arch).
+    /// License/arch are validated-but-deferred to issue #70: present in the
+    /// fixture so tests pin that parsing still succeeds, values not stored.
+    /// </summary>
+    internal static string ApkInstalledWithMeta(params (string Name, string Version, string License, string Arch)[] packages)
+    {
+        var sb = new StringBuilder();
+        foreach (var (name, version, license, arch) in packages)
+        {
+            sb.Append("P:").Append(name).Append('\n');
+            sb.Append("V:").Append(version).Append('\n');
+            sb.Append("L:").Append(license).Append('\n');
+            sb.Append("A:").Append(arch).Append('\n');
+            sb.Append('\n');
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// dpkg <c>status</c> stanza with <c>Architecture:</c>.
+    /// Arch is validated-but-deferred to issue #70 (see <see cref="ApkInstalledWithMeta"/>).
+    /// </summary>
+    internal static string DpkgStatusWithArch(params (string Name, string Version, string Arch)[] packages)
+    {
+        var sb = new StringBuilder();
+        foreach (var (name, version, arch) in packages)
+        {
+            sb.Append("Package: ").Append(name).Append('\n');
+            sb.Append("Status: install ok installed\n");
+            sb.Append("Architecture: ").Append(arch).Append('\n');
+            sb.Append("Version: ").Append(version).Append('\n');
+            sb.Append('\n');
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// dpkg stanza with a folded <c>Description:</c> body (continuation lines
+    /// starting with space/tab) — key detection must not false-match them.
+    /// </summary>
+    internal static string DpkgStatusFolded(string name, string version)
+    {
+        var sb = new StringBuilder();
+        sb.Append("Package: ").Append(name).Append('\n');
+        sb.Append("Status: install ok installed\n");
+        sb.Append("Version: ").Append(version).Append('\n');
+        sb.Append("Description: a long description\n");
+        sb.Append(" continued line starting with a space\n");
+        sb.Append("\ttab-continued line\n");
+        sb.Append('\n');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// apk stanza with a folded continuation line (starting with a space) —
+    /// key detection must not false-match it.
+    /// </summary>
+    internal static string ApkInstalledFolded(string name, string version)
+    {
+        var sb = new StringBuilder();
+        sb.Append("P:").Append(name).Append('\n');
+        sb.Append("V:").Append(version).Append('\n');
+        sb.Append("A:x86_64\n");
+        sb.Append(" continuation line starting with a space\n");
+        sb.Append('\n');
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// rpm <c>Packages</c> text dump: one <c>name-ver-rel.arch</c> NVRA line
+    /// per package (<c>rpm -qa</c> default output).
+    /// </summary>
+    internal static string RpmPackages(params string[] nvra)
+    {
+        var sb = new StringBuilder();
+        foreach (var line in nvra)
+        {
+            sb.Append(line).Append('\n');
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Synthetic binary rpm bytes (NUL-heavy, BerkeleyDB-flavored magic) —
+    /// the parser must sniff these and yield <c>[]</c>, never crash.
+    /// </summary>
+    internal static byte[] BinaryRpmBytes()
+    {
+        return new byte[] { 0xED, 0xAB, 0xEE, 0xDB, 0x00, 0x62, 0x69, 0x6E, 0x00, 0x72, 0x70, 0x6D, 0x00 };
+    }
+
+    internal static string WriteTempBytesFile(string fileName, byte[] contents)
+    {
+        var dir = ParserTestHelpers.CreateTempDir();
+        var path = Path.Combine(dir, fileName);
+        File.WriteAllBytes(path, contents);
+        return path;
+    }
+
     internal static string WriteTempTextFile(string fileName, string contents)
     {
         var dir = ParserTestHelpers.CreateTempDir();
