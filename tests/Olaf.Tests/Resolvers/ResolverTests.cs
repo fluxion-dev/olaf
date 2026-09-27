@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using Olaf.Core;
 
@@ -94,6 +95,196 @@ public sealed class NuGetResolverTests
         Assert.Null(result.SpdxId);
         Assert.NotNull(result.Reason);
         Assert.Contains("not-found", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Should_ResolveSpdx_When_CatalogEntryIsUrlString()
+    {
+        // Bug #61: live leaf returns catalogEntry as URL string; resolver must
+        // follow it with a second GET to the catalog doc.
+        const string catalogUrl = "https://api.nuget.org/v3/catalog0/data/2023.03.08.07.46.17/newtonsoft.json.13.0.3.json";
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            var url = req.RequestUri?.ToString() ?? string.Empty;
+            if (url.Equals(catalogUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.Json(new
+                {
+                    licenseExpression = "MIT",
+                    licenseUrl = "https://licenses.nuget.org/MIT",
+                });
+            }
+
+            if (url.Contains("licenses.nuget.org", StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.Text("MIT License\nPermission is hereby granted, free of charge,");
+            }
+
+            return StubHttpMessageHandler.Json(new
+            {
+                catalogEntry = catalogUrl,
+            });
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "Newtonsoft.Json", "13.0.3", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.False(string.IsNullOrWhiteSpace(result.LicenseText));
+    }
+
+    [Fact]
+    public async Task Should_ResolveSpdx_When_RegistrationBodyIsGzipped()
+    {
+        // registration5-gz-semver2 always serves Content-Encoding: gzip even
+        // when the client has no AutomaticDecompression; the resolver must
+        // decompress before parsing the catalogEntry URL.
+        const string catalogUrl = "https://api.nuget.org/v3/catalog0/data/2023.03.08.07.46.17/gzip-pkg.1.0.0.json";
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            var url = req.RequestUri?.ToString() ?? string.Empty;
+            if (url.Equals(catalogUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.Json(new { licenseExpression = "MIT" });
+            }
+
+            return GzippedJson(new { catalogEntry = catalogUrl });
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "GzipPkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.Equal(2, handler.CallCount);
+    }
+
+    [Theory]
+    [InlineData("ftp://example.com/catalog.json")]
+    [InlineData("not-a-valid-url")]
+    public async Task Should_ReturnUnknown_When_CatalogEntryUrlNotFollowable(string catalogEntry)
+    {
+        // Bug #61: only absolute http(s) catalog URLs are followed; anything
+        // else must stay Unknown (never throw, never issue a second request).
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { catalogEntry, }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "BadCatalogPkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_CatalogResponseNotSuccess()
+    {
+        // First doc points at a catalog URL but the catalog fetch 404s:
+        // no license fields anywhere, so Unknown (never throw).
+        const string catalogUrl = "https://api.nuget.org/v3/catalog0/data/2023.03.08.07.46.17/missing-pkg.1.0.0.json";
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            var url = req.RequestUri?.ToString() ?? string.Empty;
+            if (url.Equals(catalogUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.NotFound();
+            }
+
+            return StubHttpMessageHandler.Json(new { catalogEntry = catalogUrl, });
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "MissingCatalogPkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Should_ResolveSpdx_When_NuspecXmlBody()
+    {
+        const string nuspec = "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+            + "<package><metadata><id>XmlPkg</id><version>1.0.0</version>"
+            + "<license type=\"expression\">MIT</license>"
+            + "</metadata></package>";
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text(nuspec));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "XmlPkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.False(string.IsNullOrWhiteSpace(result.LicenseText));
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_NoUsableLicense()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "EmptyPkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_BodyMalformed()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text("this is not json{{{"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
+        var dep = new Dependency("nuget", "MalformedPkg", "1.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("parse-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    private static HttpResponseMessage GzippedJson(object payload)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(payload);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        using var ms = new MemoryStream();
+        using (var gzip = new GZipStream(ms, CompressionLevel.SmallestSize))
+        {
+            gzip.Write(bytes, 0, bytes.Length);
+        }
+
+        var content = new ByteArrayContent(ms.ToArray());
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        content.Headers.ContentEncoding.Add("gzip");
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
     }
 }
 

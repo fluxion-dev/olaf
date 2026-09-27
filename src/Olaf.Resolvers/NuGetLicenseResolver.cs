@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using System.Xml.Linq;
 using Olaf.Core;
@@ -37,11 +38,35 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"registry-error: NuGet returned {(int)response.StatusCode}.");
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var body = await ReadBodyAsync(response, cancellationToken).ConfigureAwait(false);
             var (expression, licenseUrl) = ParseBody(body);
 
             var spdx = SpdxMapper.Normalize(expression)
                 ?? SpdxMapper.FromLicenseUrl(licenseUrl);
+
+            // Bug #61: live registration leaf returns catalogEntry as a URL string
+            // (not an inline object), so the first doc has no license fields.
+            // Follow the catalog URL once via the shared retry helper and parse
+            // licenseExpression/licenseUrl from the catalog doc.
+            if (spdx is null)
+            {
+                var (catalogExpression, catalogLicenseUrl) = await FollowCatalogEntryAsync(body, cancellationToken).ConfigureAwait(false);
+                if (catalogExpression is not null)
+                {
+                    expression = catalogExpression;
+                }
+
+                if (catalogLicenseUrl is not null)
+                {
+                    licenseUrl = catalogLicenseUrl;
+                }
+
+                if (catalogExpression is not null || catalogLicenseUrl is not null)
+                {
+                    spdx = SpdxMapper.Normalize(expression)
+                        ?? SpdxMapper.FromLicenseUrl(licenseUrl);
+                }
+            }
 
             if (spdx is null)
             {
@@ -79,6 +104,47 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
         }
     }
 
+    private async Task<(string? Expression, string? LicenseUrl)> FollowCatalogEntryAsync(string body, CancellationToken ct)
+    {
+        var catalogUrl = ExtractCatalogEntryUrl(body);
+        if (!TryCreateAbsoluteHttpUri(catalogUrl, out var catalogUri) || catalogUri is null)
+        {
+            return (null, null);
+        }
+
+        using var catalogResponse = await ResolverHttpRetry.GetAsync(_http, catalogUri, ct).ConfigureAwait(false);
+        if (!catalogResponse.IsSuccessStatusCode)
+        {
+            return (null, null);
+        }
+
+        var catalogBody = await ReadBodyAsync(catalogResponse, ct).ConfigureAwait(false);
+        return ParseBody(catalogBody);
+    }
+
+    private static bool TryCreateAbsoluteHttpUri(string? catalogUrl, out Uri? catalogUri)
+    {
+        catalogUri = null;
+        if (string.IsNullOrWhiteSpace(catalogUrl))
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate(catalogUrl, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (!uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase)
+            && !uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        catalogUri = uri;
+        return true;
+    }
+
     private static (string? Expression, string? LicenseUrl) ParseBody(string body)
     {
         if (string.IsNullOrWhiteSpace(body))
@@ -86,14 +152,15 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
             return (null, null);
         }
 
-        var trimmed = body.TrimStart();
-        if (trimmed.StartsWith('<'))
+        if (IsXmlBody(body))
         {
             return ParseNuspecXml(body);
         }
 
         return ParseRegistrationJson(body);
     }
+
+    private static bool IsXmlBody(string body) => body.TrimStart().StartsWith('<');
 
     private static (string? Expression, string? LicenseUrl) ParseRegistrationJson(string body)
     {
@@ -107,51 +174,142 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
             return (expr, url);
         }
 
-        if (root.TryGetProperty("catalogEntry", out var entry) && entry.ValueKind == JsonValueKind.Object)
+        foreach (var candidate in EnumerateCatalogEntryCandidates(root))
         {
-            TryGetString(entry, "licenseExpression", out var e2);
-            TryGetString(entry, "licenseUrl", out var u2);
-            if (e2 is not null || u2 is not null)
+            if (candidate.ValueKind != JsonValueKind.Object)
             {
-                return (e2, u2);
+                continue;
             }
-        }
 
-        if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in items.EnumerateArray())
+            var (candidateExpression, candidateLicenseUrl) = TryReadLicenseFields(candidate);
+            if (candidateExpression is not null || candidateLicenseUrl is not null)
             {
-                if (item.TryGetProperty("catalogEntry", out var ce) && ce.ValueKind == JsonValueKind.Object)
-                {
-                    TryGetString(ce, "licenseExpression", out var e3);
-                    TryGetString(ce, "licenseUrl", out var u3);
-                    if (e3 is not null || u3 is not null)
-                    {
-                        return (e3, u3);
-                    }
-                }
-
-                if (item.TryGetProperty("items", out var nested) && nested.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var leaf in nested.EnumerateArray())
-                    {
-                        if (leaf.TryGetProperty("catalogEntry", out var ce2) && ce2.ValueKind == JsonValueKind.Object)
-                        {
-                            TryGetString(ce2, "licenseExpression", out var e4);
-                            TryGetString(ce2, "licenseUrl", out var u4);
-                            if (e4 is not null || u4 is not null)
-                            {
-                                return (e4, u4);
-                            }
-                        }
-                    }
-                }
+                return (candidateExpression, candidateLicenseUrl);
             }
         }
 
         TryGetString(root, "licenseUrl", out var onlyUrl);
         return (null, onlyUrl);
     }
+
+    private static (string? Expression, string? LicenseUrl) TryReadLicenseFields(JsonElement entry)
+    {
+        TryGetString(entry, "licenseExpression", out var expression);
+        TryGetString(entry, "licenseUrl", out var licenseUrl);
+        return (expression, licenseUrl);
+    }
+
+    private static IEnumerable<JsonElement> EnumerateCatalogEntryCandidates(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            yield break;
+        }
+
+        if (root.TryGetProperty("catalogEntry", out var direct))
+        {
+            yield return direct;
+        }
+
+        if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in items.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (item.TryGetProperty("catalogEntry", out var catalogEntry))
+                {
+                    yield return catalogEntry;
+                }
+
+                if (item.TryGetProperty("items", out var nested) && nested.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var leaf in nested.EnumerateArray())
+                    {
+                        if (leaf.ValueKind != JsonValueKind.Object)
+                        {
+                            continue;
+                        }
+
+                        if (leaf.TryGetProperty("catalogEntry", out var leafEntry))
+                        {
+                            yield return leafEntry;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static string? ExtractCatalogEntryUrl(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        if (IsXmlBody(body))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            foreach (var candidate in EnumerateCatalogEntryCandidates(root))
+            {
+                if (candidate.ValueKind != JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                var url = candidate.GetString();
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    return url;
+                }
+            }
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static async Task<string> ReadBodyAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        // registration5-gz-semver2 always serves Content-Encoding: gzip, even when
+        // the HttpClient handler has no AutomaticDecompression (prod CLI + E2E
+        // create bare `new HttpClient`). When the handler already decompressed,
+        // ContentEncoding is empty and this is a plain string read. Stubs have no
+        // encoding either, so this is a no-op for unit tests.
+        var encodings = response.Content.Headers.ContentEncoding;
+        var isGzip = HasContentEncoding(encodings, "gzip");
+        var isDeflate = HasContentEncoding(encodings, "deflate");
+
+        if (!isGzip && !isDeflate)
+        {
+            return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        }
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+        using var ms = new MemoryStream(bytes);
+        using Stream decompressor = isGzip
+            ? new GZipStream(ms, CompressionMode.Decompress)
+            : new DeflateStream(ms, CompressionMode.Decompress);
+        using var reader = new StreamReader(decompressor);
+        return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    }
+
+    private static bool HasContentEncoding(IEnumerable<string> encodings, string name)
+        => encodings.Any(encoding => encoding.Contains(name, StringComparison.OrdinalIgnoreCase));
 
     private static (string? Expression, string? LicenseUrl) ParseNuspecXml(string body)
     {
@@ -198,18 +356,7 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
 
     private async Task<string?> TryFetchLicenseTextAsync(string? licenseUrl, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(licenseUrl))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(licenseUrl, UriKind.Absolute, out var uri))
-        {
-            return null;
-        }
-
-        if (!uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase)
-            && !uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+        if (!TryCreateAbsoluteHttpUri(licenseUrl, out var uri) || uri is null)
         {
             return null;
         }
