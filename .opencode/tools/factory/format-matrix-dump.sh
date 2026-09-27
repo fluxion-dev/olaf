@@ -13,16 +13,18 @@
 # Offline-safe: never passes --strict; resolver network failures degrade to
 # Unknown with exit 0 (deterministic continue in Program.cs).
 # Rules: repo-relative, idempotent (stdout only, temp files cleaned), no secrets.
-VERSION="0.4.0"
+VERSION="0.4.1"
 set -euo pipefail
 
 TIMEOUT_SECS=60
 FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml"
 FIXTURE_REL="tests/Olaf.Tests/Fixtures/npm"
 PROJECT_REL="src/Olaf.Cli"
+WORKDIR=""
+KEEP_TEMP=0
 
 usage() {
-  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|all] [--timeout <secs>] [--help] [--version]"
+  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|all] [--timeout <secs>] [--workdir <dir>] [--keep-temp] [--help] [--version]"
   echo ""
   echo "CLI format matrix on the committed npm fixture (offline-safe, non-strict)."
   echo "Runs 'dotnet run --project $PROJECT_REL -- --input $FIXTURE_REL --format <f>'"
@@ -42,6 +44,8 @@ usage() {
   echo "Options:"
   echo "  --format <f>   single format or 'all' (default: all)"
   echo "  --timeout <n>  per-scan timeout in seconds (default: 60)"
+  echo "  --workdir <d>  work dir (default: mktemp -d)"
+  echo "  --keep-temp    keep temp work dir for debugging (default: remove)"
   echo "  --help         show this help and exit 0"
   echo "  --version      print VERSION and exit 0"
   echo ""
@@ -50,6 +54,7 @@ usage() {
   echo "  $(basename "$0")"
   echo "  $(basename "$0") --format html"
   echo "  $(basename "$0") --format json --timeout 30"
+  echo "  $(basename "$0") --workdir /tmp/fm --keep-temp"
 }
 
 if [[ "${1:-}" == "--help" ]]; then
@@ -78,6 +83,19 @@ while [[ $# -gt 0 ]]; do
       TIMEOUT_SECS="$2"
       shift 2
       ;;
+    --workdir)
+      [[ $# -lt 2 ]] && { echo "Missing value for --workdir." >&2; exit 2; }
+      WORKDIR="$2"
+      shift 2
+      ;;
+    --workdir=*)
+      WORKDIR="${1#*=}"
+      shift
+      ;;
+    --keep-temp)
+      KEEP_TEMP=1
+      shift
+      ;;
     --help|--version)
       # handled above for $1; repeated/positional form
       usage
@@ -96,8 +114,24 @@ PROJECT="$ROOT/$PROJECT_REL"
 [[ -d "$FIXTURE" ]] || { echo "Fixture not found: $FIXTURE" >&2; exit 2; }
 [[ -d "$PROJECT" ]] || { echo "CLI project not found: $PROJECT" >&2; exit 2; }
 
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR"' EXIT
+if [[ -z "$WORKDIR" ]]; then
+  WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/format-matrix-XXXXXX")"
+  MADE_TMP=1
+else
+  mkdir -p "$WORKDIR"
+  MADE_TMP=0
+fi
+# Internal alias: TMP points at the work dir (renamed from TMPDIR to stop
+# shadowing the $TMPDIR environment variable used as the mktemp parent above).
+TMP="$WORKDIR"
+cleanup() {
+  if [[ "$KEEP_TEMP" -eq 1 ]]; then
+    echo "keeping work dir: $WORKDIR"
+  elif [[ "$MADE_TMP" -eq 1 ]]; then
+    rm -rf "$WORKDIR"
+  fi
+}
+trap cleanup EXIT
 
 FAIL=0
 pass() { echo "PASS [$1]: $2"; }
@@ -119,26 +153,26 @@ check_contains() { # $1=format $2=file $3=label $4..=patterns (all must match, f
 
 # shellcheck disable=SC2086
 for f in $FORMATS; do
-  OUT="$TMPDIR/out.$f"
+  OUT="$TMP/out.$f"
   echo "=== format: $f ==="
   if command -v timeout >/dev/null 2>&1; then
-    if timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$FIXTURE" --format "$f" >"$OUT" 2>"$TMPDIR/err.$f"; then
+    if timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$FIXTURE" --format "$f" >"$OUT" 2>"$TMP/err.$f"; then
       :
     else
       rc=$?
       if [[ $rc -eq 124 ]]; then
         fail "$f" "scan timed out after ${TIMEOUT_SECS}s"
       else
-        fail "$f" "scan exited $rc (stderr tail: $(tail -c 300 "$TMPDIR/err.$f" | tr '\n' ' '))"
+        fail "$f" "scan exited $rc (stderr tail: $(tail -c 300 "$TMP/err.$f" | tr '\n' ' '))"
       fi
       continue
     fi
   else
-    if dotnet run --project "$PROJECT" -- --input "$FIXTURE" --format "$f" >"$OUT" 2>"$TMPDIR/err.$f"; then
+    if dotnet run --project "$PROJECT" -- --input "$FIXTURE" --format "$f" >"$OUT" 2>"$TMP/err.$f"; then
       :
     else
       rc=$?
-      fail "$f" "scan exited $rc (stderr tail: $(tail -c 300 "$TMPDIR/err.$f" | tr '\n' ' '))"
+      fail "$f" "scan exited $rc (stderr tail: $(tail -c 300 "$TMP/err.$f" | tr '\n' ' '))"
       continue
     fi
   fi

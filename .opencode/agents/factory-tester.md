@@ -16,3 +16,5 @@ Rules:
 - Substring guard (Wave 5b #66 harvest): never `Substring(IndexOf(literal))` without prior `Assert.True(IndexOf >= 0)` — else ArgumentOutOfRange red-herring; prefer assert-then-slice.
 - Probe-derived counts (Wave 5b #66 harvest): hardcoded totals in CLI tests must cite probe + version + fixture in a doc-comment.
 - Attribute census (Wave 5b RECTIFY): `grep -r "\[Fact\]\|\[Theory\]"` always uses `--exclude-dir=bin --exclude-dir=obj --include=*.cs`; live `dotnet test` total is authoritative over grep (Theory expansion); FQN-filter counts beat README deltas.
+- XML select guard (Wave 5b #68 harvest): every XML select through `Ns()` with `c:` prefix — `grep SelectNodes("/` bare = stop, restore prefix.
+- Purl assert guard (Wave 5b #68 harvest): purl unconditional — never assert conditional-purl.

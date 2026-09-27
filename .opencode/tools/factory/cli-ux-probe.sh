@@ -3,6 +3,7 @@
 # Wraps: --help, --version, exit-code matrix, stdout-vs-stderr split.
 # Matrix (all via `dotnet run --project src/Olaf.Cli -- ...`):
 #   missing-input (no --input)            -> 2
+#   bare-path (positional path, no flag)  -> 1 + Unrecognized-command stderr
 #   bad-format (--format bogus)           -> 2
 #   bad-ecosystem (--ecosystem bogus)     -> 2
 #   out-exists (--out existing, no force) -> 2
@@ -10,7 +11,7 @@
 #   strict phantom (Unknown + --strict)   -> 1
 # Split: successful --out run must have empty stdout (report -> file only).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -37,7 +38,8 @@ Options:
 
 Checks:
   help exit 0 (+ mentions --input) | version exit 0 (non-empty)
-  missing-input->2 | bad-format->2 | bad-ecosystem->2 | out-exists->2
+  missing-input->2 | bare-path->1 (+ Unrecognized-command stderr)
+  bad-format->2 | bad-ecosystem->2 | out-exists->2
   nested-out->0 (+ file created) | strict-phantom->1
   split: --out run has empty stdout
 
@@ -150,6 +152,13 @@ fi
 
 echo "-- step 2: exit-code matrix --"
 run_cli "missing-input" 2 || true
+# bare-path: positional fixture path without --input (e.g. tests/Olaf.Tests/Fixtures/npm) -> 1
+run_cli "bare-path" 1 "$FIXTURE" || true
+if grep -q "Unrecognized command" "$WORKDIR/bare-path.stderr" 2>/dev/null; then
+  pass "bare-path" "stderr mentions Unrecognized command"
+else
+  fail "bare-path" "stderr missing Unrecognized command (tail: $(tail -c 200 "$WORKDIR/bare-path.stderr" | tr '\n' ' '))"
+fi
 run_cli "bad-format" 2 --input "$FIXTURE" --format bogus || true
 run_cli "bad-ecosystem" 2 --input "$FIXTURE" --ecosystem bogus || true
 
