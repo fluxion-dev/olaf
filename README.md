@@ -4,7 +4,7 @@ License scanner: scans `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swi
 
 Supported ecosystems: `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md` (`markdown` alias for `md`).
 
-Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference lock>`requirements.txt`>`pyproject.toml`>`environment.yml`; conda entries reported as `pip`).
+Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference lock>`requirements.txt`>`pyproject.toml`>`environment.yml`; conda entries reported as `pip`); `go` handles `go.mod|go.sum` (2 lines per module in `go.sum` deduped to one dep; `// indirect` + present in `go.sum` → transitive, `// indirect` + absent → direct fallback, `go.mod`-only dir keeps legacy `// indirect` → transitive, `go.sum`-only dir yields all-transitive deps; `h1:` hashes syntactically validated but parsed-but-deferred — not stored on the 8-field report, SBOM enrichment follow-up).
 
 ## Tool install
 
