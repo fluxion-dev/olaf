@@ -116,6 +116,7 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
             "bundler" or "gem" => $"https://api.clearlydefined.io/definitions/gem/rubygems/-/{name}/{version}",
             "vcpkg" => $"https://api.clearlydefined.io/definitions/vcpkg/vcpkgio/-/{name}/{version}",
             "conan" => $"https://api.clearlydefined.io/definitions/conan/conancenter/-/{name}/{version}",
+            "go" => $"https://api.clearlydefined.io/definitions/go/github/-/{name}/{version}",
             _ => null,
         };
     }
