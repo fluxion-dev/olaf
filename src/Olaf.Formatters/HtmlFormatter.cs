@@ -26,7 +26,7 @@ public sealed class HtmlFormatter : ILicenseFormatter
                 .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.Dependency.Version))
                 .Append("</td><td>")
-                .Append(WebUtility.HtmlEncode(l.SpdxId ?? l.Status))
+                .Append(WebUtility.HtmlEncode(LicenseDisplay.EffectiveSpdx(l)))
                 .Append("</td><td>")
                 .Append(WebUtility.HtmlEncode(l.LicenseText ?? string.Empty))
                 .Append("</td><td>")

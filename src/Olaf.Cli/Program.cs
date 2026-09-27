@@ -360,16 +360,6 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         return strict && licenses.Any(r => r.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
     }
 
-    static string EffectiveSpdx(ResolvedLicense license)
-    {
-        if (!string.IsNullOrWhiteSpace(license.SpdxId))
-        {
-            return license.SpdxId.Trim();
-        }
-
-        return "Unknown";
-    }
-
     static string FormatDependency(Dependency dependency)
     {
         return $"{dependency.Ecosystem}:{dependency.Name}@{dependency.Version}";
@@ -377,12 +367,12 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     static string FormatOffender(ResolvedLicense license)
     {
-        return $"{FormatDependency(license.Dependency)} -> {EffectiveSpdx(license)}";
+        return $"{FormatDependency(license.Dependency)} -> {LicenseDisplay.EffectiveSpdx(license)}";
     }
 
     static bool IsPolicyOffender(ResolvedLicense license, bool enforceUnknown, HashSet<string> allowed, HashSet<string> denied)
     {
-        var effective = EffectiveSpdx(license);
+        var effective = LicenseDisplay.EffectiveSpdx(license);
         var isUnknown = license.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase);
         var hasAllow = allowed.Count > 0;
         var hasDeny = denied.Count > 0;

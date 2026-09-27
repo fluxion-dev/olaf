@@ -28,7 +28,7 @@ public sealed class MarkdownFormatter : ILicenseFormatter
             sb.Append("| ").Append(Cell(l.Dependency.Ecosystem))
                 .Append(" | ").Append(Cell(l.Dependency.Name))
                 .Append(" | ").Append(Cell(l.Dependency.Version))
-                .Append(" | ").Append(Cell(EffectiveSpdx(l)))
+                .Append(" | ").Append(Cell(LicenseDisplay.EffectiveSpdx(l)))
                 .Append(" | ").Append(Cell(l.LicenseText))
                 .Append(" | ").Append(Cell(l.SourceUrl))
                 .Append(" | ").Append(Cell(l.Status))
@@ -45,7 +45,7 @@ public sealed class MarkdownFormatter : ILicenseFormatter
             sb.AppendLine($"- Ecosystem: {Cell(l.Dependency.Ecosystem)}");
             sb.AppendLine($"- Name: {Cell(l.Dependency.Name)}");
             sb.AppendLine($"- Version: {Cell(l.Dependency.Version)}");
-            sb.AppendLine($"- SPDX: {Cell(EffectiveSpdx(l))}");
+            sb.AppendLine($"- SPDX: {Cell(LicenseDisplay.EffectiveSpdx(l))}");
             sb.AppendLine($"- License: {Cell(l.LicenseText)}");
             sb.AppendLine($"- Source: {Cell(l.SourceUrl)}");
             sb.AppendLine($"- Status: {Cell(l.Status)}");
@@ -54,16 +54,6 @@ public sealed class MarkdownFormatter : ILicenseFormatter
         }
 
         return sb.ToString();
-    }
-
-    private static string EffectiveSpdx(ResolvedLicense license)
-    {
-        if (!string.IsNullOrWhiteSpace(license.SpdxId))
-        {
-            return license.SpdxId.Trim();
-        }
-
-        return "Unknown";
     }
 
     private static string Cell(string? value)

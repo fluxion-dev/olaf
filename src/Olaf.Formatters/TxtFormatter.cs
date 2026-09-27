@@ -17,7 +17,7 @@ public sealed class TxtFormatter : ILicenseFormatter
         {
             sb.AppendLine();
             sb.AppendLine($"{l.Dependency.Name}@{l.Dependency.Version} ({l.Dependency.Ecosystem}) direct={(l.Dependency.Direct ? "true" : "false")}");
-            sb.AppendLine($"  SPDX: {EffectiveSpdx(l)}");
+            sb.AppendLine($"  SPDX: {LicenseDisplay.EffectiveSpdx(l)}");
             if (!string.IsNullOrWhiteSpace(l.SourceUrl))
             {
                 sb.AppendLine($"  Source: {l.SourceUrl}");
@@ -31,15 +31,5 @@ public sealed class TxtFormatter : ILicenseFormatter
         }
 
         return sb.ToString();
-    }
-
-    private static string EffectiveSpdx(ResolvedLicense license)
-    {
-        if (!string.IsNullOrWhiteSpace(license.SpdxId))
-        {
-            return license.SpdxId.Trim();
-        }
-
-        return "Unknown";
     }
 }

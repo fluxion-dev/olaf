@@ -601,6 +601,26 @@ public sealed class HtmlFormatterTests
     }
 
     [Fact]
+    public void Should_FallbackToUnknown_When_SpdxIsWhitespace()
+    {
+        var formatter = FormatterTestHelpers.ResolveFormatter("html");
+
+        var result = new ScanResult(new List<ResolvedLicense>
+        {
+            new(
+                new Dependency("npm", "ws-pkg", "1.0.0", false),
+                "   ",
+                null,
+                null,
+                "Resolved",
+                null),
+        });
+        var output = formatter.FormatResult(result);
+
+        Assert.Contains(">Unknown<", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Should_ProduceValidHtml_When_ScanResultEmpty()
     {
         var formatter = FormatterTestHelpers.ResolveFormatter("html");

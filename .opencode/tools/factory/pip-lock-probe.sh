@@ -111,11 +111,29 @@ FAIL=0
 pass() { echo "PASS [$1]: $2"; }
 fail() { echo "FAIL [$1]: $2"; FAIL=1; }
 
-# dep_ver <json> <name>: print version for package <name> (case-insensitive), empty if absent.
-dep_ver() {
-  python3 - "$1" "$2" <<'PY' 2>/dev/null
+# ---- Canonical dep extractors (from _template.sh 0.2.2; behavior identical) ----
+# dep_count <json>: print license/dependency count.
+dep_count() {
+  python3 - "$1" <<'PY' 2>/dev/null
 import json, sys
-path, want = sys.argv[1], sys.argv[2].lower()
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+except Exception:
+    print("?")
+    sys.exit(0)
+items = data.get("licenses", data.get("dependencies", data.get("resolved", [])))
+print(len(items) if isinstance(items, list) else "?")
+PY
+}
+
+# dep_field <json> <name> <field>: print <field> for package <name>
+# (case-insensitive; unwraps {"dependency":{...}} envelope; empty if absent;
+# booleans print as true/false; strings lowercased only for field=="direct").
+dep_field() {
+  python3 - "$1" "$2" "$3" <<'PY' 2>/dev/null
+import json, sys
+path, want, field = sys.argv[1], sys.argv[2].lower(), sys.argv[3]
 try:
     with open(path) as f:
         data = json.load(f)
@@ -129,24 +147,22 @@ if isinstance(items, list):
         dep = it.get("dependency", it)
         name = str(dep.get("name", it.get("name", "")))
         if name.lower() == want:
-            print(str(dep.get("version", it.get("version", ""))))
+            v = dep.get(field, it.get(field, ""))
+            if v is True:
+                print("true")
+            elif v is False:
+                print("false")
+            elif isinstance(v, str):
+                print(v.lower() if field == "direct" else v)
+            else:
+                print(str(v) if v != "" else "")
             break
 PY
 }
 
-# dep_count <json>: print license/dependency count.
-dep_count() {
-  python3 - "$1" <<'PY' 2>/dev/null
-import json, sys
-try:
-    with open(path := sys.argv[1]) as f:
-        data = json.load(f)
-except Exception:
-    print("?")
-    sys.exit(0)
-items = data.get("licenses", data.get("dependencies", data.get("resolved", [])))
-print(len(items) if isinstance(items, list) else "?")
-PY
+# dep_ver <json> <name>: print version for package <name> (case-insensitive), empty if absent.
+dep_ver() {
+  dep_field "$1" "$2" "version"
 }
 
 run_scan() {
