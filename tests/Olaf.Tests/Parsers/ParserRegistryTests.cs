@@ -237,3 +237,61 @@ public sealed class ParserRegistryTests
         }
     }
 }
+
+/// <summary>
+/// Issue #66: registry dedup direct-wins. On a same-triple
+/// (Ecosystem, Name, Version) collision the IsTransitive:false survivor is
+/// kept regardless of input order; canonical sort is preserved.
+/// DeduplicateAndSort is exercised via reflection (private unit of the fix —
+/// a Scan-level test cannot control filesystem enumeration order, so it
+/// could not prove order-independence). Fully offline, no fixtures.
+/// </summary>
+public sealed class ParserRegistryDirectWinsTests
+{
+    private static IReadOnlyList<Olaf.Core.Dependency> Dedupe(List<Olaf.Core.Dependency> deps)
+    {
+        var method = typeof(ParserRegistry).GetMethod(
+            "DeduplicateAndSort",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+        return (IReadOnlyList<Olaf.Core.Dependency>)method.Invoke(null, new object[] { deps })!;
+    }
+
+    [Fact]
+    public void Should_PreferDirect_When_SameTripleCollidesDirectFirst()
+    {
+        var deps = new List<Olaf.Core.Dependency>
+        {
+            new("npm", "express", "4.18.2", IsTransitive: false),
+            new("npm", "express", "4.18.2", IsTransitive: true),
+        };
+
+        var result = Dedupe(deps);
+
+        var single = Assert.Single(result);
+        Assert.Equal("express", single.Name);
+        Assert.False(single.IsTransitive);
+        Assert.True(single.Direct);
+    }
+
+    [Fact]
+    public void Should_PreferDirectRegardlessOfOrder_When_SameTripleCollidesTransitiveFirst()
+    {
+        var deps = new List<Olaf.Core.Dependency>
+        {
+            new("npm", "express", "4.18.2", IsTransitive: true),
+            new("npm", "debug", "4.3.4", IsTransitive: true),
+            new("npm", "express", "4.18.2", IsTransitive: false),
+        };
+
+        var result = Dedupe(deps);
+
+        Assert.Equal(2, result.Count);
+        var express = Assert.Single(result, d => d.Name == "express");
+        Assert.False(express.IsTransitive);
+        Assert.True(express.Direct);
+        // Canonical sort preserved: debug < express.
+        Assert.Equal("debug", result[0].Name);
+        Assert.Equal("express", result[1].Name);
+    }
+}

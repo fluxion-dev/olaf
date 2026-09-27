@@ -4,7 +4,7 @@ License scanner: scans `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swi
 
 Supported ecosystems: `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md` (`markdown` alias for `md`).
 
-Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `Pipfile.lock|requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference `Pipfile.lock` authoritative-first (empty lock falls through to poetry/uv tier), then `poetry.lock`/`uv.lock` merged > `requirements.txt` > `pyproject.toml` > `environment.yml|environment.yaml`; `Pipfile.lock` entries `IsTransitive=false`; `hashes[]` validated but parsed-but-deferred — not stored on the report; conda entries reported as `pip`); `go` handles `go.mod|go.sum` (2 lines per module in `go.sum` deduped to one dep; `// indirect` + present in `go.sum` → transitive, `// indirect` + absent → direct fallback, `go.mod`-only dir keeps legacy `// indirect` → transitive, `go.sum`-only dir yields all-transitive deps; `h1:` hashes syntactically validated but parsed-but-deferred — not stored on the 8-field report, SBOM enrichment follow-up). `apk` handles `installed` (`lib/apk/db/installed`: blank-line-separated stanzas with `P:`/`V:` fields; versions verbatim including `-r0`; `L:` (declared license) + `A:` (arch) validated-but-deferred — presence never breaks parsing, values not stored, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `dpkg` handles `status` (`var/lib/dpkg/status`: blank-line-separated stanzas with `Package:`/`Version:` fields; versions verbatim including epoch; `Architecture:` validated-but-deferred — same terms, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `rpm` handles `Packages` text dumps (`var/lib/rpm/Packages` or `usr/lib/sysimage/rpm/Packages`: one `name-ver-rel.arch` NVRA line per package, `rpm -qa` default output; arch stripped after the last `.`, version is `ver-rel` joined verbatim; binary (BerkeleyDB) input yields empty, never throws; entries `IsTransitive=false`; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `container` scans image tarballs (`*.tar|*.tar.gz|*.tgz` with top-level `manifest.json`/`index.json` markers) and exploded OCI/docker-save layout dirs (`manifest.json|index.json|oci-layout` plus layer blobs) and reports the image's packages as `apk`/`dpkg`/`rpm` entries (`IsTransitive=false`; layers apply bottom→top with OCI whiteouts — basename prefix `.wh.`, `.wh..wh..opq` clears the directory — and topmost layer wins for the same package; absolute/`..` entries and symlinks/hardlinks are skipped; RPM `Packages` text dumps are routed to the `rpm` parser while BINARY rpm bytes still yield empty (binary format deferred to issue #70); uncompressed bytes are capped by `--max-image-mb`, default `1024`; corrupt/truncated tarballs and non-image tars fail with exit `2`, never silent empty).
+Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `Pipfile.lock|requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference `Pipfile.lock` authoritative-first (empty lock falls through to poetry/uv tier), then `poetry.lock`/`uv.lock` merged > `requirements.txt` > `pyproject.toml` > `environment.yml|environment.yaml`; `Pipfile.lock` entries `IsTransitive=false`; `hashes[]` validated but parsed-but-deferred — not stored on the report; conda entries reported as `pip`); `go` handles `go.mod|go.sum` (2 lines per module in `go.sum` deduped to one dep; `// indirect` + present in `go.sum` → transitive, `// indirect` + absent → direct fallback, `go.mod`-only dir keeps legacy `// indirect` → transitive, `go.sum`-only dir yields all-transitive deps; `h1:` hashes syntactically validated but parsed-but-deferred — not stored on the 9-field report, SBOM enrichment follow-up). `apk` handles `installed` (`lib/apk/db/installed`: blank-line-separated stanzas with `P:`/`V:` fields; versions verbatim including `-r0`; `L:` (declared license) + `A:` (arch) validated-but-deferred — presence never breaks parsing, values not stored, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `dpkg` handles `status` (`var/lib/dpkg/status`: blank-line-separated stanzas with `Package:`/`Version:` fields; versions verbatim including epoch; `Architecture:` validated-but-deferred — same terms, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `rpm` handles `Packages` text dumps (`var/lib/rpm/Packages` or `usr/lib/sysimage/rpm/Packages`: one `name-ver-rel.arch` NVRA line per package, `rpm -qa` default output; arch stripped after the last `.`, version is `ver-rel` joined verbatim; binary (BerkeleyDB) input yields empty, never throws; entries `IsTransitive=false`; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `container` scans image tarballs (`*.tar|*.tar.gz|*.tgz` with top-level `manifest.json`/`index.json` markers) and exploded OCI/docker-save layout dirs (`manifest.json|index.json|oci-layout` plus layer blobs) and reports the image's packages as `apk`/`dpkg`/`rpm` entries (`IsTransitive=false`; layers apply bottom→top with OCI whiteouts — basename prefix `.wh.`, `.wh..wh..opq` clears the directory — and topmost layer wins for the same package; absolute/`..` entries and symlinks/hardlinks are skipped; RPM `Packages` text dumps are routed to the `rpm` parser while BINARY rpm bytes still yield empty (binary format deferred to issue #70); uncompressed bytes are capped by `--max-image-mb`, default `1024`; corrupt/truncated tarballs and non-image tars fail with exit `2`, never silent empty).
 
 ## Tool install
 
@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 577 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 597 passing (`dotnet test`).
 
 ## Usage
 
@@ -28,13 +28,16 @@ dotnet run --project src/Olaf.Cli -- --input package.json --strict
 # attribution report (human-readable text / markdown)
 dotnet run --project src/Olaf.Cli -- --input package.json --format txt
 dotnet run --project src/Olaf.Cli -- --input package.json --format md
+# direct-only filter (report direct dependencies only; counts recompute on the filtered set)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json --direct-only
 # allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json`; `markdown` alias for `md`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json`; `markdown` alias for `md`), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
+Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set.
 
 `--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
 
@@ -43,6 +46,8 @@ Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md` (default `json
 --ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm (pypi alias for pip)
 --max-image-mb <max-image-mb>  Cap container-image scan at N megabytes uncompressed handled (default: 1024; must be > 0)
 --strict                 Fail on unresolved or unknown licenses
+--direct-only            Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)
+--include-transitive     Explicitly include transitive dependencies (same as default: report all)
 ```
 
 ## Reliability
@@ -51,7 +56,7 @@ Resolution runs with bounded-8 concurrency and retry-once on transient HTTP fail
 
 ## Report contract
 
-Every `licenses` entry has the same 8 fields (rows sorted by ecosystem, name, version):
+Every `licenses` entry has the same 9 fields (rows sorted by ecosystem, name, version; `direct` is always LAST):
 
 | Field | Meaning |
 |-------|---------|
@@ -63,6 +68,30 @@ Every `licenses` entry has the same 8 fields (rows sorted by ecosystem, name, ve
 | `sourceUrl` | Provenance URL, or null when unavailable |
 | `status` | `Resolved` or `Unknown` |
 | `reason` | Why unresolved (null when resolved) |
+| `direct` | `true` when direct (`!IsTransitive`), `false` when transitive — always last |
+
+### Transitive semantics (`direct` / `IsTransitive`)
+
+`direct` surfaces `Dependency.Direct` (`!IsTransitive`). Per-ecosystem rules (unchanged by #66 except dedup):
+
+| Ecosystem | Direct (`direct: true`) | Transitive (`direct: false`) | Notes |
+|-----------|-------------------------|------------------------------|-------|
+| `npm` | `package.json` manifest entries | `package-lock.json` / `pnpm-lock.yaml` / `yarn.lock` / `bun.lock` lock entries (all) | Lock-all-transitive is a heuristic (direct deps re-listed in a lock still surface as transitive); any lock beats manifest, all locks merge deduped |
+| `pip` | `Pipfile.lock`, `requirements.txt`, `pyproject.toml`, `environment.yml`/`environment.yaml` entries | `poetry.lock` / `uv.lock` (TOML `[[package]]`) entries | `Pipfile.lock` stays `IsTransitive=false` (matches #63 pinned tests); conda entries reported as `pip` |
+| `go` | `go.mod` entries without `// indirect`, or `// indirect` + absent from `go.sum` (direct fallback) | `// indirect` + present in `go.sum` → transitive; `go.mod`-only dir keeps legacy `// indirect` → transitive; `go.sum`-only dir yields all-transitive deps | AND-table: `IsTransitive = manifest-indirect && in-go.sum`; 2 `go.sum` lines per module deduped to one dep |
+| `cargo` | `Cargo.toml` manifest entries | `Cargo.lock` entries (all) | Lock-all-transitive heuristic, same direct-conflation caveat as npm |
+| `nuget` | manifest / `packages.lock.json` direct entries | lock entries resolved `!direct` | `packages.lock.json` carries its own direct marker |
+| `composer` | `composer.json` manifest entries | `composer.lock` entries (all) | — |
+| `bundler` | `Gemfile` / `*.gemspec` manifest entries | `Gemfile.lock` `PATH`/`GEM` remote entries (all) | — |
+| `swift` | `Package.swift` manifest entries | `Package.resolved` entries (all) | — |
+| `cocoapods` | `Podfile` manifest entries | `Podfile.lock` entries (all) | — |
+| `conan` | `conanfile.txt` / `conanfile.py` manifest entries | `conan.lock` entries (all) | — |
+| `maven` | all entries | — (false-only) | `pom.xml` has no transitive marker; everything reports `direct: true` |
+| `gradle` | all entries | — (false-only) | `build.gradle` / lockfile entries all `direct: true` |
+| `vcpkg` | all entries | — (false-only) | `vcpkg.json` entries all `direct: true` |
+| `apk` / `dpkg` / `rpm` / `container` | all entries | — (false-only) | OS DB rows and image-layer packages report `direct: true` |
+
+Dedup (registry): same `(ecosystem, name, version)` triple from manifest + lock (or overlapping locks) collapses to one row with **direct-wins** — the `IsTransitive: false` survivor is kept, so a direct listing beats a transitive duplicate. Sort stays `ecosystem → name → version`.
 
 ## License Coverage
 
@@ -99,12 +128,12 @@ The SPDX IDs are available through `SpdxMapper.Normalize()` and `SpdxLicenseText
 
 Summary shape per format:
 
-- JSON: `{"summary":{"total":…,"resolved":…,"unknown":…},"licenses":[…]}`.
-- YAML: `summary:` with `total`/`resolved`/`unknown` plus a `licenses:` list with the same 8 keys.
-- XML: `<report><summary total="…" resolved="…" unknown="…"/><licenses><license>` with the 8 fields as child elements.
-- HTML: `<p>Total: … · Resolved: … · Unknown: …</p>` plus an 8-column table (Ecosystem, Name, Version, SPDX, License, Source, Status, Reason; the SPDX cell falls back to status when `spdx` is null).
-- TXT: `Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …` plus one `name@version (ecosystem)` block per package (SPDX falls back to `Unknown`, plus source/status/reason lines).
-- MD (`markdown` alias): `# Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …`, an 8-column markdown table, plus one `## name@version (ecosystem)` section per package carrying all 8 fields.
+- JSON: `{"summary":{"total":…,"resolved":…,"unknown":…},"licenses":[…]}` with 9 keys per entry (`direct` last).
+- YAML: `summary:` with `total`/`resolved`/`unknown` plus a `licenses:` list with the same 9 keys (`direct: true|false` last).
+- XML: `<report><summary total="…" resolved="…" unknown="…"/><licenses><license>` with the 9 fields as child elements (`<direct>` last).
+- HTML: `<p>Total: … · Resolved: … · Unknown: …</p>` plus a 9-column table (Ecosystem, Name, Version, SPDX, License, Source, Status, Reason, Direct; the SPDX cell falls back to status when `spdx` is null).
+- TXT: `Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …` plus one `name@version (ecosystem) direct=<true|false>` block per package (SPDX falls back to `Unknown`, plus source/status/reason lines).
+- MD (`markdown` alias): `# Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …`, a 9-column markdown table (`| Direct |` last), plus one `## name@version (ecosystem)` section per package carrying all 9 fields (`- Direct: true|false` last).
 
 Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `licenses` list, XML emits `<licenses />`, HTML emits an empty `<tbody>`.
 
@@ -152,7 +181,7 @@ dotnet run --project src/Olaf.Cli -- --input image.tar --format json --max-image
 |---|---|
 | `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
 | `1` | `--strict` found unresolved/`Unknown` licenses, or `--allow`/`--deny` policy-gate offenders |
-| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure |
+| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive` |
 
 ## Output contract
 

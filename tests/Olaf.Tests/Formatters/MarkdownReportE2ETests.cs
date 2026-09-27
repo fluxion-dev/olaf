@@ -86,8 +86,8 @@ public sealed class MarkdownReportE2ETests
             unknown: scan.UnknownCount);
 
         // Table header + separator, then 3 data rows and 3 ## sections.
-        Assert.Contains("| Ecosystem | Name | Version | SPDX | License | Source | Status | Reason |", output, StringComparison.Ordinal);
-        Assert.Contains("| --- | --- | --- | --- | --- | --- | --- | --- |", output, StringComparison.Ordinal);
+        Assert.Contains("| Ecosystem | Name | Version | SPDX | License | Source | Status | Reason | Direct |", output, StringComparison.Ordinal);
+        Assert.Contains("| --- | --- | --- | --- | --- | --- | --- | --- | --- |", output, StringComparison.Ordinal);
         var pipeLines = output.Split('\n').Count(line => line.TrimStart().StartsWith("| ", StringComparison.Ordinal));
         Assert.Equal(5, pipeLines);
         Assert.Equal(3, CountOccurrences(output, "## "));
@@ -99,18 +99,18 @@ public sealed class MarkdownReportE2ETests
     {
         var (scan, output) = await BuildRealMarkdownReportAsync();
 
-        // Per-row: 8 cells means 9 pipe delimiters per data row.
+        // Per-row: 9 cells means 10 pipe delimiters per data row.
         foreach (var name in new[] { "express", "lodash", PhantomName })
         {
             var row = GetTableRow(output, name);
-            Assert.Equal(9, CountOccurrences(row, "|"));
+            Assert.Equal(10, CountOccurrences(row, "|"));
         }
 
-        // Per-package sections with - bullets carrying all 8 fields.
+        // Per-package sections with - bullets carrying all 9 fields.
         Assert.Contains("## express@4.18.2 (npm)", output, StringComparison.Ordinal);
         Assert.Contains("## lodash@4.17.21 (npm)", output, StringComparison.Ordinal);
         Assert.Contains($"## {PhantomName}@9.9.9 (npm)", output, StringComparison.Ordinal);
-        foreach (var bullet in new[] { "- Ecosystem:", "- Name:", "- Version:", "- SPDX:", "- License:", "- Source:", "- Status:", "- Reason:" })
+        foreach (var bullet in new[] { "- Ecosystem:", "- Name:", "- Version:", "- SPDX:", "- License:", "- Source:", "- Status:", "- Reason:", "- Direct:" })
         {
             Assert.Contains(bullet, output, StringComparison.Ordinal);
         }

@@ -136,9 +136,11 @@ public sealed class ParserRegistry
 
     private static IReadOnlyList<Dependency> DeduplicateAndSort(List<Dependency> dependencies)
     {
-        // Dedup on (Ecosystem, Name, Version) ordinal — explicitly ignore IsTransitive.
+        // Dedup on (Ecosystem, Name, Version) ordinal — direct wins on same-triple
+        // collision (prefer IsTransitive:false survivor); stable sort preserved.
         return dependencies
-            .DistinctBy(d => (d.Ecosystem, d.Name, d.Version))
+            .GroupBy(d => (d.Ecosystem, d.Name, d.Version))
+            .Select(g => g.FirstOrDefault(d => !d.IsTransitive) ?? g.First())
             .OrderBy(d => d.Ecosystem, StringComparer.OrdinalIgnoreCase)
             .ThenBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(d => d.Version, StringComparer.Ordinal)

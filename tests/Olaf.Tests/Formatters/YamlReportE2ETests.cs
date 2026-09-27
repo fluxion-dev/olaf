@@ -112,8 +112,8 @@ public sealed class YamlReportE2ETests
         Assert.Equal(3, report.Licenses.Count);
         foreach (var entry in report.Licenses)
         {
-            Assert.Equal(8, entry.Count);
-            foreach (var key in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason" })
+            Assert.Equal(9, entry.Count);
+            foreach (var key in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason", "direct" })
             {
                 Assert.True(entry.ContainsKey(key), $"YAML licenses[] entry missing key '{key}'.");
             }

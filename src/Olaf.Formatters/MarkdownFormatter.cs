@@ -21,8 +21,8 @@ public sealed class MarkdownFormatter : ILicenseFormatter
         }
 
         sb.AppendLine();
-        sb.AppendLine("| Ecosystem | Name | Version | SPDX | License | Source | Status | Reason |");
-        sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- |");
+        sb.AppendLine("| Ecosystem | Name | Version | SPDX | License | Source | Status | Reason | Direct |");
+        sb.AppendLine("| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
         foreach (var l in sorted)
         {
             sb.Append("| ").Append(Cell(l.Dependency.Ecosystem))
@@ -33,6 +33,7 @@ public sealed class MarkdownFormatter : ILicenseFormatter
                 .Append(" | ").Append(Cell(l.SourceUrl))
                 .Append(" | ").Append(Cell(l.Status))
                 .Append(" | ").Append(Cell(l.Reason))
+                .Append(" | ").Append(l.Dependency.Direct ? "true" : "false")
                 .AppendLine(" |");
         }
 
@@ -49,6 +50,7 @@ public sealed class MarkdownFormatter : ILicenseFormatter
             sb.AppendLine($"- Source: {Cell(l.SourceUrl)}");
             sb.AppendLine($"- Status: {Cell(l.Status)}");
             sb.AppendLine($"- Reason: {Cell(l.Reason)}");
+            sb.AppendLine($"- Direct: {(l.Dependency.Direct ? "true" : "false")}");
         }
 
         return sb.ToString();

@@ -10,9 +10,9 @@
 #   (c) dir-preference: Pipfile + poetry.lock + uv.lock + requirements.txt
 #       co-present with Pipfile.lock -> lock-only 7, rival-only pkgs absent
 #   (d) IsTransitive=false static check on ParsePipfileLock
-#       (CLI JSON carries no transitive field)
+#       (CLI JSON carries `direct` field, issue #66)
 # Rules: repo-relative, idempotent (temp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.1.1"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -36,7 +36,7 @@ Checks:
   (c) lock + Pipfile/poetry/uv/requirements co-present -> lock-only 7,
       rival-only packages absent
   (d) ParsePipfileLock constructs Dependency(.., IsTransitive: false)
-      and CLI JSON carries no transitive field
+      and CLI JSON carries \`direct\` field (issue #66)
 
 Options:
   --repo-root <dir>   Repo root (default: git top-level or CWD)
@@ -276,10 +276,10 @@ if sed -n '/ParsePipfileLock/,/^    }/p' "$PARSER" | grep -q "IsTransitive: fals
 else
   fail "d/static" "IsTransitive: false not found in ParsePipfileLock body"
 fi
-if grep -qi "transitive" "$WORKDIR/canonical.stdout"; then
-  fail "d/no-field" "CLI JSON unexpectedly mentions transitive"
+if grep -q '"direct"' "$WORKDIR/canonical.stdout"; then
+  pass "d/direct-field" "CLI JSON carries direct field (issue #66)"
 else
-  pass "d/no-field" "CLI JSON carries no transitive field"
+  fail "d/direct-field" "CLI JSON missing direct field"
 fi
 
 echo "== summary =="

@@ -3,12 +3,12 @@
 # PROTOTYPE (do NOT promote yet — promote on 2nd reuse per factory-toolbuilder).
 # Runs: for f in json yaml xml html; do
 #   dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format $f; done
-# then checks each output for 8 fields + summary counts; HTML additionally
+# then checks each output for 8 fields + direct (9th) + summary counts; HTML additionally
 # requires <table> and HTML-encoded cell output.
 # Offline-safe: never passes --strict; resolver network failures degrade to
 # Unknown with exit 0 (deterministic continue in Program.cs).
 # Rules: repo-relative, idempotent (stdout only, temp files cleaned), no secrets.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -25,6 +25,7 @@ usage() {
   echo "(default: 60), then verifies:"
   echo "  - 8 fields present (ecosystem,name,version,spdx,licenseText,sourceUrl,status,reason"
   echo "    or per-format equivalents: <th> headers for html, <elements> for xml, keys for yaml)"
+  echo "  - 9th field 'direct' present (json \"direct\" / yaml direct: / xml <direct> / html <th>Direct</th>)"
   echo "  - summary counts present (total/resolved/unknown or per-format equivalent)"
   echo "  - html additionally contains <table> and HTML-encoded cell output"
   echo ""
@@ -141,11 +142,17 @@ for f in $FORMATS; do
         && check_contains "$f" "$OUT" "counts" '"total"' '"resolved"' '"unknown"'; then
         pass "$f" "8 fields + summary counts present"
       fi
+      if check_contains "$f" "$OUT" "direct" '"direct"'; then
+        pass "$f" "9th field 'direct' present"
+      fi
       ;;
     yaml)
       if check_contains "$f" "$OUT" "fields" 'ecosystem:' 'name:' 'version:' 'spdx:' 'licenseText:' 'sourceUrl:' 'status:' 'reason:' \
         && check_contains "$f" "$OUT" "counts" 'total:' 'resolved:' 'unknown:'; then
         pass "$f" "8 fields + summary counts present"
+      fi
+      if check_contains "$f" "$OUT" "direct" 'direct:'; then
+        pass "$f" "9th field 'direct' present"
       fi
       ;;
     xml)
@@ -153,11 +160,17 @@ for f in $FORMATS; do
         && check_contains "$f" "$OUT" "counts" 'total=' 'resolved=' 'unknown='; then
         pass "$f" "8 fields + summary counts present"
       fi
+      if check_contains "$f" "$OUT" "direct" '<direct>'; then
+        pass "$f" "9th field 'direct' present"
+      fi
       ;;
     html)
       if check_contains "$f" "$OUT" "fields/headers" '<th>Ecosystem</th>' '<th>Name</th>' '<th>Version</th>' '<th>SPDX</th>' '<th>License</th>' '<th>Source</th>' '<th>Status</th>' '<th>Reason</th>' \
         && check_contains "$f" "$OUT" "counts" 'Total:' 'Resolved:' 'Unknown:'; then
         pass "$f" "8 <th> headers + summary counts present"
+      fi
+      if check_contains "$f" "$OUT" "direct-header" '<th>Direct</th>'; then
+        pass "$f" "9th header <th>Direct</th> present"
       fi
       if check_contains "$f" "$OUT" "table" '<table>' '</table>' '<td>'; then
         pass "$f" "<table> with cells present"
