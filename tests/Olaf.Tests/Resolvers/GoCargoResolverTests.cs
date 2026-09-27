@@ -102,6 +102,132 @@ public sealed class GoResolverTests
         Assert.Contains("ecosystem-mismatch", result.Reason, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(0, handler.CallCount);
     }
+
+    [Fact]
+    public async Task Should_FallBackToZip_When_InfoJsonMalformed()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            req.RequestUri?.ToString().EndsWith(".info", StringComparison.OrdinalIgnoreCase) == true
+                ? StubHttpMessageHandler.Text("this is not json{{{")
+                : StubHttpMessageHandler.NotFound());
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new GoLicenseResolver(http);
+        var dep = new Dependency("go", "github.com/spf13/cobra", "v1.8.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("not-found", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_Proxy500()
+    {
+        var handler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.ServerError());
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new GoLicenseResolver(http);
+        var dep = new Dependency("go", "github.com/spf13/cobra", "v1.8.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("registry-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Should_ResolveMit_When_InfoEmptyAndZipHasMitLicense()
+    {
+        const string mitText = "Permission is hereby granted, free of charge, to any person obtaining a copy\n"
+            + "of this software and associated documentation files\n"
+            + "MIT License\n"
+            + "WITHOUT WARRANTY OF ANY KIND";
+        var zipBytes = BuildZip(("github.com/spf13/cobra@v1.8.0/LICENSE", mitText));
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            var url = req.RequestUri?.ToString() ?? string.Empty;
+            if (url.EndsWith(".info", StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.Json(new { });
+            }
+
+            if (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(zipBytes),
+                };
+            }
+
+            return StubHttpMessageHandler.NotFound();
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new GoLicenseResolver(http);
+        var dep = new Dependency("go", "github.com/spf13/cobra", "v1.8.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.Equal(dep, result.Dependency);
+        Assert.False(string.IsNullOrWhiteSpace(result.LicenseText));
+        Assert.NotNull(result.SourceUrl);
+        Assert.Contains("pkg.go.dev", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, handler.CallCount); // .info miss + .zip fallback
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_ZipHasNoLicenseFile()
+    {
+        var zipBytes = BuildZip(("github.com/spf13/cobra@v1.8.0/go.mod", "module github.com/spf13/cobra\n"));
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            var url = req.RequestUri?.ToString() ?? string.Empty;
+            if (url.EndsWith(".info", StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.Json(new { });
+            }
+
+            if (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(zipBytes),
+                };
+            }
+
+            return StubHttpMessageHandler.NotFound();
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new GoLicenseResolver(http);
+        var dep = new Dependency("go", "github.com/spf13/cobra", "v1.8.0", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static byte[] BuildZip(params (string name, string content)[] files)
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (name, content) in files)
+            {
+                var entry = archive.CreateEntry(name);
+                using var writer = new StreamWriter(entry.Open());
+                writer.Write(content);
+            }
+        }
+
+        return ms.ToArray();
+    }
 }
 
 public sealed class CargoResolverTests

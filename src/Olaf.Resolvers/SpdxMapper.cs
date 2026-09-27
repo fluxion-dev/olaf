@@ -22,6 +22,11 @@ internal static class SpdxMapper
             return null;
         }
 
+        if (trimmed.Contains('\n') || trimmed.Contains('\r') || trimmed.Length > 120)
+        {
+            return null;
+        }
+
         if (trimmed.Contains(" OR ", StringComparison.Ordinal)
             || trimmed.Contains(" AND ", StringComparison.Ordinal)
             || trimmed.Contains(" WITH ", StringComparison.Ordinal))
@@ -61,6 +66,45 @@ internal static class SpdxMapper
             "aal" or "attribution assurance license" => "AAL",
             _ => trimmed,
         };
+    }
+
+    public static string? FromLicenseText(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return null;
+        }
+
+        var lower = content.ToLowerInvariant();
+        if (lower.Contains("apache license") && (lower.Contains("version 2.0") || lower.Contains("v2.0")))
+        {
+            return "Apache-2.0";
+        }
+
+        if (lower.Contains("permission to use, copy, modify, and/or distribute"))
+        {
+            return "ISC";
+        }
+
+        if (lower.Contains("redistribution and use in source and binary forms"))
+        {
+            if (lower.Contains("neither the name of"))
+            {
+                return "BSD-3-Clause";
+            }
+
+            return "BSD-2-Clause";
+        }
+
+        if (lower.Contains("permission is hereby granted")
+            && (lower.Contains("mit")
+                || lower.Contains("massachusetts institute of technology")
+                || lower.Contains("without warranty of any kind")))
+        {
+            return "MIT";
+        }
+
+        return null;
     }
 
     public static string? FromLicenseUrl(string? url)

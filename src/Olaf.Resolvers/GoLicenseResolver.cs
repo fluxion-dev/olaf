@@ -185,6 +185,7 @@ public sealed class GoLicenseResolver : ILicenseResolver
                 }
 
                 var spdx = SpdxMapper.Normalize(content)
+                    ?? SpdxMapper.FromLicenseText(content)
                     ?? SpdxMapper.FromLicenseUrl(content);
 
                 if (spdx is not null)
