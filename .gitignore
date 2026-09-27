@@ -480,3 +480,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Olaf factory working files (repo-local, never committed)
+.opencode/plans/
+.opencode/tools/factory/scratch/

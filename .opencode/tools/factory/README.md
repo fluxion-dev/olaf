@@ -2,7 +2,7 @@
 
 Persistent, repo-scoped helpers owned by the `olaf-factory` skill.
 All tools are mutable — extend them as scenarios evolve, don't fork around them.
-Scratch work goes in `/tmp/opencode/factory-tools/`; promote here when reused 2+ times or across issues.
+Scratch work goes in `scratch/` (repo-local, gitignored); promote here when reused 2+ times or across issues.
 
 ## Rules
 - Bash or `python3` only, no secrets, no absolute local paths. Repo-root relative.
@@ -12,7 +12,7 @@ Scratch work goes in `/tmp/opencode/factory-tools/`; promote here when reused 2+
 - Start new tools from `_template.sh`.
 
 ## Lifecycle (fluid)
-1. **Create:** prototype in `/tmp`, promote on 2nd reuse. Bump `VERSION`, add `TOOLS.md` row.
+1. **Create:** prototype in `scratch/`, promote on 2nd reuse. Bump `VERSION`, add `TOOLS.md` row.
 2. **Modify:** extend in place for scenario drift (new flag, new output, hardened parsing). Additive only — existing invocations keep working. Bump minor `VERSION`, append changelog line in `TOOLS.md`, test `--help` + one real run.
 3. **Deprecate → remove:** mark `deprecated` in `TOOLS.md` when superseded; keep file one full factory loop, then delete.
 

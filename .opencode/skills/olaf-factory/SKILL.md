@@ -13,7 +13,7 @@ Source of truth for work: GitHub issues (`gh issue list/view/create`).
 1. **Pick work:** `gh issue list --limit 20 --json number,title,state,labels`
    - If zero OPEN issues: STOP and report "factory idle — no remaining issues".
    - Otherwise pick lowest-numbered OPEN MVP issue. Read it fully: `gh issue view <n> --comments`.
-2. **Plan:** delegate to `factory-planner`. It must fan out to `factory-discovery` agents to build codebase context, then return a serial step plan (prep-refactor → implement → test → QA → cleanup-refactor → final-QA → docs → PR → merge). Do not start coding until plan exists.
+2. **Plan:** delegate to `factory-planner`. It must fan out to `factory-discovery` agents to build codebase context, then write the serial step plan to `.opencode/plans/issue-<n>.md` and return it (prep-refactor → implement → test → QA → cleanup-refactor → final-QA → docs → PR → merge). Do not start coding until plan exists.
 3. **Execute serially, one phase at a time:**
    1. `factory-refactor` (prep): small safe cleanups only, keep tests green.
    2. `factory-implementer`: implement plan steps, no drive-by scope creep.
@@ -37,7 +37,7 @@ All tools are mutable and must evolve with developing scenarios — never treat 
 promoted tool as frozen:
 
 - **Detect:** any `gh`/`dotnet`/parse/inspect pipeline repeated 3+ times, or costing 500+ tokens per re-emission, is a tool candidate. A tool that no longer fits its scenario (missing flag, wrong output shape, brittle parsing) is a modify candidate — same priority as a new tool.
-- **Scratch first:** prototype in `/tmp/opencode/factory-tools/<name>.sh` (or `.py`). Keep it repo-relative, idempotent, no secrets.
+- **Scratch first:** prototype in `.opencode/tools/factory/scratch/<name>.sh` (or `.py`). Keep it repo-relative, idempotent, no secrets.
 - **Promote when reused 2+ times or across issues:** move to `.opencode/tools/factory/<name>.sh`, `chmod +x`, support `--help` (and `--version` when behavior matters), add `VERSION=` header, document in `.opencode/tools/factory/TOOLS.md` (purpose + usage + tokens saved + version + status).
 - **Modify fluidly:** any agent may extend a promoted tool mid-issue when the scenario demands it (new flag, new output mode, new ecosystem). Rules: additive changes only (never break existing flags/output without a `VERSION` minor/major bump + `TOOLS.md` changelog line), test `--help` + one real run after every edit, keep the tool executable. Prefer editing the existing tool over forking a `v2` copy; fork only on breaking change, then mark old as `deprecated` in `TOOLS.md` for one issue cycle before removal.
 - **Retire:** when a scenario dies (flag removed, workflow replaced), mark `deprecated` in `TOOLS.md`, leave the file for one full factory loop, then delete. Record all of this in the PR body under `Factory-Notes`.
@@ -50,7 +50,8 @@ promoted tool as frozen:
 - .NET 10, `olaf.slnx`. Verify with execution: `dotnet test tests/Olaf.Tests/Olaf.Tests.csproj --verbosity minimal`. Never claim green without running it.
 - Keep diffs minimal and scoped to the target issue. Git side effects (branch/commit/push/PR/merge) are authorized only inside the factory loop's PR → merge steps, scoped to the target issue's files; otherwise do not commit unless user explicitly asks.
 - Token discipline: read files with Glob/Grep first, full Read only on demand. Reuse discovery output and factory tools instead of re-exploring.
-- **Self-improvement:** if you repeat a lookup/conversion 3+ times, prototype a script in `/tmp/opencode/factory-tools/` (e.g. fixture dumper, SDK log parser), promote to `.opencode/tools/factory/` when reused, register in `TOOLS.md`, and note it in the PR body under `Factory-Notes`. Update your agent file with the lesson only when it is repo-general (no secrets, no local paths).
+- **Working directory:** all factory working files live in the repo working directory, never in `/tmp` — serial plans in `.opencode/plans/issue-<n>.md`, tool prototypes/patches/probes in `.opencode/tools/factory/scratch/`. Both dirs are gitignored so `git status` stays clean. Sole exception: ephemeral git verification worktrees under `/tmp`, removed with `git worktree remove --force` immediately after use.
+- **Self-improvement:** if you repeat a lookup/conversion 3+ times, prototype a script in `.opencode/tools/factory/scratch/` (e.g. fixture dumper, SDK log parser), promote to `.opencode/tools/factory/` when reused, register in `TOOLS.md`, and note it in the PR body under `Factory-Notes`. Update your agent file with the lesson only when it is repo-general (no secrets, no local paths).
 - **Bug reporting:** any out-of-scope bug found during work → `gh issue create --title "bug: ..." --body "repro, expected, actual, files"` immediately, then continue current issue. Never silently fix out-of-scope bugs.
 - Exit codes are contract: `0` success, `1` `--strict` violation, `2` usage/IO.
 
