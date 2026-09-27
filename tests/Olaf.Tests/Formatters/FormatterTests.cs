@@ -385,8 +385,8 @@ public sealed class YamlFormatterTests
         var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
 
         Assert.False(string.IsNullOrWhiteSpace(output));
-        Assert.Contains('\n', output.ToString());
-        Assert.Contains(':', output.ToString());
+        Assert.Contains('\n', output);
+        Assert.Contains(':', output);
         Assert.Contains("express", output, StringComparison.Ordinal);
         Assert.Contains("4.18.2", output, StringComparison.Ordinal);
         Assert.Contains("MIT", output, StringComparison.Ordinal);
