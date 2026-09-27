@@ -484,3 +484,4 @@ $RECYCLE.BIN/
 # Olaf factory working files (repo-local, never committed)
 .opencode/plans/
 .opencode/tools/factory/scratch/
+.opencode/worktrees/
