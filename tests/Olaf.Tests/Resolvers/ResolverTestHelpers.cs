@@ -80,7 +80,10 @@ internal static class ResolverTestHelpers
         var candidates = AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(SafeGetTypes)
             .Where(t => typeof(ILicenseResolver).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract)
-            .Where(t => t.Name.Contains(ecosystem, StringComparison.OrdinalIgnoreCase)
+            .Where(t => 
+                // Issue #23: prefer name-starts-with match, then substring fallback.
+                // This prevents "go" from matching "CargoLicenseResolver" (Cargo contains "go").
+                t.Name.StartsWith(ecosystem, StringComparison.OrdinalIgnoreCase)
                 || (ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase)
                     && t.Name.Contains("pip", StringComparison.OrdinalIgnoreCase)))
             .ToList();
