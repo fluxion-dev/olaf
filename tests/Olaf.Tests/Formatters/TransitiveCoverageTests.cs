@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Olaf.Core;
 using Olaf.Tests.Parsers;
 
 namespace Olaf.Tests.Formatters;
@@ -14,17 +16,17 @@ public sealed class TransitiveCoverageTests
     [Fact]
     public void Should_ExposeDirectField_When_AllFormatsResolvedViaRegistry()
     {
-        var scan = new Olaf.Core.ScanResult(new List<Olaf.Core.ResolvedLicense>
+        var scan = new ScanResult(new List<ResolvedLicense>
         {
             new(
-                new Olaf.Core.Dependency("npm", "express", "4.18.2", false),
+                new Dependency("npm", "express", "4.18.2", false),
                 "MIT",
                 "MIT License",
                 "https://example.com/express/LICENSE",
                 "Resolved",
                 null),
             new(
-                new Olaf.Core.Dependency("npm", "shadow-dep", "1.0.0", true),
+                new Dependency("npm", "shadow-dep", "1.0.0", true),
                 null,
                 null,
                 null,
@@ -63,6 +65,63 @@ public sealed class TransitiveCoverageTests
         {
             Directory.Delete(manifestDir, recursive: true);
             Directory.Delete(lockDir, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Issue #67 scope contract (offline, constructed ScanResult): every
+    /// component resolved through FormatterRegistry for `cyclonedx-json`
+    /// and the `cyclonedx` alias carries `scope` = required (direct) or
+    /// optional (transitive). Separate helper + loop — AssertDirectFieldPresent
+    /// is NOT extended (BOM has no `direct` field).
+    /// </summary>
+    private static void AssertScopePresent(string output)
+    {
+        using var doc = JsonDocument.Parse(output);
+        var components = doc.RootElement.GetProperty("components").EnumerateArray().ToList();
+        Assert.Equal(2, components.Count);
+        foreach (var component in components)
+        {
+            Assert.True(component.TryGetProperty("scope", out var scope), "CycloneDX component missing 'scope'.");
+            Assert.True(
+                scope.GetString() is "required" or "optional",
+                $"CycloneDX scope must be required|optional, got '{scope.GetString()}'.");
+        }
+    }
+
+    [Fact]
+    public void Should_ExposeScopeField_When_CycloneDxFormatsResolvedViaRegistry()
+    {
+        var scan = new ScanResult(new List<ResolvedLicense>
+        {
+            new(
+                new Dependency("npm", "express", "4.18.2", false),
+                "MIT",
+                "MIT License",
+                "https://example.com/express/LICENSE",
+                "Resolved",
+                null),
+            new(
+                new Dependency("npm", "shadow-dep", "1.0.0", true),
+                null,
+                null,
+                null,
+                "Unknown",
+                "not-found."),
+        });
+
+        foreach (var format in new[] { "cyclonedx-json", "cyclonedx" })
+        {
+            var formatter = FormatterTestHelpers.GetFormatterViaRegistry(format);
+            var output = formatter.FormatResult(scan);
+            AssertScopePresent(output);
+
+            // Scope mapping pinned: direct → required, transitive → optional.
+            using var doc = JsonDocument.Parse(output);
+            var byName = doc.RootElement.GetProperty("components").EnumerateArray()
+                .ToDictionary(c => c.GetProperty("name").GetString()!);
+            Assert.Equal("required", byName["express"].GetProperty("scope").GetString());
+            Assert.Equal("optional", byName["shadow-dep"].GetProperty("scope").GetString());
         }
     }
 }

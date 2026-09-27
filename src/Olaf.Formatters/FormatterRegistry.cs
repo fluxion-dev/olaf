@@ -16,7 +16,9 @@ public sealed class FormatterRegistry
             "txt" => new TxtFormatter(),
             "md" => new MarkdownFormatter(),
             "markdown" => new MarkdownFormatter(),
-            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md.", nameof(format)),
+            "cyclonedx-json" => new CycloneDxFormatter(),
+            "cyclonedx" => new CycloneDxFormatter(),
+            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx.", nameof(format)),
         };
     }
 }
