@@ -5,7 +5,7 @@ using Olaf.Parsers;
 using Olaf.Resolvers;
 
 const string SupportedFormats = "json|yaml|xml|html|txt|md";
-const string SupportedEcosystems = "npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan";
+const string SupportedEcosystems = "npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg";
 
 var inputOption = new Option<string?>("--input")
 {
@@ -31,6 +31,10 @@ var strictOption = new Option<bool>("--strict")
 var ecosystemOption = new Option<string?>("--ecosystem")
 {
     Description = $"Limit scan to ecosystem: {SupportedEcosystems} (pypi alias for pip)",
+};
+var maxImageMbOption = new Option<string?>("--max-image-mb")
+{
+    Description = $"Cap container-image scan at N megabytes uncompressed handled (default: {ContainerImageParser.DefaultMaxImageMb}; must be > 0)",
 };
 var verboseOption = new Option<bool>("--verbose")
 {
@@ -72,6 +76,7 @@ var rootCommand = new RootCommand($"""
     allowOption,
     denyOption,
     ecosystemOption,
+    maxImageMbOption,
     verboseOption,
     quietOption,
 };
@@ -84,6 +89,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var force = parseResult.GetValue(forceOption);
     var strict = parseResult.GetValue(strictOption);
     var ecosystem = parseResult.GetValue(ecosystemOption);
+    var maxImageMbRaw = parseResult.GetValue(maxImageMbOption);
     var verbose = parseResult.GetValue(verboseOption);
     var quiet = parseResult.GetValue(quietOption);
     var allowRaw = parseResult.GetValue(allowOption);
@@ -125,7 +131,9 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
                 || ecosystem.Equals("swift", StringComparison.OrdinalIgnoreCase)
                 || ecosystem.Equals("cocoapods", StringComparison.OrdinalIgnoreCase)
                 || ecosystem.Equals("vcpkg", StringComparison.OrdinalIgnoreCase)
-                || ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase));
+                || ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("apk", StringComparison.OrdinalIgnoreCase)
+                || ecosystem.Equals("dpkg", StringComparison.OrdinalIgnoreCase));
     }
 
     var allowed = ParseSpdxSet(allowRaw);
@@ -155,8 +163,33 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     if (ecosystem is not null && !IsSupportedEcosystem(ecosystem))
     {
-        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan.");
+        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg.");
         return 2;
+    }
+
+    if (maxImageMbRaw is not null)
+    {
+        if (!double.TryParse(
+                maxImageMbRaw,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var maxImageMb)
+            || double.IsNaN(maxImageMb)
+            || double.IsInfinity(maxImageMb)
+            || maxImageMb <= 0)
+        {
+            Console.Error.WriteLine($"Invalid --max-image-mb '{maxImageMbRaw}': must be a positive number of megabytes.");
+            return 2;
+        }
+
+        const double bytesPerMb = 1024 * 1024;
+        ContainerImageParser.MaxImageBytes = maxImageMb * bytesPerMb >= long.MaxValue
+            ? long.MaxValue
+            : (long)(maxImageMb * bytesPerMb);
+    }
+    else
+    {
+        ContainerImageParser.MaxImageBytes = ContainerImageParser.DefaultMaxImageBytes;
     }
 
     ILicenseFormatter formatter;
@@ -181,8 +214,9 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     {
         dependencies = new ParserRegistry().Scan(input, ecosystem);
     }
-    catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or IOException or UnauthorizedAccessException or InvalidOperationException)
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or InvalidDataException)
     {
+        // IOException covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         Console.Error.WriteLine($"Failed to scan input '{input}': {ex.Message}");
         return 2;
     }
@@ -370,5 +404,13 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     return 0;
 });
+
+// System.CommandLine reports a trailing valueless option as a parse error
+// (exit 1); the exit-code contract requires exit 2 for a bad --max-image-mb.
+if (args.Length > 0 && string.Equals(args[^1], "--max-image-mb", StringComparison.Ordinal))
+{
+    Console.Error.WriteLine("Invalid --max-image-mb: missing value; must be a positive number of megabytes.");
+    return 2;
+}
 
 return await rootCommand.Parse(args).InvokeAsync();

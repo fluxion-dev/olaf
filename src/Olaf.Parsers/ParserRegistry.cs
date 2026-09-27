@@ -12,7 +12,7 @@ public sealed class ParserRegistry
     }
 
     public ParserRegistry()
-        : this(new IEcosystemParser[] { new NpmParser(), new NuGetParser(), new PipParser(), new GoParser(), new CargoParser(), new MavenParser(), new GradleParser(), new ComposerParser(), new BundlerParser(), new SwiftParser(), new CocoaPodsParser(), new VcpkgParser(), new ConanParser() })
+        : this(new IEcosystemParser[] { new NpmParser(), new NuGetParser(), new PipParser(), new GoParser(), new CargoParser(), new MavenParser(), new GradleParser(), new ComposerParser(), new BundlerParser(), new SwiftParser(), new CocoaPodsParser(), new VcpkgParser(), new ConanParser(), new ApkParser(), new DpkgParser(), new ContainerImageParser() })
     {
     }
 
@@ -85,9 +85,10 @@ public sealed class ParserRegistry
         {
             dependencies.AddRange(parser.Parse(path));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Malformed/inaccessible manifest: preserve swallow, never throw.
+            // IOException covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         }
     }
 
@@ -106,8 +107,9 @@ public sealed class ParserRegistry
             {
                 filesInDirectory = Directory.GetFiles(currentDirectory);
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or DirectoryNotFoundException or IOException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
+                // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
                 continue;
             }
 
@@ -117,8 +119,9 @@ public sealed class ParserRegistry
             {
                 subdirectories = Directory.GetDirectories(currentDirectory);
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException or DirectoryNotFoundException or IOException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
+                // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
                 continue;
             }
 
