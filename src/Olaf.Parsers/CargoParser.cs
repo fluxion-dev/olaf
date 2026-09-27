@@ -110,6 +110,7 @@ public sealed class CargoParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
     }
@@ -223,6 +224,7 @@ public sealed class CargoParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
     }
@@ -272,6 +274,7 @@ public sealed class CargoParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return null;
         }
     }

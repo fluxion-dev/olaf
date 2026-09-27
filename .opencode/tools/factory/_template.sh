@@ -1,8 +1,51 @@
 #!/usr/bin/env bash
 # Template for factory tools. Copy to <name>.sh and fill in.
 # Rules: repo-relative, idempotent, no secrets, executable, --help required.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
+
+# ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
+# Priority: git top-level -> script-dir fallback -> fail-closed.
+# NOTE: factory tools live at .opencode/tools/factory/ so repo root is
+#   ../../.. from the script dir. Scratch prototypes live one level deeper
+#   (.opencode/tools/factory/scratch/) so use ../../../.. there instead.
+#   Verify against parser-coverage-probe.sh:11 which uses ../../...
+ROOT=""
+if git rev-parse --show-toplevel >/dev/null 2>&1; then
+  ROOT="$(git rev-parse --show-toplevel)"
+else
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$SCRIPT_DIR/../../../olaf.slnx" ]]; then
+    ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+  else
+    echo "Cannot locate repo root (no git top-level, no olaf.slnx fallback)." >&2
+    exit 2
+  fi
+fi
+
+# ---- Canonical pass/fail (copy-paste) ----
+fail=0
+pass() { echo "PASS: $*"; }
+fail_msg() { echo "FAIL: $*"; fail=1; }
+
+# ---- Canonical temp-dir with KEEP_TEMP (copy-paste; adapt prefix) ----
+# Wire --workdir/--keep-temp flags to these; mktemp under ${TMPDIR:-/tmp}.
+WORKDIR=""
+KEEP_TEMP=0
+# if [[ -z "$WORKDIR" ]]; then
+#   WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/<name>-XXXXXX")"
+#   MADE_TMP=1
+# else
+#   mkdir -p "$WORKDIR"
+#   MADE_TMP=0
+# fi
+# cleanup() {
+#   if (( ! KEEP_TEMP )) && (( MADE_TMP )) && [[ -d "$WORKDIR" ]]; then
+#     rm -rf "$WORKDIR"
+#   fi
+# }
+# trap cleanup EXIT
+
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"
   echo "TODO: describe purpose, options, examples."

@@ -11,3 +11,4 @@ Rules:
 - Verify every example by running it (`dotnet run --project src/Olaf.Cli -- --help`, fixture scan). In write mode leave tree green; in read mode use the frozen SHA, never rebuild over a live writer.
 - Report docs touched (write mode) or verdict (read mode) + verification commands run.
 - Self-improvement: every handoff ends with `FRICTION` (doc drift found, examples that needed re-running, flags/ecosystems lists that risk going stale, doc-lint tool proposal or `no-friction`). Recurring drift (same file stale 2+ issues) → mandatory proposal for a generated-docs probe owned by `factory-toolbuilder`. In Wave 5b patch the drift check into this file.
+- Wave 2 signoff drift gates (Wave 5b): before docs sign-off run `parser-coverage-probe.sh` + `test-count-probe.sh` and require green. `test-count-probe` FAIL = update the README count line to the live `dotnet test` total, not a merge block.

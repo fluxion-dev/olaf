@@ -78,6 +78,7 @@ public sealed class MavenParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
         catch (System.Xml.XmlException)

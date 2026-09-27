@@ -3,7 +3,7 @@
 # Builds CLI, scans a temp dir containing a definitely-missing npm package,
 # asserts: non-strict exit 0 + "Unknown" in stdout; --strict exit 1.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.1.1"
 set -euo pipefail
 
 PKG_NAME="this-package-definitely-does-not-exist-olaf-xyz"
@@ -65,8 +65,6 @@ if [[ -z "$REPO_ROOT" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     if [[ -f "$SCRIPT_DIR/../../../olaf.slnx" ]]; then
       REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-    elif [[ -f "/home/brad/personal-repos/olaf/olaf.slnx" ]]; then
-      REPO_ROOT="/home/brad/personal-repos/olaf"
     else
       echo "Cannot locate repo root (no git top-level, no olaf.slnx fallback)." >&2
       exit 2

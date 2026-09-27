@@ -35,6 +35,7 @@ public sealed class ApkParser : IEcosystemParser
             }
             catch (IOException)
             {
+                // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
                 return Array.Empty<Dependency>();
             }
 

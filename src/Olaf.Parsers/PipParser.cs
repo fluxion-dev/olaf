@@ -183,6 +183,7 @@ public sealed class PipParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
     }
@@ -250,6 +251,7 @@ public sealed class PipParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
     }
@@ -446,15 +448,7 @@ public sealed class PipParser : IEcosystemParser
                     }
                     // No version key (git/file/path/editable) → "*" (resolved VCS/local ref).
 
-                    // Validate hashes[] holds strings, then discard — Dependency carries no hash field.
-                    if (entry.Value.TryGetProperty("hashes", out var hashesEl)
-                        && hashesEl.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var hashEl in hashesEl.EnumerateArray())
-                        {
-                            _ = hashEl.ValueKind == JsonValueKind.String ? hashEl.GetString() : null;
-                        }
-                    }
+                    // deferred: hashes validated not stored (#86)
 
                     byName[entry.Name] = version;
                 }
@@ -548,6 +542,7 @@ public sealed class PipParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
     }
@@ -645,6 +640,7 @@ public sealed class PipParser : IEcosystemParser
         }
         catch (IOException)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
     }

@@ -120,7 +120,7 @@ public sealed class GoParser : IEcosystemParser
         }
         catch (IOException)
         {
-            // Covers FileNotFoundException + DirectoryNotFoundException (both derive from IOException).
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return new HashSet<(string Name, string Version)>();
         }
         catch (UnauthorizedAccessException)
@@ -235,7 +235,7 @@ public sealed class GoParser : IEcosystemParser
         }
         catch (IOException)
         {
-            // Covers FileNotFoundException + DirectoryNotFoundException (both derive from IOException).
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
         catch (UnauthorizedAccessException)

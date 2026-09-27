@@ -195,6 +195,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (IOException ex)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             // System.Formats.Tar surfaces truncation/checksum damage as IOException,
             // which TryAddDependencies would swallow ([] + exit 0). Re-map to
             // InvalidDataException so corrupt tars escape to a clean exit-2 error.
@@ -336,6 +337,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (IOException ex)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             throw new InvalidDataException($"Container image '{path}' has an unreadable manifest blob: {ex.Message}", ex);
         }
 
@@ -385,7 +387,7 @@ public sealed class ContainerImageParser : IEcosystemParser
             using var layer = OpenMaybeGzip(blob);
             ExtractLayerEntries(layer, overlayDir, ref totalBytes);
         }
-        catch (IOException ex) when (ex is not FileNotFoundException)
+        catch (IOException ex) when (ex is not FileNotFoundException) // allowlist: missing layer blob is a not-found path, not corruption
         {
             // Same corrupt-tar remap as the outer pass (see StageOuterTar).
             throw new InvalidDataException($"Container image layer is corrupt or truncated: {ex.Message}", ex);
@@ -419,7 +421,7 @@ public sealed class ContainerImageParser : IEcosystemParser
                 {
                     if (baseName.StartsWith(".wh.", StringComparison.Ordinal))
                     {
-                        ApplyWhiteout(overlayFull, segments, baseName);
+                        ApplyWhiteout(overlayFull, segments);
                         continue;
                     }
 
@@ -450,13 +452,15 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (IOException ex)
         {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             // Same corrupt-tar remap as the outer pass (see StageOuterTar).
             throw new InvalidDataException($"Container image layer is corrupt or truncated: {ex.Message}", ex);
         }
     }
 
-    private static void ApplyWhiteout(string overlayFull, string[] segments, string baseName)
+    private static void ApplyWhiteout(string overlayFull, string[] segments)
     {
+        var baseName = segments[^1];
         var dirRel = string.Join('/', segments.Take(segments.Length - 1));
         var dirFull = dirRel.Length == 0 ? overlayFull : Confine(overlayFull, dirRel);
         if (string.Equals(baseName, ".wh..wh..opq", StringComparison.Ordinal))
@@ -648,6 +652,7 @@ public sealed class ContainerImageParser : IEcosystemParser
                     }
                     catch (IOException)
                     {
+                        // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
                         return Array.Empty<Dependency>();
                     }
                     catch (UnauthorizedAccessException)
