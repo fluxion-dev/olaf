@@ -53,7 +53,7 @@ Resolution runs with bounded-8 concurrency and retry-once on transient HTTP fail
 Every `licenses` entry has the same 8 fields (rows sorted by ecosystem, name, version):
 
 | Field | Meaning |
-|---|---|
+|-------|---------|
 | `ecosystem` | `npm`, `nuget`, `pip`, `go`, `cargo`, `maven`, `gradle`, `composer`, `bundler`, `swift`, `cocoapods`, `vcpkg`, or `conan` |
 | `name` | Package name |
 | `version` | Version spec from the manifest |
@@ -62,6 +62,39 @@ Every `licenses` entry has the same 8 fields (rows sorted by ecosystem, name, ve
 | `sourceUrl` | Provenance URL, or null when unavailable |
 | `status` | `Resolved` or `Unknown` |
 | `reason` | Why unresolved (null when resolved) |
+
+## License Coverage
+
+This project provides SPDX license mapping for the following licenses:
+
+| License | SPDX ID | Description |
+|---------|----------|-------------|
+| MIT | MIT | MIT License |
+| Apache License 2.0 | Apache-2.0 | Apache License Version 2.0 |
+| Apache License 1.1 | Apache-1.1 | Apache License Version 1.1 |
+| ISC | ISC | ISC License |
+| BSD 2-Clause | BSD-2-Clause | BSD 2-Clause License |
+| BSD 3-Clause | BSD-3-Clause | BSD 3-Clause License |
+| BSD 4-Clause | BSD-4-Clause | Original BSD License |
+| GNU General Public License v1.0 | GPL-1.0-only | GNU General Public License Version 1.0 |
+| GNU General Public License v2.0 | GPL-2.0-only | GNU General Public License Version 2.0 |
+| GNU General Public License v3.0 | GPL-3.0-only | GNU General Public License Version 3.0 |
+| GNU Lesser General Public License v2.0 | LGPL-2.0-only | GNU Lesser General Public License Version 2.0 |
+| GNU Lesser General Public License v2.1 | LGPL-2.1-only | GNU Lesser General Public License Version 2.1 |
+| GNU Lesser General Public License v3.0 | LGPL-3.0-only | GNU Lesser General Public License Version 3.0 |
+| GNU Affero General Public License v1.0 | AGPL-1.0-only | GNU AFFERO General Public License Version 1.0 |
+| GNU Affero General Public License v3.0 | AGPL-3.0-only | GNU AFFERO General Public License Version 3.0 |
+| Mozilla Public License v1.0 | MPL-1.0 | Mozilla Public License Version 1.0 |
+| Mozilla Public License v1.1 | MPL-1.1 | Mozilla Public License Version 1.1 |
+| Mozilla Public License v2.0 | MPL-2.0 | Mozilla Public License Version 2.0 |
+| CDDL License v1.0 | CDDL-1.0 | Common Development and Distribution License |
+| Eclipse Public License v1.0 | EPL-1.0 | Eclipse Public License v1.0 |
+| Unlicense | Unlicense | Unlicense |
+| CC0 1.0 Universal | CC0-1.0 | CC0 1.0 Universal |
+| Artistic License 2.0 | Artistic-2.0 | Artistic License 2.0 |
+| Attribution Assurance License | AAL | Attribution Assurance License |
+
+The SPDX IDs are available through `SpdxMapper.Normalize()` and `SpdxLicenseTexts.GetText()` for license text retrieval.
 
 Summary shape per format:
 

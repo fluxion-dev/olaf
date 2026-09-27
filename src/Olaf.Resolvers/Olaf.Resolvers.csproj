@@ -11,4 +11,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
-</Project>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Olaf.Tests" />
+  </ItemGroup>
+
+ </Project>
