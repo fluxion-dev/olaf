@@ -28,16 +28,15 @@ Launch in ONE parallel block (background subagents where possible):
 - `factory-toolbuilder` in **analyze-only** mode: report reuse/modify/create candidate, do NOT write scratch yet.
 - `factory-qa` in **pre-flight read** mode (optional): scope risks on base, no verdict.
 
-Merge rule: orchestrator waits for ALL readers, synthesizes into the serial plan, then `factory-planner` performs the ONE serial write of this wave: `.opencode/plans/issue-<n>.md` (prep → implement → test → cleanup → docs → verify → PR → merge + retro, each step with done-criteria + verification command). Planner MUST `Read` the last 3 `retro-<n>.md` files first and cite reused tools + applied lessons in the plan. No coding starts until the plan file exists. Pin `base SHA` in the plan for Wave 3 comparison.
+Merge rule: orchestrator waits for ALL readers, synthesizes into the serial plan, then `factory-planner` performs the ONE serial write of this wave: `.opencode/plans/issue-<n>.md` (implement → test → cleanup → docs → verify → PR → merge + retro, each step with done-criteria + verification command). Planner MUST `Read` the last 3 `retro-<n>.md` files first and cite reused tools + applied lessons in the plan. No coding starts until the plan file exists. Pin `base SHA` in the plan for Wave 3 comparison.
 
 ### Wave 2 — Serial write chain (one agent at a time, in order, exclusive worktree)
 Run strictly in sequence. Each writer: pull latest plan, apply ONLY its scoped edits, run narrowest check, hand off. No parallel writers, no background writers, no re-discovery reads beyond `Grep/Read` of files the plan already names.
-1. `factory-refactor` (prep, write): behavior-preserving friction removal only. Green check required.
-2. `factory-implementer` (write): numbered plan steps only, minimal diff, preserve exit codes 0/1/2. Narrow `dotnet build` / single-filter test per edit. May request a tool but does NOT promote it — drops prototype in `scratch/` and leaves a `TOOL-REQUEST` note for step 5.
-3. `factory-tester` (write, tests-only lock): add/update xUnit under `tests/Olaf.Tests/` (no live network, `Fixtures/` + temp dirs). Filtered runs during iteration, full suite before sign-off. Sends impl failures back with `file:line` + repro (re-queue implementer serially, never parallel).
-4. `factory-refactor` (cleanup, write): dedup/tighten only, no behavior change. Green check required.
-5. `factory-toolbuilder` (write, if requested): promote/modify/retire in `.opencode/tools/factory/` + `TOOLS.md` row. Additive-only, `VERSION` bump, `--help` + one real run verified.
-6. `factory-docs` (write, docs-only lock): touch ONLY docs affected by shipped behavior (`README.md`, `--help` text, formatter notes). Every example re-executed.
+1. `factory-implementer` (write): numbered plan steps only, minimal diff, preserve exit codes 0/1/2. Narrow `dotnet build` / single-filter test per edit. May request a tool but does NOT promote it — drops prototype in `scratch/` and leaves a `TOOL-REQUEST` note for step 4.
+2. `factory-tester` (write, tests-only lock): add/update xUnit under `tests/Olaf.Tests/` (no live network, `Fixtures/` + temp dirs). Filtered runs during iteration, full suite before sign-off. Sends impl failures back with `file:line` + repro (re-queue implementer serially, never parallel).
+3. `factory-refactor` (cleanup, write): the ONLY refactoring pass — dedup/tighten only after implementation + tests are green, no behavior change. Green check required.
+4. `factory-toolbuilder` (write, if requested): promote/modify/retire in `.opencode/tools/factory/` + `TOOLS.md` row. Additive-only, `VERSION` bump, `--help` + one real run verified.
+5. `factory-docs` (write, docs-only lock): touch ONLY docs affected by shipped behavior (`README.md`, `--help` text, formatter notes). Every example re-executed.
 
 Any writer that finds an out-of-scope bug: `gh issue create` (serial write, allowed inside writer's window) then continue current scope. Never silently fix out-of-scope bugs, never widen scope.
 
@@ -71,7 +70,7 @@ Goal: every issue makes the factory faster, cheaper (tokens + wall-time), and le
 - **Thresholds (trigger = must act):** same pipeline/search/command 3+ times in one issue OR reused across 2+ issues OR one emission costs ~500+ tokens → mandatory `TOOL-REQUEST`. Same confusion/handoff-miss 2+ times → mandatory agent-file patch proposal. Tool misfit (missing flag, wrong shape, brittle parse) → modify-in-place request, same priority as new tool. Stale tool (unused 3+ issues) → retire candidate.
 - **Tool lifecycle (reads parallel, writes serial):**
   - Parallel (read): checking `TOOLS.md`/`README.md`, running any promoted tool for verification.
-  - Serial (Wave 2 step 5 or Wave 5b): prototype in `scratch/`, promote to `.opencode/tools/factory/<name>.sh` (`chmod +x`, `--help`, `VERSION=`), modify in place (additive-only + bump + changelog line), deprecate → remove after one loop. Record every change under PR `Factory-Notes` AND the retro file.
+  - Serial (Wave 2 step 4 or Wave 5b): prototype in `scratch/`, promote to `.opencode/tools/factory/<name>.sh` (`chmod +x`, `--help`, `VERSION=`), modify in place (additive-only + bump + changelog line), deprecate → remove after one loop. Record every change under PR `Factory-Notes` AND the retro file.
 - **Reuse mandate:** check registry before re-emitting any `gh`/`dotnet`/parse pipeline. Build via `factory-toolbuilder`; planner assigns tool builds as Wave 2 steps, retro assigns batch tooling as Wave 5b steps — never Wave 1/3 writes.
 - **Efficiency ledger:** `.opencode/plans/retro-<n>.md` files are the ledger (per-issue savings + cumulative notes). Orchestrator reads the last 3 in every Wave 1.
 - **No free work:** repeat work without a matching `TOOL-REQUEST`, agent patch, or deferred `friction:` issue is a Wave 5 FAIL — orchestrator sends it back.
