@@ -226,6 +226,14 @@ internal static class FormatterTestHelpers
                 }
 
                 break;
+            case "md":
+            case "markdown":
+                foreach (var header in new[] { "| Ecosystem |", "| Name |", "| Version |", "| SPDX |", "| License |", "| Source |", "| Status |", "| Reason |" })
+                {
+                    Assert.Contains(header, output, StringComparison.Ordinal);
+                }
+
+                break;
             default:
                 Assert.Fail($"Unknown format '{format}' in AssertEightFieldsPresent.");
                 break;
@@ -238,6 +246,14 @@ internal static class FormatterTestHelpers
     {
         Assert.NotNull(output);
         var trimmed = output.TrimStart();
+        if (trimmed.StartsWith('#'))
+        {
+            Assert.Contains($"Total: {total}", output, StringComparison.Ordinal);
+            Assert.Contains($"Resolved: {resolved}", output, StringComparison.Ordinal);
+            Assert.Contains($"Unknown: {unknown}", output, StringComparison.Ordinal);
+            return;
+        }
+
         if (trimmed.StartsWith('{'))
         {
             using var doc = JsonDocument.Parse(output);
