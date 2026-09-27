@@ -617,3 +617,32 @@ public sealed class RetryResolverTests
         Assert.Equal(2, handler.CallCount);
     }
 }
+
+/// <summary>
+/// Regression test for issue #23: ResolverTestHelpers.ResolveResolver("go")
+/// must resolve GoLicenseResolver, NOT CargoLicenseResolver via substring collision.
+/// </summary>
+public sealed class GoResolveHelperTests
+{
+    [Fact]
+    public async Task Should_ResolveGoEcosystem_WithoutSubstringCollision()
+    {
+        // Arrange: stub a Go proxy response
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { License = "MIT" }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        // Act: resolve via the helper (was returning CargoLicenseResolver before fix)
+        var resolver = ResolverTestHelpers.ResolveResolver("go", http);
+        var dep = new Dependency("go", "github.com/spf13/cobra", "v1.8.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        // Assert: GoLicenseResolver resolves successfully, not CargoLicenseResolver
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.Equal(dep, result.Dependency);
+        Assert.False(string.IsNullOrWhiteSpace(result.LicenseText));
+        Assert.NotNull(result.SourceUrl);
+        Assert.Contains("pkg.go.dev", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
+    }
+}
