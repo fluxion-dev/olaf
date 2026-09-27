@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using Xunit;
 using Olaf.Resolvers;
 
 namespace Olaf.Tests.Resolvers
@@ -144,6 +142,13 @@ namespace Olaf.Tests.Resolvers
         {
             var result = SpdxMapper.Normalize(input);
             Assert.Equal(expected, result);
+        }
+
+        [Fact]
+        public void Normalize_EclipsePublicLicenseLongForm_ReturnsEPL()
+        {
+            Assert.Equal("EPL-1.0", SpdxMapper.Normalize("Eclipse Public License 1.0"));
+            Assert.Equal("EPL-2.0", SpdxMapper.Normalize("Eclipse Public License 2.0"));
         }
 
         [Fact]

@@ -143,6 +143,23 @@ public sealed class MavenResolverTests
     }
 
     [Fact]
+    public async Task Should_ReturnUnknown_When_PomIsMalformed()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text("this is not xml{{{"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("maven", "com.google.guava:guava", "32.1.2-jre", false);
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Should_ReturnUnknown_When_CoordinateNotGroupArtifact()
     {
         var handler = new StubHttpMessageHandler((req, _) =>

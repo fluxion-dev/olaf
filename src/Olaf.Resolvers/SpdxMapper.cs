@@ -55,11 +55,13 @@ internal static class SpdxMapper
             "lgpl-2.1-only" or "lgplv2.1" or "lgpl-2.1" => "LGPL-2.1-only",
             "lgpl-3.0-only" or "lgplv3" or "lgpl-3.0" => "LGPL-3.0-only",
             "mpl-1.0" or "mozilla public license 1.0" => "MPL-1.0",
-            "mpl-1.1" or "mpl-1.1" or "mozilla public license 1.1" => "MPL-1.1",
+            "mpl-1.1" or "mozilla public license 1.1" => "MPL-1.1",
             "mpl-2.0" or "mozilla public license 2.0" => "MPL-2.0",
             "cddl-1.0" => "CDDL-1.0",
-            "epl-1.0" => "EPL-1.0",
-            "epl-2.0" => "EPL-2.0",
+            "epl-1.0" or "eclipse public license 1.0" or "eclipse public license, version 1.0"
+                or "eclipse public license v1.0" or "eclipse public license - v 1.0" => "EPL-1.0",
+            "epl-2.0" or "eclipse public license 2.0" or "eclipse public license, version 2.0"
+                or "eclipse public license v2.0" => "EPL-2.0",
             "unlicense" or "the unlicense" => "Unlicense",
             "cc0-1.0" or "cc0" => "CC0-1.0",
             "artistic-2.0" => "Artistic-2.0",
