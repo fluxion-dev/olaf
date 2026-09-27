@@ -217,7 +217,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or InvalidDataException)
     {
-        // IOException covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+        // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         Console.Error.WriteLine($"Failed to scan input '{input}': {ex.Message}");
         return 2;
     }

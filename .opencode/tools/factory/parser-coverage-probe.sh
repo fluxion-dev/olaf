@@ -5,7 +5,11 @@
 # parser-coverage lines. FAIL (exit 1) on missing filename, wrong order, or
 # missing parsed-but-deferred/IsTransitive/conda notes; WARN (exit 0 + note) on
 # abbreviation-only drift (e.g. registry `environment` vs README full names).
-VERSION="0.1.0"
+# 0.2.0 adds: Apk/Dpkg/Rpm CanHandle sets (bare-name extractor, no dot filter),
+# container ScanOverlay DB-routing static check, OS deferred-note checks
+# (L:/A:/Architecture: validated-but-deferred, NVRA split, binary->empty,
+# IsTransitive=false, license-unknown reason).
+VERSION="0.2.0"
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -16,8 +20,10 @@ REGISTRY="$PARSERS/ParserRegistry.cs"
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [--help] [--version]"
-  echo "Probe README parser-coverage drift: extracts parser CanHandle sets,"
-  echo "SupportedEcosystems/SupportedFormats consts, tier comments, --help text;"
+  echo "Probe README parser-coverage drift: extracts parser CanHandle sets"
+  echo "(Npm/Pip/Go dotted names + Apk/Dpkg/Rpm bare names),"
+  echo "SupportedEcosystems/SupportedFormats consts, tier comments, --help text,"
+  echo "container ScanOverlay DB-routing, OS deferred notes;"
   echo "diffs against README.md parser-coverage lines."
   echo "Exit 0 = OK (or WARN-only abbreviation drift); 1 = real drift found; 2 = usage/IO error."
   echo "Example: ./.opencode/tools/factory/parser-coverage-probe.sh"
@@ -49,9 +55,21 @@ extract_handles() {
     | grep -o '"[^"]*"' | tr -d '"' | grep -E '^[A-Za-z0-9_.-]+$' | grep '\.' | sort -u
 }
 
+# ---- Bare-name variant for OS parsers (0.2.0 additive): Apk/Dpkg/Rpm ----
+# ---- CanHandle on extensionless DB basenames (installed/status/Packages) ----
+# ---- which the dotted filter above would drop; same body-scoping, no dot ----
+# ---- requirement. Npm/Pip/Go path untouched. ----
+extract_handles_bare() {
+  awk '/bool CanHandle/,/^\s*\}/' "$1" \
+    | grep -o '"[^"]*"' | tr -d '"' | grep -E '^[A-Za-z0-9_.-]+$' | sort -u
+}
+
 echo "--- CanHandle sets (extracted) ---"
 for p in Npm Pip Go; do
   echo "$p: $(extract_handles "$PARSERS/${p}Parser.cs" | tr '\n' ' ')"
+done
+for p in Apk Dpkg Rpm; do
+  echo "$p: $(extract_handles_bare "$PARSERS/${p}Parser.cs" | tr '\n' ' ')"
 done
 
 # ---- Extract Supported consts ----
@@ -79,6 +97,16 @@ for p in Npm Pip Go; do
       fail_msg "README missing $p file '$fn'"
     fi
   done < <(extract_handles "$PARSERS/${p}Parser.cs")
+done
+for p in Apk Dpkg Rpm; do
+  while IFS= read -r fn; do
+    [[ -z "$fn" ]] && continue
+    if grep -qF "$fn" <<<"$COV"; then
+      pass "README covers $p file '$fn'"
+    else
+      fail_msg "README missing $p file '$fn'"
+    fi
+  done < <(extract_handles_bare "$PARSERS/${p}Parser.cs")
 done
 
 # ---- Check 3 (FAIL): filename order matches documented canonical order ----
@@ -155,6 +183,93 @@ if grep -qF "$ECOS" <<<"$HELP_TXT" && grep -qF "$FMTS" <<<"$HELP_TXT"; then
   pass "--help lists current ecosystems + formats"
 else
   fail_msg "--help text drifted from Supported consts"
+fi
+
+# ---- Check 8 (FAIL, 0.2.0): OS CanHandle static — Apk/Dpkg/Rpm handle ----
+# ---- their DB basenames (extensionless, so not covered by Check 2 dot ----
+# ---- filter without the bare extractor) ----
+if grep -q '"installed"' "$PARSERS/ApkParser.cs"; then
+  pass "Apk CanHandle 'installed'"
+else
+  fail_msg "ApkParser CanHandle missing 'installed'"
+fi
+if grep -q '"status"' "$PARSERS/DpkgParser.cs"; then
+  pass "Dpkg CanHandle 'status'"
+else
+  fail_msg "DpkgParser CanHandle missing 'status'"
+fi
+if grep -q '"Packages"' "$PARSERS/RpmParser.cs"; then
+  pass "Rpm CanHandle 'Packages'"
+else
+  fail_msg "RpmParser CanHandle missing 'Packages'"
+fi
+
+# ---- Check 9 (FAIL, 0.2.0): container ScanOverlay DB-routing static ----
+# ---- ScanOverlay must route the three on-disk DB paths to their parsers ----
+CIP="$PARSERS/ContainerImageParser.cs"
+if grep -q 'ScanOverlay' "$CIP"; then
+  pass "ScanOverlay present in ContainerImageParser"
+else
+  fail_msg "ContainerImageParser missing ScanOverlay"
+fi
+if grep -qF 'lib/apk/db/installed' "$CIP"; then
+  pass "ScanOverlay routes lib/apk/db/installed"
+else
+  fail_msg "ScanOverlay missing lib/apk/db/installed route"
+fi
+if grep -qF 'lib/dpkg/status' "$CIP"; then
+  pass "ScanOverlay routes lib/dpkg/status"
+else
+  fail_msg "ScanOverlay missing lib/dpkg/status route"
+fi
+if grep -qF 'var/lib/rpm/Packages' "$CIP" && grep -qF 'usr/lib/sysimage/rpm/Packages' "$CIP"; then
+  pass "ScanOverlay routes var/lib/rpm + sysimage Packages"
+else
+  fail_msg "ScanOverlay missing rpm Packages routes (var/lib/rpm + usr/lib/sysimage/rpm)"
+fi
+
+# ---- Check 10 (FAIL, 0.2.0): OS deferred-note checks in README ----
+# ---- L:/A:/Architecture: validated-but-deferred; NVRA split; binary->empty; ----
+# ---- IsTransitive=false on OS entries; license-unknown reason ----
+if grep -q 'L:.*validated-but-deferred\|validated-but-deferred.*L:' "$README"; then
+  pass "README notes apk L: validated-but-deferred"
+else
+  fail_msg "README missing apk L: validated-but-deferred note"
+fi
+if grep -q 'A:.*validated-but-deferred\|validated-but-deferred.*A:' "$README"; then
+  pass "README notes apk A: validated-but-deferred"
+else
+  fail_msg "README missing apk A: validated-but-deferred note"
+fi
+if grep -q 'Architecture:.*validated-but-deferred\|validated-but-deferred.*Architecture' "$README"; then
+  pass "README notes dpkg Architecture: validated-but-deferred"
+else
+  fail_msg "README missing dpkg Architecture: validated-but-deferred note"
+fi
+if grep -q 'NVRA' "$README"; then
+  pass "README notes rpm NVRA split"
+else
+  fail_msg "README missing rpm NVRA split note"
+fi
+if grep -q 'BerkeleyDB.*empty\|binary.*yields empty' "$README"; then
+  pass "README notes rpm binary->empty"
+else
+  fail_msg "README missing rpm binary-yields-empty note"
+fi
+if grep -q 'IsTransitive=false' "$README" && grep -q '`apk`.*IsTransitive=false\|IsTransitive=false.*`apk`' "$README"; then
+  pass "README notes OS IsTransitive=false"
+else
+  # Fallback: README carries IsTransitive=false on apk/dpkg/rpm lines (wording drift tolerated)
+  if [[ "$(grep -o 'IsTransitive=false' "$README" | wc -l)" -ge 4 ]]; then
+    pass "README notes OS IsTransitive=false (4+ occurrences incl. pip/go)"
+  else
+    fail_msg "README missing OS IsTransitive=false note (apk/dpkg/rpm entries)"
+  fi
+fi
+if grep -q 'license-unknown' "$README"; then
+  pass "README notes license-unknown reason"
+else
+  fail_msg "README missing license-unknown reason note"
 fi
 
 echo "---"

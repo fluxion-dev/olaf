@@ -114,7 +114,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Best-effort temp cleanup; never mask scan results.
-            // IOException covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         }
     }
 
@@ -261,6 +261,7 @@ public sealed class ContainerImageParser : IEcosystemParser
             }
             catch (JsonException ex)
             {
+                // corrupt-manifest remap
                 throw new InvalidDataException($"Container image '{path}' has an unreadable manifest.json: {ex.Message}", ex);
             }
 
@@ -308,6 +309,7 @@ public sealed class ContainerImageParser : IEcosystemParser
             }
             catch (JsonException ex)
             {
+                // corrupt-manifest remap
                 throw new InvalidDataException($"Container image '{path}' has an unreadable index.json: {ex.Message}", ex);
             }
 
@@ -375,6 +377,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (JsonException ex)
         {
+            // corrupt-manifest remap
             throw new InvalidDataException($"Container image '{path}' has an unreadable manifest blob: {ex.Message}", ex);
         }
 
@@ -563,11 +566,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
     }
 
-    /// <summary>
-    /// Routes merged overlay DB files to the thin parsers. BINARY rpm
-    /// <c>Packages</c> bytes still yield <c>[]</c> (binary format deferred to
-    /// issue #70) — never crash.
-    /// </summary>
+    /// <summary>Routes merged overlay DB files to the thin parsers (rpm binary notes: see class doc).</summary>
     internal static IReadOnlyList<Dependency> ScanOverlay(string overlayDir)
     {
         var merged = new List<Dependency>();
@@ -586,7 +585,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (IOException)
         {
-            // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
         catch (UnauthorizedAccessException)
@@ -692,7 +691,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (IOException)
         {
-            // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
         catch (UnauthorizedAccessException)
@@ -792,7 +791,7 @@ public sealed class ContainerImageParser : IEcosystemParser
         }
         catch (IOException)
         {
-            // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         }
         catch (UnauthorizedAccessException)
         {

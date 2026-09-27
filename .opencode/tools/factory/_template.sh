@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Template for factory tools. Copy to <name>.sh and fill in.
 # Rules: repo-relative, idempotent, no secrets, executable, --help required.
-VERSION="0.2.0"
+# /tmp-mktemp permitted exception: ephemeral mktemp probe dirs under
+# ${TMPDIR:-/tmp} with trap-cleanup are permitted (see KEEP_TEMP fragment
+# below); persistent files/plans/retros/prototypes/worktrees MUST be
+# repo-relative — NEVER write those outside the repo.
+# --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
+# wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
+VERSION="0.2.1"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----

@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace Olaf.Tests.Parsers;
 
 /// <summary>
-/// Implementer-owned synthetic builders for container-image tests (issue #64).
+/// Implementer-owned synthetic builders for container-image tests (issues #64–65).
 /// All image fixtures are built programmatically with <see cref="TarWriter"/>;
 /// no binary <c>.tar</c> check-ins, no network. Tester asserts only.
 /// </summary>

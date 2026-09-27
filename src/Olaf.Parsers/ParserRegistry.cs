@@ -88,7 +88,7 @@ public sealed class ParserRegistry
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Malformed/inaccessible manifest: preserve swallow, never throw.
-            // IOException covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
         }
     }
 
@@ -109,7 +109,7 @@ public sealed class ParserRegistry
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
-                // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+                // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
                 continue;
             }
 
@@ -121,7 +121,7 @@ public sealed class ParserRegistry
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
-                // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+                // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
                 continue;
             }
 

@@ -15,3 +15,4 @@ Rules:
 - Report files touched + test result for the next serial writer in chain.
 - Self-improvement: every handoff ends with `FRICTION` (recurring smells, renames that kept re-appearing, dead code found again, pattern worth a lint/tool, or `no-friction`). If the same smell appears 2+ issues, proposing the pattern as a tool or agent-file rule is mandatory. In Wave 5b patch the winning pattern into this file.
 - Scope lock: comment-shape propagation stays within the issue file list unless the plan blesses repo-wide normalization.
+- Copy-paste rule (Wave 5b): CS0160 sentence is exactly `// Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.`; OS-parser resolver tail is exactly `— no resolver changes here.` — copy verbatim, never reword.

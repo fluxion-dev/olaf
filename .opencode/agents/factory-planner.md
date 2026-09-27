@@ -19,3 +19,7 @@ Wave 5a hardening (binding):
 - C# catch ordering: never emit `catch FileNotFoundException` / `catch DirectoryNotFoundException` after `catch IOException` (CS0160 — both derive from IOException). Emit `catch (IOException)` (covers File/DirectoryNotFound by inheritance — never catch them separately) + `catch (UnauthorizedAccessException)` with covering comment, matching `ParserRegistry.TryAddDependencies` parity. Any `when`-filtered IOException (e.g. `when (ex is not FileNotFoundException)`) requires trailing `// allowlist: <reason>` or QA FAILs it.
 - Companion-file stories (lockfile/go.sum style): plan must pin (a) AND-fallback direction for transitive flags, (b) hash stored-vs-deferred decision with field shape or deferred-with-validation note, (c) filed follow-up `gh issue` number for any deferred half (not just candidate text).
 - Plans are gitignored so Wave 5a harvests from PR Factory-Notes — ensure Factory-Notes carry plan-accuracy data.
+
+Wave 5b hardening (binding, threshold-HIT):
+- Fixture-filename assertion: every planned fixture path must match a real CanHandle/registry lookup (exact filename, not just directory), verified by a discovery `ls`/glob snapshot cited in the plan before freeze.
+- Plan-table sum-check: itemized test rows must sum to the pinned planned-new total before plan freeze (e.g. rows `3+2+1 = 6 planned-new`); mismatch blocks freeze.

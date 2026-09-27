@@ -72,7 +72,7 @@ public sealed class ApkParser : IEcosystemParser
         }
         catch (IOException)
         {
-            // Covers File/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
             return Array.Empty<Dependency>();
         }
         catch (UnauthorizedAccessException)
