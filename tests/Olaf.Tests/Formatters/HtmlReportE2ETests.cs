@@ -1,6 +1,7 @@
 using System.Net;
 using Olaf.Core;
 using Olaf.Tests.Resolvers;
+using Xunit.Sdk;
 
 namespace Olaf.Tests.Formatters;
 
@@ -53,20 +54,20 @@ public sealed class HtmlReportE2ETests
     private static string GetRow(string output, string name)
     {
         var cell = $"<td>{WebUtility.HtmlEncode(name)}</td>";
-        var nameIndex = output.IndexOf(cell, StringComparison.Ordinal);
-        if (nameIndex < 0)
-        {
-            throw new Xunit.Sdk.XunitException($"HTML table missing row for '{name}'.");
-        }
-
-        var rowStart = output.LastIndexOf("<tr>", nameIndex, StringComparison.Ordinal);
-        var rowEnd = output.IndexOf("</tr>", nameIndex, StringComparison.Ordinal);
+        var haystack = FormatterTestHelpers.FindByName(
+            new[] { output },
+            h => h.Contains(cell, StringComparison.Ordinal) ? name : null,
+            "HTML table",
+            name);
+        var nameIndex = haystack.IndexOf(cell, StringComparison.Ordinal);
+        var rowStart = haystack.LastIndexOf("<tr>", nameIndex, StringComparison.Ordinal);
+        var rowEnd = haystack.IndexOf("</tr>", nameIndex, StringComparison.Ordinal);
         if (rowStart < 0 || rowEnd < 0)
         {
-            throw new Xunit.Sdk.XunitException($"HTML table row for '{name}' is malformed.");
+            throw new XunitException($"HTML table row for '{name}' is malformed.");
         }
 
-        return output.Substring(rowStart, rowEnd - rowStart);
+        return haystack.Substring(rowStart, rowEnd - rowStart);
     }
 
     [Fact]

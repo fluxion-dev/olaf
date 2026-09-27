@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Xml;
 using Olaf.Core;
 using Olaf.Formatters;
@@ -94,20 +93,6 @@ public sealed class CycloneDxXmlFormatterTests
         return nodes!.Cast<XmlNode>().ToList();
     }
 
-    private static XmlNode FindComponent(List<XmlNode> components, string name, XmlNamespaceManager manager)
-    {
-        foreach (var component in components)
-        {
-            var nameNode = component.SelectSingleNode("c:name", manager);
-            if (nameNode is not null && nameNode.InnerText == name)
-            {
-                return component;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"CycloneDX XML <components> missing entry '{name}'.");
-    }
-
     private static string? ComponentProperty(XmlNode component, XmlNamespaceManager manager, string propertyName)
     {
         var properties = component.SelectNodes("c:properties/c:property", manager);
@@ -151,11 +136,7 @@ public sealed class CycloneDxXmlFormatterTests
         var secondSerial = second.DocumentElement!.Attributes!["serialNumber"]!.Value;
         Assert.Matches(@"^urn:uuid:[0-9a-fA-F-]{36}$", secondSerial);
         Assert.NotEqual(root.Attributes["serialNumber"]!.Value, secondSerial);
-        Assert.True(
-            Regex.IsMatch(
-                second.SelectSingleNode("/c:bom/c:metadata/c:timestamp", Ns(second))!.InnerText,
-                @"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"),
-            "metadata/timestamp must match ISO-8601 UTC shape.");
+        FormatterTestHelpers.AssertIso8601(second.SelectSingleNode("/c:bom/c:metadata/c:timestamp", Ns(second))!.InnerText);
     }
 
     // F2: metadata order + content.
@@ -172,9 +153,7 @@ public sealed class CycloneDxXmlFormatterTests
         // Metadata children order: timestamp, tools, component, properties.
         Assert.Equal(new[] { "timestamp", "tools", "component", "properties" }, ChildElementNames(metadata));
 
-        Assert.True(
-            DateTimeOffset.TryParse(metadata.SelectSingleNode("c:timestamp", manager)!.InnerText, out _),
-            "metadata/timestamp must be a parseable ISO-8601 timestamp.");
+        FormatterTestHelpers.AssertIso8601(metadata.SelectSingleNode("c:timestamp", manager)!.InnerText);
         var tool = RequireSingle(doc, manager, "/c:bom/c:metadata/c:tools/c:tool");
         Assert.Equal("olaf", tool.SelectSingleNode("c:vendor", manager)!.InnerText);
         Assert.Equal("olaf", tool.SelectSingleNode("c:name", manager)!.InnerText);
@@ -287,14 +266,14 @@ public sealed class CycloneDxXmlFormatterTests
         var doc = LoadXml(output);
         var manager = Ns(doc);
         var components = ComponentNodes(doc, manager);
-        var mystery = FindComponent(components, "mystery-pkg", manager);
+        var mystery = FormatterTestHelpers.FindByName(components, c => c.SelectSingleNode("c:name", manager)?.InnerText, "CycloneDX XML <components>", "mystery-pkg");
         Assert.Null(mystery.SelectSingleNode("c:licenses", manager));
         Assert.Equal("Unknown", ComponentProperty(mystery, manager, "olaf:status"));
         Assert.Equal("not-found: no license for 'mystery-pkg 1.0.0'.", ComponentProperty(mystery, manager, "olaf:reason"));
         Assert.Equal("https://example.com/mystery", ComponentProperty(mystery, manager, "olaf:sourceUrl"));
 
         // sourceUrl property present only when non-empty.
-        var noSource = FindComponent(components, "no-source-pkg", manager);
+        var noSource = FormatterTestHelpers.FindByName(components, c => c.SelectSingleNode("c:name", manager)?.InnerText, "CycloneDX XML <components>", "no-source-pkg");
         Assert.Null(noSource.SelectSingleNode("c:licenses", manager));
         Assert.Equal("Unknown", ComponentProperty(noSource, manager, "olaf:status"));
         Assert.Null(ComponentProperty(noSource, manager, "olaf:sourceUrl"));
@@ -403,13 +382,13 @@ public sealed class CycloneDxXmlFormatterTests
             purls);
 
         // Group only on maven/gradle group:artifact coordinates.
-        var maven = FindComponent(components, "org.example:artifact", manager);
+        var maven = FormatterTestHelpers.FindByName(components, c => c.SelectSingleNode("c:name", manager)?.InnerText, "CycloneDX XML <components>", "org.example:artifact");
         Assert.Equal("org.example", maven.SelectSingleNode("c:group", manager)!.InnerText);
-        Assert.Null(FindComponent(components, "fmt", manager).SelectSingleNode("c:group", manager));
-        Assert.Null(FindComponent(components, "@scope/name", manager).SelectSingleNode("c:group", manager));
+        Assert.Null(FormatterTestHelpers.FindByName(components, c => c.SelectSingleNode("c:name", manager)?.InnerText, "CycloneDX XML <components>", "fmt").SelectSingleNode("c:group", manager));
+        Assert.Null(FormatterTestHelpers.FindByName(components, c => c.SelectSingleNode("c:name", manager)?.InnerText, "CycloneDX XML <components>", "@scope/name").SelectSingleNode("c:group", manager));
 
         // Component children order: name, version, scope, licenses, purl (no group/properties here except maven).
-        var plain = FindComponent(components, "fmt", manager);
+        var plain = FormatterTestHelpers.FindByName(components, c => c.SelectSingleNode("c:name", manager)?.InnerText, "CycloneDX XML <components>", "fmt");
         Assert.Equal(new[] { "name", "version", "scope", "licenses", "purl" }, ChildElementNames(plain));
         Assert.Equal(
             new[] { "group", "name", "version", "scope", "licenses", "purl" },

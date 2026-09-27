@@ -10,18 +10,6 @@ namespace Olaf.Tests.Cli;
 /// </summary>
 public sealed class TransitiveFilterMarginCliTests
 {
-    private static string CreateMixedFixtureDir()
-    {
-        var root = CliTestHelpers.CreateTempDir();
-        var svcA = Path.Combine(root, "svc-a");
-        var svcB = Path.Combine(root, "svc-b");
-        Directory.CreateDirectory(svcA);
-        Directory.CreateDirectory(svcB);
-        File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
-        File.Copy(CliTestHelpers.FixturePath("npm", "package-lock.json"), Path.Combine(svcB, "package-lock.json"));
-        return root;
-    }
-
     private static int TotalOf(CliResult result)
     {
         Assert.Equal(0, result.ExitCode);
@@ -58,7 +46,7 @@ public sealed class TransitiveFilterMarginCliTests
     [Fact]
     public void Should_ContainOnlyDirectTokens_When_DirectOnlyWithTxtFormat()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var result = CliTestHelpers.RunCli("--input", root, "--format", "txt", "--direct-only");
@@ -76,7 +64,7 @@ public sealed class TransitiveFilterMarginCliTests
     [Fact]
     public void Should_ContainDirectMarkers_When_IncludeTransitiveWithYamlFormat()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var result = CliTestHelpers.RunCli("--input", root, "--format", "yaml", "--include-transitive");
@@ -93,7 +81,7 @@ public sealed class TransitiveFilterMarginCliTests
     [Fact]
     public void Should_ReconcileTotals_When_ComparingFilterModes()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var @default = CliTestHelpers.RunCli("--input", root, "--format", "json");

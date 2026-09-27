@@ -35,19 +35,6 @@ public sealed class JsonReportE2ETests
         return (scan, formatter.FormatResult(scan));
     }
 
-    private static JsonElement FindByName(JsonElement licenses, string name)
-    {
-        foreach (var entry in licenses.EnumerateArray())
-        {
-            if (entry.GetProperty("name").GetString() == name)
-            {
-                return entry;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"JSON licenses[] missing entry '{name}'.");
-    }
-
     [Fact]
     [Trait("Category", "E2E")]
     public async Task Should_ProduceEnvelope_When_RealNpmScan()
@@ -104,13 +91,13 @@ public sealed class JsonReportE2ETests
             unknown: scan.UnknownCount);
 
         // Hard pins: express/lodash resolve MIT, phantom is Unknown not-found.
-        var express = FindByName(licenses, "express");
+        var express = FormatterTestHelpers.FindByName(licenses.EnumerateArray(), e => e.GetProperty("name").GetString(), "JSON licenses[]", "express");
         Assert.Equal("Resolved", express.GetProperty("status").GetString());
         Assert.Equal("MIT", express.GetProperty("spdx").GetString());
-        var lodash = FindByName(licenses, "lodash");
+        var lodash = FormatterTestHelpers.FindByName(licenses.EnumerateArray(), e => e.GetProperty("name").GetString(), "JSON licenses[]", "lodash");
         Assert.Equal("Resolved", lodash.GetProperty("status").GetString());
         Assert.Equal("MIT", lodash.GetProperty("spdx").GetString());
-        var phantom = FindByName(licenses, PhantomName);
+        var phantom = FormatterTestHelpers.FindByName(licenses.EnumerateArray(), e => e.GetProperty("name").GetString(), "JSON licenses[]", PhantomName);
         Assert.Equal("Unknown", phantom.GetProperty("status").GetString());
         Assert.Contains("not-found", phantom.GetProperty("reason").GetString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
@@ -141,7 +128,7 @@ public sealed class JsonReportE2ETests
 
         using var doc = JsonDocument.Parse(output);
         var licenses = doc.RootElement.GetProperty("licenses");
-        var phantom = FindByName(licenses, PhantomName);
+        var phantom = FormatterTestHelpers.FindByName(licenses.EnumerateArray(), e => e.GetProperty("name").GetString(), "JSON licenses[]", PhantomName);
         Assert.Equal("Unknown", phantom.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, phantom.GetProperty("spdx").ValueKind);
         var reason = phantom.GetProperty("reason").GetString();

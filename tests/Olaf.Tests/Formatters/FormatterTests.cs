@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Xml;
 using Olaf.Core;
+using Xunit.Sdk;
 
 namespace Olaf.Tests.Formatters;
 
@@ -340,6 +341,47 @@ internal static class FormatterTestHelpers
             Assert.Contains($"resolved: {resolved}", output, StringComparison.Ordinal);
             Assert.Contains($"unknown: {unknown}", output, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    /// Find-or-throw shared by every formatter/E2E suite (Spdx/CdxJson/CdxXml/
+    /// JsonE2E/DirectField/Yaml/Markdown/Html). Callers pass a name-selector
+    /// lambda so this helper never references JsonElement/XmlNode/consumer
+    /// types. Throws XunitException (not Assert.Fail) on a miss.
+    /// </summary>
+    internal static T FindByName<T>(IEnumerable<T> items, Func<T, string?> nameSelector, string collectionLabel, string missingName)
+    {
+        foreach (var item in items)
+        {
+            if (nameSelector(item) == missingName)
+            {
+                return item;
+            }
+        }
+
+        throw new XunitException($"{collectionLabel} missing entry '{missingName}'.");
+    }
+
+    /// <summary>
+    /// ISO-8601 timestamp shape + parseability (regex-never-golden: prefix
+    /// shape pinned, exact instant never matched). Shared by Spdx created +
+    /// CycloneDX JSON/XML metadata timestamps.
+    /// </summary>
+    internal static void AssertIso8601(string value)
+    {
+        Assert.Matches(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", value);
+        Assert.True(DateTimeOffset.TryParse(value, out _), "value must be a parseable ISO-8601 timestamp.");
+    }
+
+    /// <summary>
+    /// SPDX documentNamespace shape: olaf sbom prefix + UUID suffix.
+    /// </summary>
+    internal static void AssertSpdxNamespace(string ns)
+    {
+        Assert.Matches(@"^https://olaf\.example/sbom/[0-9a-fA-F-]{36}$", ns);
+        const string prefix = "https://olaf.example/sbom/";
+        Assert.True(ns.StartsWith(prefix, StringComparison.Ordinal), "documentNamespace must use the olaf sbom prefix.");
+        Assert.True(Guid.TryParse(ns.Substring(prefix.Length), out _), "documentNamespace suffix must be a UUID.");
     }
 
     private static ILicenseFormatter? TryCreate(Type type)

@@ -128,6 +128,24 @@ internal static class CliTestHelpers
         {
         }
     }
+
+    /// <summary>
+    /// Mixed npm fixture dir shared by transitive-filter CLI tests and the
+    /// SPDX --direct-only CLI test: svc-a/package.json (4 direct deps) +
+    /// svc-b/package-lock.json (2 transitive deps). Caller owns cleanup via
+    /// DeleteTempDir (try/finally).
+    /// </summary>
+    internal static string CreateMixedNpmFixtureDir()
+    {
+        var root = CreateTempDir();
+        var svcA = Path.Combine(root, "svc-a");
+        var svcB = Path.Combine(root, "svc-b");
+        Directory.CreateDirectory(svcA);
+        Directory.CreateDirectory(svcB);
+        File.Copy(FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
+        File.Copy(FixturePath("npm", "package-lock.json"), Path.Combine(svcB, "package-lock.json"));
+        return root;
+    }
 }
 
 public sealed class CliEndToEndTests

@@ -31,19 +31,6 @@ public sealed class DirectFieldFormatterTests
             "not-found: no license for 'shadow-dep 1.0.0'."),
     });
 
-    private static JsonElement FindByName(JsonElement licenses, string name)
-    {
-        foreach (var entry in licenses.EnumerateArray())
-        {
-            if (entry.GetProperty("name").GetString() == name)
-            {
-                return entry;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"JSON licenses[] missing entry '{name}'.");
-    }
-
     private static int CountOccurrences(string haystack, string needle)
     {
         var count = 0;
@@ -64,8 +51,8 @@ public sealed class DirectFieldFormatterTests
 
         using var doc = JsonDocument.Parse(output);
         var licenses = doc.RootElement.GetProperty("licenses");
-        Assert.True(FindByName(licenses, "express").GetProperty("direct").GetBoolean());
-        Assert.False(FindByName(licenses, "shadow-dep").GetProperty("direct").GetBoolean());
+        Assert.True(FormatterTestHelpers.FindByName(licenses.EnumerateArray(), e => e.GetProperty("name").GetString(), "JSON licenses[]", "express").GetProperty("direct").GetBoolean());
+        Assert.False(FormatterTestHelpers.FindByName(licenses.EnumerateArray(), e => e.GetProperty("name").GetString(), "JSON licenses[]", "shadow-dep").GetProperty("direct").GetBoolean());
         // Key order: direct appended LAST per entry.
         foreach (var entry in licenses.EnumerateArray())
         {

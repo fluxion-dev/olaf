@@ -18,3 +18,7 @@ Rules:
 - Attribute census (Wave 5b RECTIFY): `grep -r "\[Fact\]\|\[Theory\]"` always uses `--exclude-dir=bin --exclude-dir=obj --include=*.cs`; live `dotnet test` total is authoritative over grep (Theory expansion); FQN-filter counts beat README deltas.
 - XML select guard (Wave 5b #68 harvest): every XML select through `Ns()` with `c:` prefix — `grep SelectNodes("/` bare = stop, restore prefix.
 - Purl assert guard (Wave 5b #68 harvest): purl unconditional — never assert conditional-purl.
+- Glob quoting guard (Wave 5b #69 harvest): zsh — never quote `*.cs` globs; census is `grep -r --exclude-dir=bin --exclude-dir=obj --include=*.cs` with bare dir.
+- Probe-only fixture guard (Wave 5b #69 harvest): `grep -rn <fixture> tests/ src/` must return doc-comment-only, zero code refs.
+- SPDX relation guard (Wave 5b #69 harvest): relations as per-id kinds + closure, never literal counts.
+- Assert-then-slice guard (Wave 5b #69 harvest): Substring only after StartsWith / IndexOf>=0 assert.

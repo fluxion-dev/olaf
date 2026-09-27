@@ -66,19 +66,6 @@ public sealed class YamlReportE2ETests
         return report;
     }
 
-    private static Dictionary<string, string?> FindByName(YamlReportDto report, string name)
-    {
-        foreach (var entry in report.Licenses)
-        {
-            if (entry.TryGetValue("name", out var entryName) && entryName == name)
-            {
-                return entry;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"YAML licenses[] missing entry '{name}'.");
-    }
-
     private static string? Get(Dictionary<string, string?> entry, string key)
     {
         entry.TryGetValue(key, out var value);
@@ -135,13 +122,13 @@ public sealed class YamlReportE2ETests
             unknown: scan.UnknownCount);
 
         // Hard pins: express/lodash resolve MIT, phantom is Unknown not-found.
-        var express = FindByName(report, "express");
+        var express = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", "express");
         Assert.Equal("Resolved", Get(express, "status"));
         Assert.Equal("MIT", Get(express, "spdx"));
-        var lodash = FindByName(report, "lodash");
+        var lodash = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", "lodash");
         Assert.Equal("Resolved", Get(lodash, "status"));
         Assert.Equal("MIT", Get(lodash, "spdx"));
-        var phantom = FindByName(report, PhantomName);
+        var phantom = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", PhantomName);
         Assert.Equal("Unknown", Get(phantom, "status"));
         Assert.Contains("not-found", Get(phantom, "reason") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
@@ -172,7 +159,7 @@ public sealed class YamlReportE2ETests
         var (_, output) = await BuildRealYamlReportAsync();
 
         var report = ParseYamlReport(output);
-        var phantom = FindByName(report, PhantomName);
+        var phantom = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", PhantomName);
         Assert.Equal("Unknown", Get(phantom, "status"));
         // YAML nulls serialize as empty/null — assert tolerant, not exact null.
         var spdx = Get(phantom, "spdx");

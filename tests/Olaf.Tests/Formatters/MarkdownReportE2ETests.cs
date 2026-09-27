@@ -52,17 +52,17 @@ public sealed class MarkdownReportE2ETests
     private static string GetTableRow(string output, string name)
     {
         var cell = $"| {name} |";
-        foreach (var line in output.Split('\n'))
-        {
-            var row = line.Trim();
-            if (row.StartsWith("|", StringComparison.Ordinal)
-                && row.Contains(cell, StringComparison.Ordinal))
+        return FormatterTestHelpers.FindByName(
+            output.Split('\n'),
+            line =>
             {
-                return row;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"Markdown table missing row for '{name}'.");
+                var row = line.Trim();
+                return row.StartsWith("|", StringComparison.Ordinal) && row.Contains(cell, StringComparison.Ordinal)
+                    ? name
+                    : null;
+            },
+            "Markdown table",
+            name).Trim();
     }
 
     [Fact]

@@ -47,19 +47,6 @@ public sealed class SpdxJsonFormatterTests
         return root.GetProperty("relationships").EnumerateArray().ToList();
     }
 
-    private static JsonElement FindPackage(List<JsonElement> packages, string name)
-    {
-        foreach (var package in packages)
-        {
-            if (package.GetProperty("name").GetString() == name)
-            {
-                return package;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"SPDX packages[] missing entry '{name}'.");
-    }
-
     private static ScanResult MixedSpdxScanResult() => new(new List<ResolvedLicense>
     {
         // Deliberately unsorted: pip first, then unknown npm, then direct npm.
@@ -133,8 +120,8 @@ public sealed class SpdxJsonFormatterTests
         var output = FormatterTestHelpers.ResolveFormatter("spdx-json").FormatResult(scan);
 
         var packages = PackageList(ParseRoot(output));
-        Assert.Equal("MIT", FindPackage(packages, "single-pkg").GetProperty("licenseConcluded").GetString());
-        Assert.Equal("(OFL-1.1 AND MIT)", FindPackage(packages, "expr-pkg").GetProperty("licenseConcluded").GetString());
+        Assert.Equal("MIT", FormatterTestHelpers.FindByName(packages, p => p.GetProperty("name").GetString(), "SPDX packages[]", "single-pkg").GetProperty("licenseConcluded").GetString());
+        Assert.Equal("(OFL-1.1 AND MIT)", FormatterTestHelpers.FindByName(packages, p => p.GetProperty("name").GetString(), "SPDX packages[]", "expr-pkg").GetProperty("licenseConcluded").GetString());
     }
 
     [Fact]
@@ -208,7 +195,7 @@ public sealed class SpdxJsonFormatterTests
         };
         foreach (var (name, concluded) in expected)
         {
-            var package = FindPackage(packages, name);
+            var package = FormatterTestHelpers.FindByName(packages, p => p.GetProperty("name").GetString(), "SPDX packages[]", name);
             Assert.Equal(concluded, package.GetProperty("licenseConcluded").GetString());
             Assert.Equal(
                 package.GetProperty("licenseConcluded").GetString(),
@@ -293,15 +280,11 @@ public sealed class SpdxJsonFormatterTests
 
         // Namespace shape (uniqueness pinned by M1, not golden-matched here).
         var ns = root.GetProperty("documentNamespace").GetString() ?? string.Empty;
-        Assert.Matches(@"^https://olaf\.example/sbom/[0-9a-fA-F-]{36}$", ns);
-        const string prefix = "https://olaf.example/sbom/";
-        Assert.True(ns.StartsWith(prefix, StringComparison.Ordinal), "documentNamespace must use the olaf sbom prefix.");
-        Assert.True(Guid.TryParse(ns.Substring(prefix.Length), out _), "documentNamespace suffix must be a UUID.");
+        FormatterTestHelpers.AssertSpdxNamespace(ns);
 
         // Created parses (exact instant pinned by M2, never golden-matched).
         var created = root.GetProperty("creationInfo").GetProperty("created").GetString() ?? string.Empty;
-        Assert.Matches(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", created);
-        Assert.True(DateTimeOffset.TryParse(created, out _), "creationInfo.created must be parseable ISO-8601.");
+        FormatterTestHelpers.AssertIso8601(created);
         var creators = root.GetProperty("creationInfo").GetProperty("creators").EnumerateArray().Select(c => c.GetString()).ToList();
         Assert.Single(creators);
         Assert.StartsWith("Tool: olaf ", creators[0], StringComparison.Ordinal);
@@ -327,8 +310,8 @@ public sealed class SpdxJsonFormatterTests
             Assert.False(string.IsNullOrWhiteSpace(refs[0].GetProperty("referenceLocator").GetString()));
         }
 
-        Assert.Equal("pkg:npm/express@4.18.2", FindPackage(packages, "express").GetProperty("externalRefs").EnumerateArray().First().GetProperty("referenceLocator").GetString());
-        Assert.Equal("pkg:pypi/requests@2.31.0", FindPackage(packages, "requests").GetProperty("externalRefs").EnumerateArray().First().GetProperty("referenceLocator").GetString());
+        Assert.Equal("pkg:npm/express@4.18.2", FormatterTestHelpers.FindByName(packages, p => p.GetProperty("name").GetString(), "SPDX packages[]", "express").GetProperty("externalRefs").EnumerateArray().First().GetProperty("referenceLocator").GetString());
+        Assert.Equal("pkg:pypi/requests@2.31.0", FormatterTestHelpers.FindByName(packages, p => p.GetProperty("name").GetString(), "SPDX packages[]", "requests").GetProperty("externalRefs").EnumerateArray().First().GetProperty("referenceLocator").GetString());
     }
 
     [Fact]
@@ -364,12 +347,12 @@ public sealed class SpdxJsonFormatterTests
         Assert.Equal("SPDX-2.3", root.GetProperty("spdxVersion").GetString());
         Assert.Equal("CC0-1.0", root.GetProperty("dataLicense").GetString());
         Assert.Equal("SPDXRef-DOCUMENT", root.GetProperty("SPDXID").GetString());
-        Assert.True(PackageList(root).Count > 0, "Expected at least one SPDX package for the npm fixture.");
-        Assert.True(RelationshipList(root).Count > 0, "Expected SPDX relationships for the npm fixture.");
+        Assert.NotEmpty(PackageList(root));
+        Assert.NotEmpty(RelationshipList(root));
 
         // --direct-only flows the filtered set through (subset relation, no
         // hardcoded totals — counts depend on resolver output, not parsing).
-        var mixed = CreateMixedNpmFixtureDir();
+        var mixed = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var all = CliTestHelpers.RunCli("--input", mixed, "--format", "spdx-json");
@@ -437,8 +420,8 @@ public sealed class SpdxJsonFormatterTests
         var first = ParseRoot(formatter.FormatResult(scan)).GetProperty("documentNamespace").GetString() ?? string.Empty;
         var second = ParseRoot(formatter.FormatResult(scan)).GetProperty("documentNamespace").GetString() ?? string.Empty;
 
-        Assert.Matches(@"^https://olaf\.example/sbom/[0-9a-fA-F-]{36}$", first);
-        Assert.Matches(@"^https://olaf\.example/sbom/[0-9a-fA-F-]{36}$", second);
+        FormatterTestHelpers.AssertSpdxNamespace(first);
+        FormatterTestHelpers.AssertSpdxNamespace(second);
         Assert.NotEqual(first, second);
     }
 
@@ -449,20 +432,8 @@ public sealed class SpdxJsonFormatterTests
 
         var created = ParseRoot(output).GetProperty("creationInfo").GetProperty("created").GetString() ?? string.Empty;
 
-        Assert.Matches(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", created);
+        FormatterTestHelpers.AssertIso8601(created);
         Assert.True(DateTimeOffset.TryParse(created, out var parsed), "creationInfo.created must be a parseable ISO-8601 timestamp.");
         Assert.True(parsed.Year >= 2026, "creationInfo.created must not be a stale golden value.");
-    }
-
-    private static string CreateMixedNpmFixtureDir()
-    {
-        var root = CliTestHelpers.CreateTempDir();
-        var svcA = Path.Combine(root, "svc-a");
-        var svcB = Path.Combine(root, "svc-b");
-        Directory.CreateDirectory(svcA);
-        Directory.CreateDirectory(svcB);
-        File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
-        File.Copy(CliTestHelpers.FixturePath("npm", "package-lock.json"), Path.Combine(svcB, "package-lock.json"));
-        return root;
     }
 }

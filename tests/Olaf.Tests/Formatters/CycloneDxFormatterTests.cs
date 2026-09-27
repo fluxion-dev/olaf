@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Olaf.Core;
 using Olaf.Formatters;
 using Olaf.Tests.Cli;
@@ -60,19 +59,6 @@ public sealed class CycloneDxFormatterTests
         return root.GetProperty("components").EnumerateArray().ToList();
     }
 
-    private static JsonElement FindComponent(List<JsonElement> components, string name)
-    {
-        foreach (var component in components)
-        {
-            if (component.GetProperty("name").GetString() == name)
-            {
-                return component;
-            }
-        }
-
-        throw new Xunit.Sdk.XunitException($"CycloneDX components[] missing entry '{name}'.");
-    }
-
     private static string? PropertyValue(JsonElement component, string propertyName)
     {
         foreach (var property in component.GetProperty("properties").EnumerateArray())
@@ -100,9 +86,7 @@ public sealed class CycloneDxFormatterTests
 
         // Metadata tools/component/properties counts == ScanResult.
         var metadata = root.GetProperty("metadata");
-        Assert.True(
-            DateTimeOffset.TryParse(metadata.GetProperty("timestamp").GetString(), out _),
-            "metadata.timestamp must be a parseable ISO-8601 timestamp.");
+        FormatterTestHelpers.AssertIso8601(metadata.GetProperty("timestamp").GetString() ?? string.Empty);
         var tool = metadata.GetProperty("tools").EnumerateArray().Single();
         Assert.Equal("olaf", tool.GetProperty("vendor").GetString());
         Assert.Equal("olaf", tool.GetProperty("name").GetString());
@@ -135,9 +119,9 @@ public sealed class CycloneDxFormatterTests
             Assert.Equal("library", component.GetProperty("type").GetString());
         }
 
-        Assert.Equal("required", FindComponent(components, "express").GetProperty("scope").GetString());
-        Assert.Equal("optional", FindComponent(components, "shadow-dep").GetProperty("scope").GetString());
-        Assert.Equal("required", FindComponent(components, "requests").GetProperty("scope").GetString());
+        Assert.Equal("required", FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "express").GetProperty("scope").GetString());
+        Assert.Equal("optional", FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "shadow-dep").GetProperty("scope").GetString());
+        Assert.Equal("required", FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "requests").GetProperty("scope").GetString());
     }
 
     [Fact]
@@ -224,14 +208,14 @@ public sealed class CycloneDxFormatterTests
         var output = FormatterTestHelpers.ResolveFormatter("cyclonedx-json").FormatResult(scan);
 
         var components = ComponentList(RootComponents(output));
-        var mystery = FindComponent(components, "mystery-pkg");
+        var mystery = FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "mystery-pkg");
         Assert.Equal(0, mystery.GetProperty("licenses").GetArrayLength());
         Assert.Equal("Unknown", PropertyValue(mystery, "olaf:status"));
         Assert.Equal("not-found: no license for 'mystery-pkg 1.0.0'.", PropertyValue(mystery, "olaf:reason"));
         Assert.Equal("https://example.com/mystery", PropertyValue(mystery, "olaf:sourceUrl"));
 
         // sourceUrl property present only when non-empty.
-        var noSource = FindComponent(components, "no-source-pkg");
+        var noSource = FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "no-source-pkg");
         Assert.Equal(0, noSource.GetProperty("licenses").GetArrayLength());
         Assert.Equal("Unknown", PropertyValue(noSource, "olaf:status"));
         Assert.Null(PropertyValue(noSource, "olaf:sourceUrl"));
@@ -253,14 +237,8 @@ public sealed class CycloneDxFormatterTests
         Assert.NotEqual(firstSerial, secondSerial);
 
         // Timestamps parseable (regex-equivalent: ISO-8601 round-trip shape), never golden-matched.
-        Assert.True(
-            Regex.IsMatch(
-                first.GetProperty("metadata").GetProperty("timestamp").GetString() ?? string.Empty,
-                @"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"),
-            "metadata.timestamp must match ISO-8601 UTC shape.");
-        Assert.True(
-            DateTimeOffset.TryParse(second.GetProperty("metadata").GetProperty("timestamp").GetString(), out _),
-            "metadata.timestamp must be parseable.");
+        FormatterTestHelpers.AssertIso8601(first.GetProperty("metadata").GetProperty("timestamp").GetString() ?? string.Empty);
+        FormatterTestHelpers.AssertIso8601(second.GetProperty("metadata").GetProperty("timestamp").GetString() ?? string.Empty);
     }
 
     [Fact]
@@ -296,10 +274,10 @@ public sealed class CycloneDxFormatterTests
         var output = FormatterTestHelpers.ResolveFormatter("cyclonedx-json").FormatResult(scan);
 
         var components = ComponentList(RootComponents(output));
-        Assert.Equal("pkg:pypi/requests@2.31.0", FindComponent(components, "requests").GetProperty("purl").GetString());
+        Assert.Equal("pkg:pypi/requests@2.31.0", FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "requests").GetProperty("purl").GetString());
         Assert.Equal(
             "pkg:golang/github.com/foo/bar@1.2.3",
-            FindComponent(components, "github.com/foo/bar").GetProperty("purl").GetString());
+            FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "github.com/foo/bar").GetProperty("purl").GetString());
     }
 
     [Fact]
@@ -316,8 +294,8 @@ public sealed class CycloneDxFormatterTests
         var components = ComponentList(RootComponents(output));
         Assert.Equal(
             "pkg:npm/%40scope/name@1.0.0",
-            FindComponent(components, "@scope/name").GetProperty("purl").GetString());
-        Assert.Equal("pkg:npm/express@4.18.2", FindComponent(components, "express").GetProperty("purl").GetString());
+            FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "@scope/name").GetProperty("purl").GetString());
+        Assert.Equal("pkg:npm/express@4.18.2", FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "express").GetProperty("purl").GetString());
     }
 
     [Fact]
@@ -333,17 +311,17 @@ public sealed class CycloneDxFormatterTests
         var output = FormatterTestHelpers.ResolveFormatter("cyclonedx-json").FormatResult(scan);
 
         var components = ComponentList(RootComponents(output));
-        var maven = FindComponent(components, "org.example:artifact");
+        var maven = FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "org.example:artifact");
         Assert.Equal("pkg:maven/org.example/artifact@2.0.0", maven.GetProperty("purl").GetString());
         Assert.Equal("org.example", maven.GetProperty("group").GetString());
 
         // Gradle reuses the maven purl shape for JVM group:artifact coordinates.
-        var gradle = FindComponent(components, "org.example:plugin");
+        var gradle = FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "org.example:plugin");
         Assert.Equal("pkg:maven/org.example/plugin@3.0.0", gradle.GetProperty("purl").GetString());
         Assert.Equal("org.example", gradle.GetProperty("group").GetString());
 
         // Missing colon falls back to the bare name (never throws).
-        var bare = FindComponent(components, "bare-artifact");
+        var bare = FormatterTestHelpers.FindByName(components, c => c.GetProperty("name").GetString(), "CycloneDX components[]", "bare-artifact");
         Assert.Equal("pkg:maven/bare-artifact@1.0.0", bare.GetProperty("purl").GetString());
     }
 
@@ -409,7 +387,7 @@ public sealed class CycloneDxFormatterTests
         var root = RootComponents(result.Stdout);
         Assert.Equal("CycloneDX", root.GetProperty("bomFormat").GetString());
         Assert.Equal("1.5", root.GetProperty("specVersion").GetString());
-        Assert.True(ComponentList(root).Count > 0, "Expected at least one BOM component for the npm fixture.");
+        Assert.NotEmpty(ComponentList(root));
 
         // Bad-format exit-2 contract preserved.
         var badFormat = CliTestHelpers.RunCli("--input", input, "--format", "toml");

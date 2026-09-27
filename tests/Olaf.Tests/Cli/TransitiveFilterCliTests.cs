@@ -13,18 +13,6 @@ namespace Olaf.Tests.Cli;
 /// </summary>
 public sealed class TransitiveFilterCliTests
 {
-    private static string CreateMixedFixtureDir()
-    {
-        var root = CliTestHelpers.CreateTempDir();
-        var svcA = Path.Combine(root, "svc-a");
-        var svcB = Path.Combine(root, "svc-b");
-        Directory.CreateDirectory(svcA);
-        Directory.CreateDirectory(svcB);
-        File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
-        File.Copy(CliTestHelpers.FixturePath("npm", "package-lock.json"), Path.Combine(svcB, "package-lock.json"));
-        return root;
-    }
-
     private static JsonDocument ParseJsonStdout(CliResult result)
     {
         Assert.Equal(0, result.ExitCode);
@@ -35,7 +23,7 @@ public sealed class TransitiveFilterCliTests
     [Fact]
     public void Should_ReportAll_When_NoFilterFlag()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var result = CliTestHelpers.RunCli("--input", root, "--format", "json");
@@ -57,7 +45,7 @@ public sealed class TransitiveFilterCliTests
     [Fact]
     public void Should_ReportDirectOnlySubset_When_DirectOnlyFlag()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var result = CliTestHelpers.RunCli("--input", root, "--format", "json", "--direct-only");
@@ -88,7 +76,7 @@ public sealed class TransitiveFilterCliTests
     [Fact]
     public void Should_Exit2_When_BothFilterFlags()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var result = CliTestHelpers.RunCli("--input", root, "--format", "json", "--direct-only", "--include-transitive");
@@ -105,7 +93,7 @@ public sealed class TransitiveFilterCliTests
     [Fact]
     public void Should_ReportAll_When_IncludeTransitiveExplicit()
     {
-        var root = CreateMixedFixtureDir();
+        var root = CliTestHelpers.CreateMixedNpmFixtureDir();
         try
         {
             var result = CliTestHelpers.RunCli("--input", root, "--format", "json", "--include-transitive");
