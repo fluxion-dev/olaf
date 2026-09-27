@@ -118,4 +118,41 @@ public sealed class GoCargoRegistryTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void Should_ScanGoPairOnce_When_DirHasGoModAndGoSum()
+    {
+        // Registry grouping: go.mod + go.sum in one dir still yields one
+        // parser call → 4 deps, no double-count.
+        var dir = ParserTestHelpers.CreateTempDir();
+        try
+        {
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("go", "go.mod"), dir, "go.mod");
+            ParserTestHelpers.CopyFixtureToDir(
+                ParserTestHelpers.FixturePath("go", "go.sum"), dir, "go.sum");
+
+            var deps = new ParserRegistry().Scan(dir);
+
+            Assert.Equal(4, deps.Count);
+            Assert.All(deps, d => Assert.Equal("go", d.Ecosystem));
+            Assert.Contains(deps, d => d.Name == "github.com/spf13/cobra" && !d.IsTransitive);
+            Assert.Contains(deps, d => d.Name == "gopkg.in/yaml.v3" && d.IsTransitive);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Should_ScanGoSumFile_When_SingleGoSumFileGiven()
+    {
+        var deps = new ParserRegistry().Scan(ParserTestHelpers.FixturePath("go", "go.sum"));
+
+        Assert.Equal(4, deps.Count);
+        Assert.All(deps, d => Assert.Equal("go", d.Ecosystem));
+        Assert.All(deps, d => Assert.True(d.IsTransitive));
+        Assert.Contains(deps, d => d.Name == "github.com/spf13/cobra" && d.Version == "v1.8.0");
+    }
 }

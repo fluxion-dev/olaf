@@ -5,12 +5,15 @@ namespace Olaf.Parsers;
 
 public sealed class GoParser : IEcosystemParser
 {
+    private static readonly Regex RequireLineRegex = new(@"^(\S+)\s+(\S+)\s*$");
+
     public string Ecosystem => "go";
 
     public bool CanHandle(string fileName)
     {
         var name = Path.GetFileName(fileName);
-        return string.Equals(name, "go.mod", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(name, "go.mod", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(name, "go.sum", StringComparison.OrdinalIgnoreCase);
     }
 
     public IReadOnlyList<Dependency> Parse(string inputPath)
@@ -18,21 +21,164 @@ public sealed class GoParser : IEcosystemParser
         if (Directory.Exists(inputPath))
         {
             var modPath = Path.Combine(inputPath, "go.mod");
-            if (File.Exists(modPath))
+            var sumPath = Path.Combine(inputPath, "go.sum");
+            var hasMod = File.Exists(modPath);
+            var hasSum = File.Exists(sumPath);
+
+            if (hasMod)
             {
-                return ParseGoMod(modPath);
+                var modDeps = ParseGoMod(modPath);
+                if (!hasSum)
+                {
+                    return modDeps;
+                }
+
+                var presence = ParseGoSumKeys(sumPath);
+                return JoinWithGoSum(modDeps, presence);
+            }
+
+            if (hasSum)
+            {
+                return DepsFromGoSumKeys(ParseGoSumKeys(sumPath));
             }
 
             var candidate = Directory.GetFiles(inputPath).FirstOrDefault(CanHandle);
             if (candidate is not null)
             {
-                return ParseGoMod(candidate);
+                return ParseFile(candidate);
             }
 
             return Array.Empty<Dependency>();
         }
 
-        return ParseGoMod(inputPath);
+        return ParseFile(inputPath);
+    }
+
+    internal static IReadOnlyList<Dependency> ParseFile(string path)
+    {
+        var name = Path.GetFileName(path);
+        if (string.Equals(name, "go.sum", StringComparison.OrdinalIgnoreCase))
+        {
+            return DepsFromGoSumKeys(ParseGoSumKeys(path));
+        }
+
+        return ParseGoMod(path);
+    }
+
+    internal static IReadOnlyList<Dependency> JoinWithGoSum(
+        IReadOnlyList<Dependency> modDeps,
+        HashSet<(string Name, string Version)> presence)
+    {
+        var result = new List<Dependency>(modDeps.Count);
+        var seen = new HashSet<(string Name, string Version)>();
+        foreach (var dep in modDeps)
+        {
+            var key = (dep.Name, dep.Version);
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+
+            // AND-table: direct always false; indirect true only if present in go.sum.
+            var transitive = dep.IsTransitive && presence.Contains(key);
+            result.Add(dep with { IsTransitive = transitive });
+        }
+
+        return result;
+    }
+
+    internal static IReadOnlyList<Dependency> DepsFromGoSumKeys(
+        HashSet<(string Name, string Version)> keys)
+    {
+        return keys
+            .OrderBy(k => k.Name, StringComparer.Ordinal)
+            .ThenBy(k => k.Version, StringComparer.Ordinal)
+            .Select(k => new Dependency("go", k.Name, k.Version, IsTransitive: true))
+            .ToArray();
+    }
+
+    internal static HashSet<(string Name, string Version)> ParseGoSumKeys(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return new HashSet<(string Name, string Version)>();
+            }
+
+            var keys = new HashSet<(string Name, string Version)>();
+            foreach (var raw in File.ReadAllLines(path))
+            {
+                if (TryParseGoSumLine(raw, out var name, out var version)
+                    && name is not null && version is not null)
+                {
+                    keys.Add((name, version));
+                }
+            }
+
+            return keys;
+        }
+        catch (IOException)
+        {
+            // Covers FileNotFoundException + DirectoryNotFoundException (both derive from IOException).
+            return new HashSet<(string Name, string Version)>();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new HashSet<(string Name, string Version)>();
+        }
+    }
+
+    internal static bool TryParseGoSumLine(string line, out string? name, out string? version)
+    {
+        name = null;
+        version = null;
+
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return false;
+        }
+
+        var text = line.Trim();
+        if (text.StartsWith("//", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var parts = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 3)
+        {
+            return false;
+        }
+
+        var module = parts[0];
+        var versionToken = parts[1];
+        var hash = parts[2];
+
+        // Hash is syntactically validated (h1: prefix) but NOT stored — parsed-but-deferred.
+        if (!hash.StartsWith("h1:", StringComparison.Ordinal) || hash.Length <= 3)
+        {
+            return false;
+        }
+
+        string ver;
+        if (versionToken.EndsWith("/go.mod", StringComparison.Ordinal))
+        {
+            ver = versionToken.Substring(0, versionToken.Length - "/go.mod".Length);
+        }
+        else
+        {
+            ver = versionToken;
+        }
+
+        if (string.IsNullOrWhiteSpace(module) || string.IsNullOrWhiteSpace(ver))
+        {
+            return false;
+        }
+
+        name = module;
+        version = ver;
+        return true;
     }
 
     internal static IReadOnlyList<Dependency> ParseGoMod(string path)
@@ -50,7 +196,7 @@ public sealed class GoParser : IEcosystemParser
             foreach (var raw in File.ReadAllLines(path))
             {
                 var line = raw.Trim();
-                if (line.Length == 0 || line.StartsWith("//"))
+                if (line.Length == 0 || line.StartsWith("//", StringComparison.Ordinal))
                 {
                     continue;
                 }
@@ -59,17 +205,11 @@ public sealed class GoParser : IEcosystemParser
                 {
                     inRequireBlock = true;
                     var rest = line.Substring("require (".Length).Trim();
-                    if (rest.Length > 0 && !rest.StartsWith("//"))
+                    if (rest.Length > 0 && !rest.StartsWith("//", StringComparison.Ordinal))
                     {
                         TryAddRequireLine(deps, rest);
                     }
 
-                    continue;
-                }
-
-                if (!inRequireBlock && string.Equals(line, "require (", StringComparison.Ordinal))
-                {
-                    inRequireBlock = true;
                     continue;
                 }
 
@@ -94,6 +234,11 @@ public sealed class GoParser : IEcosystemParser
             return deps;
         }
         catch (IOException)
+        {
+            // Covers FileNotFoundException + DirectoryNotFoundException (both derive from IOException).
+            return Array.Empty<Dependency>();
+        }
+        catch (UnauthorizedAccessException)
         {
             return Array.Empty<Dependency>();
         }
@@ -125,7 +270,7 @@ public sealed class GoParser : IEcosystemParser
             text = text.Substring(0, comment).Trim();
         }
 
-        var match = Regex.Match(text, @"^(\S+)\s+(\S+)\s*$");
+        var match = RequireLineRegex.Match(text);
         if (!match.Success)
         {
             return (null, null, false);
