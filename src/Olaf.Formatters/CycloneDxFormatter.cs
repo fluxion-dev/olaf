@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -11,80 +10,41 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
     public string FormatResult(ScanResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
-        var sorted = FormatterSort.ByEcosystemNameVersion(result.Licenses).ToList();
-        var bomRefCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        var components = new List<Dictionary<string, object?>>(sorted.Count);
-        foreach (var license in sorted)
+        var mapped = CycloneDxComponentMapper.Map(result);
+        var components = new List<Dictionary<string, object?>>(mapped.Count);
+        foreach (var item in mapped)
         {
-            var dep = license.Dependency;
-
-            // bom-ref mirrors the CLI human-readable key "{ecosystem}:{name}@{version}"
-            // (Program.cs FormatDependency); residual collisions get -2, -3, ... suffixes.
-            var baseRef = $"{dep.Ecosystem}:{dep.Name}@{dep.Version}";
-            string bomRef;
-            if (bomRefCounts.TryGetValue(baseRef, out var seen))
+            object? licenses = item.LicenseKind switch
             {
-                seen += 1;
-                bomRefCounts[baseRef] = seen;
-                bomRef = $"{baseRef}-{seen}";
-            }
-            else
-            {
-                bomRefCounts[baseRef] = 1;
-                bomRef = baseRef;
-            }
-
-            // License rule trusts LicenseDisplay.EffectiveSpdx (normalization already
-            // happened upstream at resolve time); single-token SpdxId => id, else name.
-            var effective = LicenseDisplay.EffectiveSpdx(license);
-            object? licenses;
-            var properties = new List<Dictionary<string, string?>>();
-            if (string.Equals(effective, "Unknown", StringComparison.Ordinal))
-            {
-                licenses = Array.Empty<object>();
-                properties.Add(new Dictionary<string, string?> { ["name"] = "olaf:status", ["value"] = license.Status });
-                properties.Add(new Dictionary<string, string?> { ["name"] = "olaf:reason", ["value"] = license.Reason });
-                if (!string.IsNullOrEmpty(license.SourceUrl))
+                CycloneDxLicenseKind.None => Array.Empty<object>(),
+                CycloneDxLicenseKind.Name => new[]
                 {
-                    properties.Add(new Dictionary<string, string?> { ["name"] = "olaf:sourceUrl", ["value"] = license.SourceUrl });
-                }
-            }
-            else if (effective.Any(char.IsWhiteSpace))
-            {
-                licenses = new[]
+                    new Dictionary<string, object?> { ["license"] = new Dictionary<string, string?> { ["name"] = item.LicenseValue } },
+                },
+                _ => new[]
                 {
-                    new Dictionary<string, object?> { ["license"] = new Dictionary<string, string?> { ["name"] = effective } },
-                };
-            }
-            else
-            {
-                licenses = new[]
-                {
-                    new Dictionary<string, object?> { ["license"] = new Dictionary<string, string?> { ["id"] = effective } },
-                };
-            }
+                    new Dictionary<string, object?> { ["license"] = new Dictionary<string, string?> { ["id"] = item.LicenseValue } },
+                },
+            };
+            var properties = item.Properties
+                .Select(p => new Dictionary<string, string?> { ["name"] = p.Name, ["value"] = p.Value })
+                .ToList();
 
             var component = new Dictionary<string, object?>
             {
                 ["type"] = "library",
-                ["name"] = dep.Name,
-                ["version"] = dep.Version,
-                ["purl"] = CycloneDxPurl.Build(dep),
-                ["bom-ref"] = bomRef,
-                ["scope"] = dep.Direct ? "required" : "optional",
+                ["name"] = item.Name,
+                ["version"] = item.Version,
+                ["purl"] = item.Purl,
+                ["bom-ref"] = item.BomRef,
+                ["scope"] = item.Scope,
                 ["licenses"] = licenses,
                 ["properties"] = properties,
             };
 
-            // maven/gradle carry the group qualifier separately for consumers that
-            // key on it; both JVM ecosystems share the pkg:maven purl shape.
-            var ecosystem = (dep.Ecosystem ?? string.Empty).ToLowerInvariant();
-            if (ecosystem is "maven" or "gradle")
+            if (item.Group is not null)
             {
-                if (CycloneDxPurl.TrySplitMavenCoordinates(dep.Name, out var group, out _))
-                {
-                    component["group"] = group;
-                }
+                component["group"] = item.Group;
             }
 
             components.Add(component);
@@ -93,7 +53,10 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
         // specVersion pinned to 1.5. v1.4-compat note: every field used here
         // (scope, licenses, properties, serialNumber) already exists in 1.4,
         // so 1.4 validators accept this document as a superset.
-        var toolVersion = typeof(FormatterRegistry).Assembly.GetName().Version?.ToString() ?? "0.0.0-dev";
+        var toolVersion = CycloneDxComponentMapper.ToolVersion;
+        var metadataProperties = CycloneDxComponentMapper.MetadataProperties(result)
+            .Select(p => new Dictionary<string, string?> { ["name"] = p.Name, ["value"] = p.Value })
+            .ToArray();
         var metadata = new Dictionary<string, object?>
         {
             ["timestamp"] = DateTime.UtcNow.ToString("o"),
@@ -104,12 +67,7 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
             // Constant: the formatter receives only ScanResult, so the input
             // basename is unavailable at this layer.
             ["component"] = new Dictionary<string, string?> { ["type"] = "application", ["name"] = "olaf-scan" },
-            ["properties"] = new[]
-            {
-                new Dictionary<string, string?> { ["name"] = "olaf:total", ["value"] = result.TotalCount.ToString(CultureInfo.InvariantCulture) },
-                new Dictionary<string, string?> { ["name"] = "olaf:resolved", ["value"] = result.ResolvedCount.ToString(CultureInfo.InvariantCulture) },
-                new Dictionary<string, string?> { ["name"] = "olaf:unknown", ["value"] = result.UnknownCount.ToString(CultureInfo.InvariantCulture) },
-            },
+            ["properties"] = metadataProperties,
         };
         var envelope = new Dictionary<string, object?>
         {
@@ -121,55 +79,5 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
             ["components"] = components,
         };
         return JsonSerializer.Serialize(envelope);
-    }
-}
-
-internal static class CycloneDxPurl
-{
-    internal static bool TrySplitMavenCoordinates(string name, out string group, out string coordinates)
-    {
-        if (MavenCoordinates.TrySplit(name, out var groupPart, out var artifactPart))
-        {
-            group = groupPart!;
-            coordinates = groupPart + "/" + artifactPart;
-            return true;
-        }
-
-        group = string.Empty;
-        coordinates = name;
-        return false;
-    }
-
-    internal static string Build(Dependency dep)
-    {
-        ArgumentNullException.ThrowIfNull(dep);
-        var name = dep.Name ?? string.Empty;
-        var version = dep.Version ?? string.Empty;
-        var ecosystem = (dep.Ecosystem ?? string.Empty).ToLowerInvariant();
-        switch (ecosystem)
-        {
-            case "pip":
-            case "pypi":
-                return $"pkg:pypi/{name}@{version}";
-            case "go":
-                return $"pkg:golang/{name}@{version}";
-            case "npm":
-                // Scoped "@scope/name" URL-encodes "@" as "%40" but keeps "/".
-                var path = name.StartsWith("@", StringComparison.Ordinal) ? "%40" + name[1..] : name;
-                return $"pkg:npm/{path}@{version}";
-            case "maven":
-            case "gradle":
-                // Gradle reuses the maven purl shape: both are JVM "group:artifact"
-                // coordinates split on the first colon; a missing colon falls back
-                // to the bare name (never throw).
-                if (TrySplitMavenCoordinates(name, out _, out var coordinates))
-                {
-                    return $"pkg:maven/{coordinates}@{version}";
-                }
-
-                return $"pkg:maven/{name}@{version}";
-            default:
-                return $"pkg:generic/{name}@{version}";
-        }
     }
 }
