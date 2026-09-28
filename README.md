@@ -8,20 +8,33 @@ Supported ecosystems (13): `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler
 
 No .NET install required: each `v*` tag builds self-contained single-file
 binaries (`.github/workflows/release.yml`, matrix `linux-x64|osx-arm64|win-x64`)
-and attaches the three bundles to that tag's GitHub Release:
+and attaches the three bundles to that tag's GitHub Release
+(`v0.1.0-preview.3`: https://github.com/fluxion-dev/olaf/releases/tag/v0.1.0-preview.3):
 
-| RID | Binary | Size (publish from source) |
+| RID | Binary | Size (attached asset) |
 |-----|--------|----------------------------|
-| `linux-x64` | `Olaf.Cli` | 75,006,505 bytes (~71.5 MiB) |
-| `osx-arm64` | `Olaf.Cli` | 81,467,641 bytes (~77.7 MiB) |
-| `win-x64` | `Olaf.Cli.exe` | 74,966,246 bytes (~71.5 MiB) |
+| `linux-x64` | `olaf-linux-x64` | 75,007,663 bytes (~71.5 MiB) |
+| `osx-arm64` | `olaf-osx-arm64` | 81,467,641 bytes (~77.7 MiB) |
+| `win-x64` | `olaf-win-x64.exe` | 74,966,246 bytes (~71.5 MiB) |
+
+Download with `gh` (the repo is private, so anonymous `curl` of the asset
+URLs below returns `404`; `gh` authenticates and downloads byte-exact):
 
 ```bash
-chmod +x ./Olaf.Cli
-./Olaf.Cli --version
+gh release download v0.1.0-preview.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
+chmod +x /tmp/olaf-dl/olaf-linux-x64
+/tmp/olaf-dl/olaf-linux-x64 --version
+# 0.1.0-preview.3+...
 ```
 
-No tagged release yet (or your platform is missing)? Publish from source
+Direct asset URLs (the same files `gh` fetches above, byte-identical to
+`gh release view v0.1.0-preview.3 --json assets`):
+
+- https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
+- https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-osx-arm64
+- https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-win-x64.exe
+
+Your platform is missing from the release assets? Publish from source
 (requires the .NET 10 SDK; `<rid>` is one of the three RIDs above):
 
 ```bash
@@ -37,11 +50,11 @@ Alternative — .NET tool (needs a .NET runtime to run):
 
 ```bash
 dotnet pack src/Olaf.Cli -c Release
-dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.1
+dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.3
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 664 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.3` is required — unpinned install fails for prerelease versions. Tests: 664 passing (`dotnet test`).
 
 ## Usage
 
