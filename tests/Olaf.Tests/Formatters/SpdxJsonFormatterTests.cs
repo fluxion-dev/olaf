@@ -351,7 +351,7 @@ public sealed class SpdxJsonFormatterTests
         var thrown = Assert.Throws<ArgumentException>(() => new FormatterRegistry().GetFormatter("toml"));
         Assert.Contains("spdx-json", thrown.Message, StringComparison.Ordinal);
 
-        var help = CliTestHelpers.RunCli("--help");
+        var help = CliTestHelpers.RunCli("generate", "--help");
         Assert.Equal(0, help.ExitCode);
         Assert.Contains("spdx-json", help.Stdout + help.Stderr, StringComparison.Ordinal);
     }
@@ -359,43 +359,30 @@ public sealed class SpdxJsonFormatterTests
     [Fact]
     public void Should_ExitZeroWithSpdx_When_FormatSpdxJson()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "spdx-json");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        var root = ParseRoot(result.Stdout);
-        Assert.Equal("SPDX-2.3", root.GetProperty("spdxVersion").GetString());
-        Assert.Equal("CC0-1.0", root.GetProperty("dataLicense").GetString());
-        Assert.Equal("SPDXRef-DOCUMENT", root.GetProperty("SPDXID").GetString());
-        Assert.NotEmpty(PackageList(root));
-        Assert.NotEmpty(RelationshipList(root));
-
-        // --direct-only flows the filtered set through (subset relation, no
-        // hardcoded totals — counts depend on resolver output, not parsing).
-        var mixed = CliTestHelpers.CreateMixedNpmFixtureDir();
+        var dir = CliTestHelpers.CreateTempDir();
         try
         {
-            var all = CliTestHelpers.RunCli("--input", mixed, "--format", "spdx-json");
-            var directOnly = CliTestHelpers.RunCli("--input", mixed, "--format", "spdx-json", "--direct-only");
+            File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(dir, "package.json"));
 
-            Assert.Equal(0, all.ExitCode);
-            Assert.Equal(0, directOnly.ExitCode);
-            var allCount = PackageList(ParseRoot(all.Stdout)).Count;
-            var directCount = PackageList(ParseRoot(directOnly.Stdout)).Count;
-            Assert.True(allCount > 0, "Expected packages without the filter.");
-            Assert.True(directCount > 0, "Expected packages with --direct-only.");
-            Assert.True(directCount <= allCount, $"Expected --direct-only ({directCount}) to be a subset of unfiltered ({allCount}).");
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "spdx-json");
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+            var root = ParseRoot(result.Stdout);
+            Assert.Equal("SPDX-2.3", root.GetProperty("spdxVersion").GetString());
+            Assert.Equal("CC0-1.0", root.GetProperty("dataLicense").GetString());
+            Assert.Equal("SPDXRef-DOCUMENT", root.GetProperty("SPDXID").GetString());
+            Assert.NotEmpty(PackageList(root));
+            Assert.NotEmpty(RelationshipList(root));
+
+            // Bad-format exit-2 contract preserved.
+            var badFormat = CliTestHelpers.RunCli("generate", dir, "--format", "toml");
+            Assert.Equal(2, badFormat.ExitCode);
         }
         finally
         {
-            CliTestHelpers.DeleteTempDir(mixed);
+            CliTestHelpers.DeleteTempDir(dir);
         }
-
-        // Bad-format exit-2 contract preserved.
-        var badFormat = CliTestHelpers.RunCli("--input", input, "--format", "toml");
-        Assert.Equal(2, badFormat.ExitCode);
     }
 
     [Fact]

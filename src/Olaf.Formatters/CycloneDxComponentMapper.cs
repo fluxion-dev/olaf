@@ -51,7 +51,7 @@ public static class CycloneDxComponentMapper
             var dep = license.Dependency;
 
             // bom-ref mirrors the CLI human-readable key "{ecosystem}:{name}@{version}"
-            // (Program.cs FormatDependency); residual collisions get -2, -3, ... suffixes.
+            // (same shape as the ScanRunner --strict offender key); residual collisions get -2, -3, ... suffixes.
             var baseRef = $"{dep.Ecosystem}:{dep.Name}@{dep.Version}";
             string bomRef;
             if (bomRefCounts.TryGetValue(baseRef, out var seen))

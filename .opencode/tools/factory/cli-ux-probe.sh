@@ -1,26 +1,19 @@
 #!/usr/bin/env bash
-# cli-ux-probe.sh — CLI UX probe for issue #4 (CLI UX polish).
-# Wraps: --help, --version, exit-code matrix, stdout-vs-stderr split.
+# cli-ux-probe.sh — CLI UX probe for issue #123 (collapsed generate-only CLI).
+# Wraps: generate --help, exit-code matrix, stdout-vs-stderr split.
 # Matrix (all via `dotnet run --project src/Olaf.Cli -- ...`):
-#   missing-input (no --input)            -> 2
-#   bare-path (positional path, no flag)  -> 1 + Unrecognized-command stderr
-#   bad-format (--format bogus)           -> 2
-#   bad-ecosystem (--ecosystem bogus)     -> 2
-#   out-exists (--out existing, no force) -> 2
-#   nested-out (missing parents created)  -> 0 + file exists
-#   strict phantom (Unknown + --strict)   -> 1
-#   template-missing (--template nofile)  -> 2 + Template-not-found stderr
-#   template-badsyntax (unclosed {{#each}})-> 2 + line-N stderr
-#   rules-missing (--rules nofile)        -> 2 + Rules-file-not-found stderr
-#   generate-default (empty dir)          -> 0 + empty SBOM (total 0)
-#   generate-fixture (fixture parity)     -> exit + total match legacy --input
-#   generate-cdx-parity (cdx parity)      -> normalized byte-identical vs legacy --input
-#   generate-bad-format (--format bogus)  -> 2
-#   generate-missing (nonexistent path)   -> 2 + Input-not-found stderr
+#   help (generate --help)               -> 0 + <=6 flags + 7-format list
+#   deleted-flags (each of 16 + --input) -> 2 (unknown option)
+#   bad-format (generate --format bogus) -> 2 + Unsupported-format stderr
+#   out-exists (--out existing, no force)-> 2
+#   nested-out (missing parents created) -> 0 + file exists
+#   strict phantom (Unknown + --strict)  -> 1
+#   generate-default (empty dir)         -> 0 + empty SBOM (total 0)
+#   generate-fixture (npm fixture)       -> 0 + total matches offline re-run
+#   generate-missing (nonexistent path)  -> 2 + Input-not-found stderr
 # Split: successful --out run must have empty stdout (report -> file only).
-# Help: --help output mentions --template, --rules, generate + olaf-generate examples (additive, --input check untouched).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.5.1"
+VERSION="0.6.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -30,12 +23,13 @@ REPO_ROOT=""
 KEEP_TEMP=0
 PHANTOM_PKG="this-package-definitely-does-not-exist-olaf-xyz"
 PHANTOM_VER="9.9.9"
+DELETED_FLAGS="--input --template --cache-dir --no-cache --refresh-cache --cache-ttl-days --ecosystem --max-image-mb --verbose --quiet --allow --deny --rules --direct-only --include-transitive --group-by-license"
 
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [options]
 
-CLI UX probe (issue #4): --help/--version, exit-code matrix, stdout/stderr split.
+CLI UX probe (issue #123): generate --help, exit-code matrix, stdout/stderr split.
 
 Options:
   --repo-root <dir>   Repo root (default: git top-level or CWD)
@@ -46,17 +40,11 @@ Options:
   --version           Show version and exit 0
 
 Checks:
-  help exit 0 (+ mentions --input, --template, --rules) | version exit 0 (non-empty)
-  missing-input->2 | bare-path->1 (+ Unrecognized-command stderr)
-  bad-format->2 | bad-ecosystem->2 | out-exists->2
+  help exit 0 (+ <=6 flags + 7-format list)
+  deleted-flags->2 (each unknown option) | bad-format->2 | out-exists->2
   nested-out->0 (+ file created) | strict-phantom->1
-  template-missing->2 (+ Template-not-found stderr)
-  template-badsyntax->2 (+ line-N stderr)
-  rules-missing->2 (+ Rules-file-not-found stderr)
-  generate-default->0 (+ empty SBOM total 0) | generate-fixture parity (exit + total)
-  generate-cdx-parity (normalized byte-identical vs legacy --input)
-  generate-bad-format->2 | generate-missing->2 (+ Input-not-found stderr)
-  help mentions generate + olaf-generate examples
+  generate-default->0 (+ empty SBOM total 0) | generate-fixture->0 (+ total match)
+  generate-missing->2 (+ Input-not-found stderr)
   split: --out run has empty stdout
 
 Exit codes: 0 all PASS, 1 assertion failure, 2 usage/environment error.
@@ -117,11 +105,9 @@ FAIL=0
 pass() { echo "PASS [$1]: $2"; }
 fail() { echo "FAIL [$1]: $2"; FAIL=1; }
 
-# run_cli <outfile-prefix> <expected-desc...> -- <cli args...>
-# Captures exit code, stdout, stderr separately. Asserts exit code.
+# run_cli <outfile-prefix> <expected-exit> -- <cli args...>
 run_cli() {
   local tag="$1" want="$2"; shift 2
-  # remaining args after -- are CLI args
   if [[ "${1:-}" == "--" ]]; then shift; fi
   local out="$WORKDIR/$tag.stdout" err="$WORKDIR/$tag.stderr"
   set +e
@@ -148,17 +134,6 @@ mkphantom() {
   printf '{\n  "name": "olaf-ux-strict-probe",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$PHANTOM_VER" > "$d/package.json"
 }
 
-# ---- Canonical cdx_normalize (from _template.sh 0.2.8; live) ----
-cdx_normalize() {
-  local f="$1"
-  if command -v jq >/dev/null 2>&1; then
-    jq 'del(.serialNumber, .metadata.timestamp)' "$f"
-  else
-    sed -e 's/"serialNumber"[[:space:]]*:[[:space:]]*"[^"]*"/"serialNumber":"NORMALIZED"/g' \
-        -e 's/"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"/"timestamp":"NORMALIZED"/g' "$f"
-  fi
-}
-
 echo "== cli-ux-probe v$VERSION =="
 echo "repo: $REPO_ROOT"
 echo "project: $PROJECT_REL | fixture: $FIXTURE_REL"
@@ -170,49 +145,42 @@ if ! dotnet build "$PROJECT" --nologo -v minimal; then
 fi
 pass "build" "dotnet build OK"
 
-echo "-- step 1: --help / --version --"
-run_cli "help" 0 --help || true
-if grep -q -- "--input" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--input" "$WORKDIR/help.stderr" 2>/dev/null; then
-  pass "help" "mentions --input"
+echo "-- step 1: generate --help (<=6 flags + 7-format list) --"
+run_cli "help" 0 generate --help || true
+HELP_TEXT="$(cat "$WORKDIR/help.stdout" "$WORKDIR/help.stderr" 2>/dev/null)"
+FLAG_COUNT="$(grep -oE '^  --[a-z-]+' "$WORKDIR/help.stdout" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
+if [[ "$FLAG_COUNT" -le 6 ]]; then
+  pass "help" "flag count $FLAG_COUNT (want <=6)"
 else
-  fail "help" "output missing --input"
+  fail "help" "flag count $FLAG_COUNT (want <=6)"
 fi
-if grep -q -- "--template" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--template" "$WORKDIR/help.stderr" 2>/dev/null; then
-  pass "help" "mentions --template"
+if echo "$HELP_TEXT" | grep -q "json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json"; then
+  pass "help" "carries 7-format list"
 else
-  fail "help" "output missing --template"
-fi
-if grep -q -- "--rules" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--rules" "$WORKDIR/help.stderr" 2>/dev/null; then
-  pass "help" "mentions --rules"
-else
-  fail "help" "output missing --rules"
-fi
-run_cli "version" 0 --version || true
-if [[ -s "$WORKDIR/version.stdout" ]]; then
-  pass "version" "non-empty stdout ($(tr -d '\n' <"$WORKDIR/version.stdout" | head -c 80))"
-else
-  fail "version" "empty stdout"
+  fail "help" "missing 7-format list"
 fi
 
-echo "-- step 2: exit-code matrix --"
-run_cli "missing-input" 2 || true
-# bare-path: positional fixture path without --input (e.g. tests/Olaf.Tests/Fixtures/npm) -> 1
-run_cli "bare-path" 1 "$FIXTURE" || true
-if grep -q "Unrecognized command" "$WORKDIR/bare-path.stderr" 2>/dev/null; then
-  pass "bare-path" "stderr mentions Unrecognized command"
+echo "-- step 2: deleted flags are unknown-option exit 2 --"
+for flag in $DELETED_FLAGS; do
+  # shellcheck disable=SC2086
+  run_cli "deleted-$flag" 2 generate "$FIXTURE" $flag bogus || true
+done
+
+echo "-- step 3: exit-code matrix --"
+run_cli "bad-format" 2 generate "$FIXTURE" --format bogus || true
+if grep -q "Unsupported format" "$WORKDIR/bad-format.stderr" 2>/dev/null; then
+  pass "bad-format" "stderr mentions Unsupported format"
 else
-  fail "bare-path" "stderr missing Unrecognized command (tail: $(tail -c 200 "$WORKDIR/bare-path.stderr" | tr '\n' ' '))"
+  fail "bad-format" "stderr missing Unsupported format (tail: $(tail -c 200 "$WORKDIR/bad-format.stderr" | tr '\n' ' '))"
 fi
-run_cli "bad-format" 2 --input "$FIXTURE" --format bogus || true
-run_cli "bad-ecosystem" 2 --input "$FIXTURE" --ecosystem bogus || true
 
 # out-exists: pre-create file, run without --force -> 2
 echo "pre-existing" > "$WORKDIR/exists.json"
-run_cli "out-exists" 2 --input "$FIXTURE" --out "$WORKDIR/exists.json" || true
+run_cli "out-exists" 2 generate "$FIXTURE" --out "$WORKDIR/exists.json" || true
 
 # nested-out: parents missing -> 0 + file created
 NESTED="$WORKDIR/a/b/c/out.json"
-run_cli "nested-out" 0 --input "$FIXTURE" --out "$NESTED" || true
+run_cli "nested-out" 0 generate "$FIXTURE" --offline --out "$NESTED" || true
 if [[ -s "$NESTED" ]]; then
   pass "nested-out" "file created ($(wc -c <"$NESTED" | tr -d ' ') bytes)"
 else
@@ -222,12 +190,12 @@ fi
 # strict phantom: guaranteed Unknown offline -> 1
 PHANTOM_DIR="$WORKDIR/phantom"
 mkphantom "$PHANTOM_DIR"
-run_cli "strict-fixture" 1 --input "$PHANTOM_DIR" --strict || true
+run_cli "strict-fixture" 1 generate "$PHANTOM_DIR" --offline --strict || true
 
-echo "-- step 3: stdout-vs-stderr split (--out run must have empty stdout) --"
+echo "-- step 4: stdout-vs-stderr split (--out run must have empty stdout) --"
 SPLIT_OUT="$WORKDIR/split.json"
 set +e
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$FIXTURE" --out "$SPLIT_OUT" >"$WORKDIR/split.stdout" 2>"$WORKDIR/split.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- generate "$FIXTURE" --offline --out "$SPLIT_OUT" >"$WORKDIR/split.stdout" 2>"$WORKDIR/split.stderr"
 SPLIT_RC=$?
 set -e
 if [[ "$SPLIT_RC" -ne 0 ]]; then
@@ -246,42 +214,7 @@ else
   fi
 fi
 
-echo "-- step 4: template exit-code arms (issue #73, additive) --"
-run_cli "template-missing" 2 --input "$FIXTURE" --template "$WORKDIR/does-not-exist.scriban" || true
-if grep -q "Template not found" "$WORKDIR/template-missing.stderr" 2>/dev/null; then
-  pass "template-missing" "stderr mentions Template not found"
-else
-  fail "template-missing" "stderr missing Template not found (tail: $(tail -c 200 "$WORKDIR/template-missing.stderr" | tr '\n' ' '))"
-fi
-printf 'header\n{{#each licenses}}\nno-close\n' > "$WORKDIR/bad-template.scriban"
-run_cli "template-badsyntax" 2 --input "$FIXTURE" --template "$WORKDIR/bad-template.scriban" || true
-if grep -qE "line [0-9]+" "$WORKDIR/template-badsyntax.stderr" 2>/dev/null; then
-  pass "template-badsyntax" "stderr carries line number"
-else
-  fail "template-badsyntax" "stderr missing line number (tail: $(tail -c 200 "$WORKDIR/template-badsyntax.stderr" | tr '\n' ' '))"
-fi
-
-echo "-- step 5: rules explicit-missing arm (issue #75, additive) --"
-run_cli "rules-missing" 2 --input "$FIXTURE" --rules "$WORKDIR/does-not-exist-rules.yaml" || true
-if grep -q "Rules file not found" "$WORKDIR/rules-missing.stderr" 2>/dev/null; then
-  pass "rules-missing" "stderr mentions Rules file not found"
-else
-  fail "rules-missing" "stderr missing Rules file not found (tail: $(tail -c 200 "$WORKDIR/rules-missing.stderr" | tr '\n' ' '))"
-fi
-
-echo "-- step 6: generate subcommand arms (issue #76, additive) --"
-# help surface: root --help (captured in step 1) mentions generate + an olaf-generate example
-if grep -q "generate" "$WORKDIR/help.stdout" 2>/dev/null || grep -q "generate" "$WORKDIR/help.stderr" 2>/dev/null; then
-  pass "generate-help" "root --help mentions generate"
-else
-  fail "generate-help" "root --help missing generate"
-fi
-if grep -q "olaf generate" "$WORKDIR/help.stdout" 2>/dev/null || grep -q "olaf generate" "$WORKDIR/help.stderr" 2>/dev/null; then
-  pass "generate-help" "root --help carries olaf-generate examples"
-else
-  fail "generate-help" "root --help missing olaf-generate examples"
-fi
-
+echo "-- step 5: generate default/missing arms --"
 # generate-default: manifest-less empty dir -> 0 + valid empty SBOM (total 0, licenses [])
 mkdir -p "$WORKDIR/gen-empty"
 run_cli "generate-default" 0 generate "$WORKDIR/gen-empty" || true
@@ -296,46 +229,23 @@ else
   fail "generate-default" "stdout missing empty licenses array"
 fi
 
-# generate-fixture: same fixture via generate vs legacy --input -> parity exit + total
-run_cli "generate-fixture" 0 generate "$FIXTURE" || true
+# generate-fixture: offline run -> 0 + total matches a second offline re-run
+run_cli "generate-fixture" 0 generate "$FIXTURE" --offline || true
 set +e
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$FIXTURE" >"$WORKDIR/generate-parity.stdout" 2>"$WORKDIR/generate-parity.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- generate "$FIXTURE" --offline >"$WORKDIR/generate-parity.stdout" 2>"$WORKDIR/generate-parity.stderr"
 PARITY_RC=$?
 set -e
 if [[ "$PARITY_RC" -eq 0 ]]; then
-  pass "generate-fixture" "legacy --input parity exit 0"
+  pass "generate-fixture" "offline re-run parity exit 0"
 else
-  fail "generate-fixture" "legacy --input parity exit $PARITY_RC (want 0)"
+  fail "generate-fixture" "offline re-run parity exit $PARITY_RC (want 0)"
 fi
 GEN_TOTAL="$(grep -o '"total":[0-9]*' "$WORKDIR/generate-fixture.stdout" 2>/dev/null | head -1)"
 LEG_TOTAL="$(grep -o '"total":[0-9]*' "$WORKDIR/generate-parity.stdout" 2>/dev/null | head -1)"
 if [[ -n "$GEN_TOTAL" && "$GEN_TOTAL" == "$LEG_TOTAL" ]]; then
   pass "generate-fixture" "parity total $GEN_TOTAL"
 else
-  fail "generate-fixture" "total mismatch generate=${GEN_TOTAL:-?} legacy=${LEG_TOTAL:-?}"
-fi
-
-# generate-cdx-parity: same fixture via generate vs legacy --input in
-# cyclonedx-json -> normalized byte-compare (serialNumber Guid.NewGuid() +
-# metadata timestamp DateTime.UtcNow are per-run; cdx_normalize strips both
-# via jq del, sed NORMALIZED-rewrite fallback). Mirrors unit
-# Should_MatchRootStdout_When_GenerateVsInputCycloneDxJson.
-run_cli "generate-cdx" 0 generate "$FIXTURE" --format cyclonedx-json || true
-run_cli "parity-cdx" 0 --input "$FIXTURE" --format cyclonedx-json || true
-cdx_normalize "$WORKDIR/generate-cdx.stdout" > "$WORKDIR/generate-cdx.normalized"
-cdx_normalize "$WORKDIR/parity-cdx.stdout" > "$WORKDIR/parity-cdx.normalized"
-if cmp -s "$WORKDIR/generate-cdx.normalized" "$WORKDIR/parity-cdx.normalized"; then
-  pass "generate-cdx-parity" "normalized byte-identical"
-else
-  fail "generate-cdx-parity" "normalized mismatch (diff head: $(diff "$WORKDIR/generate-cdx.normalized" "$WORKDIR/parity-cdx.normalized" | head -c 200 | tr '\n' ' '))"
-fi
-
-# generate-bad-format: bogus format -> 2 + Unsupported-format stderr
-run_cli "generate-bad-format" 2 generate "$FIXTURE" --format bogus || true
-if grep -q "Unsupported format" "$WORKDIR/generate-bad-format.stderr" 2>/dev/null; then
-  pass "generate-bad-format" "stderr mentions Unsupported format"
-else
-  fail "generate-bad-format" "stderr missing Unsupported format (tail: $(tail -c 200 "$WORKDIR/generate-bad-format.stderr" | tr '\n' ' '))"
+  fail "generate-fixture" "total mismatch generate=${GEN_TOTAL:-?} rerun=${LEG_TOTAL:-?}"
 fi
 
 # generate-missing-path: nonexistent path -> 2 + Input-not-found stderr

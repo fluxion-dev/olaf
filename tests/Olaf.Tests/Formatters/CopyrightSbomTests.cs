@@ -86,12 +86,12 @@ public sealed class CopyrightSbomTests
     }
 
     [Fact]
-    public void Should_EscapeHolders_When_XmlAndHtml()
+    public void Should_EscapeHolders_When_XmlAndMarkdown()
     {
-        // Issue #72 escaping near-miss: holder with XML/HTML metacharacters must
-        // round-trip through CDX XML InnerText, arrive HTML-escaped in html, and
-        // stay literal in the human md/txt formats. Offline unit style — inline
-        // ScanResult only, no network.
+        // Issue #72 escaping near-miss (#123: md is the kept human format —
+        // txt/html retired): holder with XML metacharacters must round-trip
+        // through CDX XML InnerText and stay literal in the human md format.
+        // Offline unit style — inline ScanResult only, no network.
         const string holder = "A & B <Co>";
         var result = new ScanResult(new List<ResolvedLicense>
         {
@@ -122,15 +122,8 @@ public sealed class CopyrightSbomTests
         Assert.Equal(1, texts.Count);
         Assert.Equal(holder, texts[0]!.InnerText);
 
-        // HTML: holder is HTML-escaped, never raw.
-        var html = FormatterTestHelpers.ResolveFormatter("html").FormatResult(result);
-        Assert.Contains("A &amp; B &lt;Co&gt;", html, StringComparison.Ordinal);
-        Assert.DoesNotContain(holder, html, StringComparison.Ordinal);
-
-        // md/txt: human formats carry the literal holder.
+        // md: human format carries the literal holder.
         var md = FormatterTestHelpers.ResolveFormatter("md").FormatResult(result);
         Assert.Contains("- Copyright: A & B <Co>", md, StringComparison.Ordinal);
-        var txt = FormatterTestHelpers.ResolveFormatter("txt").FormatResult(result);
-        Assert.Contains("  Copyright: A & B <Co>", txt, StringComparison.Ordinal);
     }
 }

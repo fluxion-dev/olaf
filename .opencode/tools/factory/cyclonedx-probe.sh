@@ -157,7 +157,7 @@ run_scan() {
   # run_scan <tag> <inputdir> <format> [extra args...]; stdout-><tag>.stdout
   local tag="$1" input="$2" fmt="$3"; shift 3
   set +e
-  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --input "$input" --format "$fmt" "$@" >"$WORKDIR/$tag.stdout" 2>"$WORKDIR/$tag.stderr"
+  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- generate "$input" --format "$fmt" "$@" >"$WORKDIR/$tag.stdout" 2>"$WORKDIR/$tag.stderr"
   RC=$?
   set -e
   if [[ "$RC" -eq 124 ]]; then
@@ -333,9 +333,9 @@ fi
 
 # ---- B6 --direct-only subset + both-flags conflict ----
 set +e
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --input "$FX/go" --format cyclonedx-json --direct-only >"$WORKDIR/b6-direct.stdout" 2>"$WORKDIR/b6-direct.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- generate "$FX/go" --format cyclonedx-json --direct-only >"$WORKDIR/b6-direct.stdout" 2>"$WORKDIR/b6-direct.stderr"
 b6rc=$?
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --input "$FX/go" --format cyclonedx-json --direct-only --include-transitive >"$WORKDIR/b6-both.stdout" 2>"$WORKDIR/b6-both.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- generate "$FX/go" --format cyclonedx-json --direct-only --include-transitive >"$WORKDIR/b6-both.stdout" 2>"$WORKDIR/b6-both.stderr"
 b6both=$?
 set -e
 if [[ "$b6rc" -eq 0 ]]; then
@@ -365,9 +365,9 @@ else fail_msg "B6 both-flags conflict: exit $b6both (want 2)"; fi
 
 # ---- B7 unknown-format + --help ----
 set +e
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --input "$FIXTURE" --format toml >"$WORKDIR/b7.stdout" 2>"$WORKDIR/b7.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- generate "$FIXTURE" --format toml >"$WORKDIR/b7.stdout" 2>"$WORKDIR/b7.stderr"
 b7rc=$?
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --help >"$WORKDIR/help.stdout" 2>"$WORKDIR/help.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- generate --help >"$WORKDIR/help.stdout" 2>"$WORKDIR/help.stderr"
 helprc=$?
 set -e
 if [[ "$b7rc" -eq 2 ]]; then pass "B7 unknown-format toml: exit 2";
@@ -382,7 +382,7 @@ fi
 r1_matrix_regression() {
   # r1_matrix_regression [formats...]; default: json yaml xml html.
   local formats=("$@")
-  (( ${#formats[@]} )) || formats=(json yaml xml html)
+  (( ${#formats[@]} )) || formats=(json yaml xml)
   local R1FAIL=0 f pat
   echo "-- R1 format-matrix regression --"
   for f in "${formats[@]}"; do

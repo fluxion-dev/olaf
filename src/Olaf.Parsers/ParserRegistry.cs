@@ -12,43 +12,35 @@ public sealed class ParserRegistry
     }
 
     public ParserRegistry()
-        : this(new IEcosystemParser[] { new NpmParser(), new NuGetParser(), new PipParser(), new GoParser(), new CargoParser(), new MavenParser(), new GradleParser(), new ComposerParser(), new BundlerParser(), new SwiftParser(), new CocoaPodsParser(), new VcpkgParser(), new ConanParser(), new ApkParser(), new DpkgParser(), new RpmParser(), new ContainerImageParser() })
+        : this(new IEcosystemParser[] { new NpmParser(), new NuGetParser(), new PipParser(), new GoParser(), new CargoParser(), new MavenParser(), new GradleParser(), new ComposerParser(), new BundlerParser(), new SwiftParser(), new CocoaPodsParser(), new VcpkgParser(), new ConanParser() })
     {
     }
 
-    public IReadOnlyList<Dependency> Scan(string path, string? ecosystem = null)
+    // Issue #123: dir-only Scan. Single-file input is rejected (pass a
+    // project directory); manifest-less dirs throw InvalidOperationException
+    // ("No manifests ...") which the generate path maps to a valid empty
+    // report. The ecosystem parameter is CLI-dead (generate always scans all
+    // ecosystems) but kept for programmatic per-ecosystem filtering.
+    public IReadOnlyList<Dependency> Scan(string dir, string? ecosystem = null)
     {
-        var parsers = FilterByEcosystem(ecosystem);
-
-        if (File.Exists(path))
+        if (File.Exists(dir))
         {
-            return ScanSingleFile(path, parsers);
+            throw new InvalidOperationException($"Single-file scan is not supported: '{dir}'. Pass a project directory.");
         }
 
-        if (Directory.Exists(path))
+        if (!Directory.Exists(dir))
         {
-            return ScanDirectory(path, parsers);
+            throw new FileNotFoundException($"Path not found: '{dir}'.", dir);
         }
 
-        throw new FileNotFoundException($"Path not found: '{path}'.", path);
-    }
+        var normalized = NormalizeEcosystem(ecosystem);
+        var parsers = normalized is null
+            ? _parsers
+            : _parsers
+                .Where(p => string.Equals(p.Ecosystem, normalized, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-    private static IReadOnlyList<Dependency> ScanSingleFile(string path, IReadOnlyList<IEcosystemParser> parsers)
-    {
-        var fileName = Path.GetFileName(path);
-        var matchedParsers = parsers.Where(p => p.CanHandle(fileName)).ToList();
-        if (matchedParsers.Count == 0)
-        {
-            throw new InvalidOperationException($"No parser found for '{path}'.");
-        }
-
-        var dependencies = new List<Dependency>();
-        foreach (var parser in matchedParsers)
-        {
-            TryAddDependencies(dependencies, parser, path);
-        }
-
-        return DeduplicateAndSort(dependencies);
+        return ScanDirectory(dir, parsers);
     }
 
     private static IReadOnlyList<Dependency> ScanDirectory(string path, IReadOnlyList<IEcosystemParser> parsers)
@@ -161,18 +153,5 @@ public sealed class ParserRegistry
         }
 
         return trimmed;
-    }
-
-    private IReadOnlyList<IEcosystemParser> FilterByEcosystem(string? ecosystem)
-    {
-        var normalized = NormalizeEcosystem(ecosystem);
-        if (normalized is null)
-        {
-            return _parsers;
-        }
-
-        return _parsers
-            .Where(p => string.Equals(p.Ecosystem, normalized, StringComparison.OrdinalIgnoreCase))
-            .ToList();
     }
 }

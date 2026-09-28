@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): template engine + README template section deleted — nothing to drift-check. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # template-docs-probe.sh — Template-docs drift probe (promoted v0.1.0 direct, no scratch).
 # Mandatory per recurring-drift rule, 4th sighting #70-#73: the template model-table /
 #   caps text was touched every issue in the run (enrichment keys, holders key, engine

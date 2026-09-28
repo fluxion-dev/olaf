@@ -1,10 +1,8 @@
 # olaf
 
-License scanner: scans `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` projects, resolves licenses, writes a report to stdout or a file.
+License scanner: `olaf generate <DIR>` scans a project directory, resolves licenses, writes a report to stdout or a file.
 
-Supported ecosystems: `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (`markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias, `cyclonedx` stays JSON).
-
-Parser coverage: `npm` handles `package.json|package-lock.json|pnpm-lock.yaml|yarn.lock|bun.lock` (`bun.lockb` binary yields empty; any lock beats manifest, all locks merge deduped, lock entries transitive); `pip` handles `Pipfile.lock|requirements.txt|pyproject.toml|poetry.lock|uv.lock|environment.yml|environment.yaml` (preference `Pipfile.lock` authoritative-first (empty lock falls through to poetry/uv tier), then `poetry.lock`/`uv.lock` merged > `requirements.txt` > `pyproject.toml` > `environment.yml|environment.yaml`; `Pipfile.lock` entries `IsTransitive=false`; `hashes[]` validated but parsed-but-deferred — not stored on the report; conda entries reported as `pip`); `go` handles `go.mod|go.sum` (2 lines per module in `go.sum` deduped to one dep; `// indirect` + present in `go.sum` → transitive, `// indirect` + absent → direct fallback, `go.mod`-only dir keeps legacy `// indirect` → transitive, `go.sum`-only dir yields all-transitive deps; `h1:` hashes syntactically validated but parsed-but-deferred — not stored on the 9-field report, SBOM enrichment follow-up). `apk` handles `installed` (`lib/apk/db/installed`: blank-line-separated stanzas with `P:`/`V:` fields; versions verbatim including `-r0`; `L:` (declared license) + `A:` (arch) validated-but-deferred — presence never breaks parsing, values not stored, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `dpkg` handles `status` (`var/lib/dpkg/status`: blank-line-separated stanzas with `Package:`/`Version:` fields; versions verbatim including epoch; `Architecture:` validated-but-deferred — same terms, deferred to issue #70; entries `IsTransitive=false`; malformed yields empty, never throws; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `rpm` handles `Packages` text dumps (`var/lib/rpm/Packages` or `usr/lib/sysimage/rpm/Packages`: one `name-ver-rel.arch` NVRA line per package, `rpm -qa` default output; arch stripped after the last `.`, version is `ver-rel` joined verbatim; binary (BerkeleyDB) input yields empty, never throws; entries `IsTransitive=false`; downstream resolves `Unknown` with `license-unknown: unsupported ecosystem.`); `container` scans image tarballs (`*.tar|*.tar.gz|*.tgz` with top-level `manifest.json`/`index.json` markers) and exploded OCI/docker-save layout dirs (`manifest.json|index.json|oci-layout` plus layer blobs) and reports the image's packages as `apk`/`dpkg`/`rpm` entries (`IsTransitive=false`; layers apply bottom→top with OCI whiteouts — basename prefix `.wh.`, `.wh..wh..opq` clears the directory — and topmost layer wins for the same package; absolute/`..` entries and symlinks/hardlinks are skipped; RPM `Packages` text dumps are routed to the `rpm` parser while BINARY rpm bytes still yield empty (binary format deferred to issue #70); uncompressed bytes are capped by `--max-image-mb`, default `1024`; corrupt/truncated tarballs and non-image tars fail with exit `2`, never silent empty).
+Supported ecosystems (13): `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json` (7, zero aliases).
 
 ## Tool install
 
@@ -14,590 +12,104 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 851 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 664 passing (`dotnet test`).
 
 ## Usage
 
-Quickstart (zero-config; both verified offline — exit `0`):
+Quickstart (both exit `0`):
 
 ```bash
-# pinned to the offline npm fixture (reason strings vary with network, so never golden-match them)
 dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json
-# default PATH `.` scans cwd, json report to stdout (output varies per project)
-dotnet run --project src/Olaf.Cli -- generate .
+dotnet run --project src/Olaf.Cli -- generate . --format json --offline
 ```
 
-File/dir `--input` form (canonical file-input, same scanner, same flags):
+`generate [PATH]` is the only command. `PATH` defaults to `.` (current directory); `--format` defaults to `json`; the report goes to stdout unless `--out` is given.
 
-```bash
-# stdout (default json)
-dotnet run --project src/Olaf.Cli -- --input package.json
-# file (parent dirs auto-created; fails if exists unless --force)
-dotnet run --project src/Olaf.Cli -- --input ./src --out report.json --format yaml
-# strict gate (exit 1 on Unknown)
-dotnet run --project src/Olaf.Cli -- --input package.json --strict
-# attribution report (human-readable text / markdown)
-dotnet run --project src/Olaf.Cli -- --input package.json --format txt
-dotnet run --project src/Olaf.Cli -- --input package.json --format md
-# CycloneDX SBOM (spec 1.5; `cyclonedx` alias works too)
-dotnet run --project src/Olaf.Cli -- --input package.json --format cyclonedx-json
-# CycloneDX SBOM as XML (spec 1.5, same data as JSON; `cyclonedx` stays JSON)
-dotnet run --project src/Olaf.Cli -- --input package.json --format cyclonedx-xml
-# SPDX SBOM (spec 2.3; `spdx-json` has no alias)
-dotnet run --project src/Olaf.Cli -- --input package.json --format spdx-json
-# custom attribution template (overrides --format; see `### Custom attribution templates`)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/header-footer-loop.scriban
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/groups.scriban
-# direct-only filter (report direct dependencies only; counts recompute on the filtered set)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json --direct-only
-# grouped attribution (group txt/md/html output by license; see `### Grouping by license`)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt --group-by-license
-# allow-list gate
-dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
-# policy file (version-controlled gate; flags override per key — see `### Policy file`)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --rules examples/sbom-rules.example.yaml
-```
-
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--offline` (embedded DB only, no network; see `### Offline / air-gap`), `--cache-dir <dir>` (persistent cache directory, `cache.json` appended; see `### Disk cache`), `--no-cache`, `--refresh-cache`, `--cache-ttl-days <n>` (resolved-entry TTL in days; see `### Disk cache`), `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
-`generate [PATH]` inherits ALL of these flags (same spec, same behavior — see `### Generate subcommand`); `--input` is optional on `generate` (a present `--input` wins over the positional `PATH`).
-`--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
-`--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate. `--rules <file>` loads a YAML policy file declaring the same gate in version control (see `### Policy file`); per key, a present `--allow`/`--deny` flag REPLACES the file list, and a present `--strict` forces `failOnUnknown: true`.
-Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set. `--group-by-license` composes with `--direct-only` (filter first, then group; see `### Grouping by license`).
-
-`--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
+Flags: exactly these five plus `PATH` (`--format`, `--out`, `--force`, `--strict`, `--offline` — matches live `generate --help` verbatim):
 
 ```text
---format <format>        Output format: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json (default: json) [default: json]
---ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm (pypi alias for pip)
---max-image-mb <max-image-mb>  Cap container-image scan at N megabytes uncompressed handled (default: 1024; must be > 0)
---strict                 Fail on unresolved or unknown licenses
---offline                Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)
---cache-dir <cache-dir>            Directory for the persistent license-resolution cache (cache.json is appended; overrides OLAF_CACHE_DIR, XDG_CACHE_HOME, and the OS default)
---no-cache                         Bypass the persistent license cache (no reads, no writes)
---refresh-cache                    Skip cache reads and force fresh writes (wins over --no-cache)
---cache-ttl-days <cache-ttl-days>  Resolved-entry TTL in days (default: 30; must be a positive integer; scales Resolved only, not-found stays 1 day)
---allow <allow>                Comma-separated SPDX allow-list; strict-gate fails licenses not in the list
---deny <deny>                  Comma-separated SPDX deny-list; strict-gate fails licenses in the list
---rules <rules>                Policy rules file (.sbom-rules.yaml)
---direct-only            Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)
---include-transitive     Explicitly include transitive dependencies (same as default: report all)
---group-by-license       Group txt/md/html output by license (ignored for SBOM formats)
---template <template>    Custom attribution template file (overrides --format)
+--format <format>  Output format: json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json (default: json) [default: json]
+--out <out>        Output file path (default: stdout; parent directories are created)
+--force            Overwrite output file if it exists
+--strict           Fail (exit 1) on unknown licenses
+--offline          Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)
 ```
 
-Root `--help` also lists the subcommand (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
+There are no other flags: `--input`, `--template`, `--ecosystem`, `--cache-dir`, `--no-cache`, `--refresh-cache`, `--cache-ttl-days`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--max-image-mb`, `--verbose`, and `--quiet` were removed (unknown option → exit `2`).
 
-```text
-Commands:
-  generate <PATH>  Scan a project path and write a license report (zero-config).
-                   Defaults: PATH "."; json report to stdout unless --out is given
-                   (file output reuses the same atomic-write path as the root command).
-
-                   Examples:
-                     olaf generate .
-                     olaf generate ./svc --format cyclonedx-json
-                     olaf generate . --out sbom [default: .]
-```
-
-### Generate subcommand (`generate [PATH]`)
-
-`olaf generate [PATH]` is the zero-config entry point. CLI forms are `--input <file|dir>` (root) and `generate [PATH]` (subcommand) — there is no other subcommand, and a bare positional without `generate` is still an error.
-
-- Defaults: `PATH` is `.` (current directory); `--format` is `json`; the report goes to stdout unless `--out` is given. Verified offline: `dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json` → exit `0`, stdout byte-identical to `dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json`.
-- `--out <file>`: the report goes to the file and stdout stays empty (verified: `--out` run exits `0` with `0` stdout bytes); parent directories are auto-created; fails if the file exists unless `--force` is given. Same atomic-write path as root.
-- Empty directory: `generate <empty-dir>` emits a valid empty SBOM per format and exits `0` (verified: `dotnet run --project src/Olaf.Cli -- generate <empty-dir> --format json` → `{"summary":{"total":0,"resolved":0,"unknown":0},"licenses":[]}`, exit `0`; `--format spdx-json` → empty `packages` with a single self-`DESCRIBES` relationship, exit `0`). Legacy `--input <empty-dir>` still fails with exit `2` (`No manifests found …`).
-- Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--offline`, `--cache-dir`, `--no-cache`, `--refresh-cache`, `--cache-ttl-days`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
-- Bare `olaf .` is NOT supported: only `olaf generate .`. A bare positional without the subcommand stays a parse error (`Unrecognized command or argument '.'`, exit `1`).
-
-Further examples (`generate .` covered in Quickstart above):
+File output (exit `0`, stdout stays empty; fails if the file exists unless `--force`):
 
 ```bash
-dotnet run --project src/Olaf.Cli -- generate ./svc --format cyclonedx-json
-dotnet run --project src/Olaf.Cli -- generate . --out sbom
-dotnet run --project src/Olaf.Cli -- generate --help
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json --offline --out /tmp/olaf-report.json --force
 ```
 
-## Reliability
-
-Resolution runs with bounded-8 concurrency and retry-once on transient HTTP failures (timeout/transport/408/429/5xx). Unresolved packages return `Unknown` with reason tokens (`offline-cache-miss`, `not-found`, `resolver-error`, …). Cancellation (`OperationCanceledException`) is always rethrown, never swallowed into `Unknown`.
-
-## Report contract
-
-Every `licenses` entry has the same 9 fields (rows sorted by ecosystem, name, version; `direct` is always LAST):
-
-| Field | Meaning |
-|-------|---------|
-| `ecosystem` | `npm`, `nuget`, `pip`, `go`, `cargo`, `maven`, `gradle`, `composer`, `bundler`, `swift`, `cocoapods`, `vcpkg`, `conan`, `apk`, `dpkg`, or `rpm` (container-image scans report their packages as `apk`/`dpkg`/`rpm` entries) |
-| `name` | Package name |
-| `version` | Version spec from the manifest |
-| `spdx` | SPDX id, or null when unresolved |
-| `licenseText` | License text, or null when unavailable |
-| `sourceUrl` | Provenance URL, or null when unavailable |
-| `status` | `Resolved` or `Unknown` |
-| `reason` | Why unresolved (null when resolved) |
-| `direct` | `true` when direct (`!IsTransitive`), `false` when transitive — always last |
-
-### Transitive semantics (`direct` / `IsTransitive`)
-
-`direct` surfaces `Dependency.Direct` (`!IsTransitive`). Per-ecosystem rules (unchanged by #66 except dedup):
-
-| Ecosystem | Direct (`direct: true`) | Transitive (`direct: false`) | Notes |
-|-----------|-------------------------|------------------------------|-------|
-| `npm` | `package.json` manifest entries | `package-lock.json` / `pnpm-lock.yaml` / `yarn.lock` / `bun.lock` lock entries (all) | Lock-all-transitive is a heuristic (direct deps re-listed in a lock still surface as transitive); any lock beats manifest, all locks merge deduped |
-| `pip` | `Pipfile.lock`, `requirements.txt`, `pyproject.toml`, `environment.yml`/`environment.yaml` entries | `poetry.lock` / `uv.lock` (TOML `[[package]]`) entries | `Pipfile.lock` stays `IsTransitive=false` (matches #63 pinned tests); conda entries reported as `pip` |
-| `go` | `go.mod` entries without `// indirect`, or `// indirect` + absent from `go.sum` (direct fallback) | `// indirect` + present in `go.sum` → transitive; `go.mod`-only dir keeps legacy `// indirect` → transitive; `go.sum`-only dir yields all-transitive deps | AND-table: `IsTransitive = manifest-indirect && in-go.sum`; 2 `go.sum` lines per module deduped to one dep |
-| `cargo` | `Cargo.toml` manifest entries | `Cargo.lock` entries (all) | Lock-all-transitive heuristic, same direct-conflation caveat as npm |
-| `nuget` | manifest / `packages.lock.json` direct entries | lock entries resolved `!direct` | `packages.lock.json` carries its own direct marker |
-| `composer` | `composer.json` manifest entries | `composer.lock` entries (all) | — |
-| `bundler` | `Gemfile` / `*.gemspec` manifest entries | `Gemfile.lock` `PATH`/`GEM` remote entries (all) | — |
-| `swift` | `Package.swift` manifest entries | `Package.resolved` entries (all) | — |
-| `cocoapods` | `Podfile` manifest entries | `Podfile.lock` entries (all) | — |
-| `conan` | `conanfile.txt` / `conanfile.py` manifest entries | `conan.lock` entries (all) | — |
-| `maven` | all entries | — (false-only) | `pom.xml` has no transitive marker; everything reports `direct: true` |
-| `gradle` | all entries | — (false-only) | `build.gradle` / lockfile entries all `direct: true` |
-| `vcpkg` | all entries | — (false-only) | `vcpkg.json` entries all `direct: true` |
-| `apk` / `dpkg` / `rpm` / `container` | all entries | — (false-only) | OS DB rows and image-layer packages report `direct: true` |
-
-Dedup (registry): same `(ecosystem, name, version)` triple from manifest + lock (or overlapping locks) collapses to one row with **direct-wins** — the `IsTransitive: false` survivor is kept, so a direct listing beats a transitive duplicate. Sort stays `ecosystem → name → version`.
-
-## License Coverage
-
-This project ships an embedded offline SPDX DB (`src/Olaf.Resolvers/Data/spdx-licenses.json`, loaded by `SpdxLicenseDb`) covering 35 ids — the authoritative subset list lives under `## License text` below (pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`).
-
-The SPDX IDs are available through `SpdxMapper.Normalize()`, and for text via `SpdxLicenseDb.TryGetText()` (primary, embedded DB) vs `SpdxLicenseTexts.TryGetText()` (fallback seed used by the fetcher) vs `SpdxLicenseTexts.GetText()` (fallback stub on miss).
-
-### Offline / air-gap (`--offline`)
-
-`--offline` resolves licenses from the embedded DB only — zero HTTP (throwing-handler tests assert no send on every offline path). Bool flag on root + `generate` (inherited with identical behavior); a present `--offline` replaces only the `offline` key (bool-only per-key REPLACE; `allow-rescues-deny` + `strict-forces-failOnUnknown` anchors hold).
-
-- DB shape: `{id, name, osi, fsf, deprecated, text}` per entry (`text` is the full license text where hydrated, else `""`; `metadata-first` key order; ids in `LC_ALL=C` byte order). Loader is a `Lazy<IReadOnlyDictionary>` singleton, case-insensitive id key, `TryGet(id|Normalize(id))`; texts resolve at runtime via `SpdxLicenseTexts` when the checked-in row ships `""`. Size gate: `<5MB` (checked-in seed is ~6KB).
-- Pin + checksum: `tools/spdx-db.sha256` pins the checked-in JSON (`sha256sum -c tools/spdx-db.sha256`).
-- Refresh (maintainer-only): `tools/update-spdx-db.sh` (`SPDX_VERSION=v3.29.0`, `LC_ALL=C sort` + `jq -S` deterministic build, byte-identical re-emit, rewrites the JSON + `.sha256`). `MAINTAINER-NETWORK` — this script fetches from the network; CI and the test suite NEVER execute it.
-- Strict composition: `--strict` + `--offline` composes; exit matrix `0` (clean) / `1` (license violations / strict fail on `Unknown`) / `2` (usage error) holds, including the empty-input fork (`generate <empty-dir> --offline` exits `0` with a 0-dep report; legacy `--input <empty-dir>` still exits `2`).
-- Disk-cache seam: `--offline` reads the persistent disk cache first (memory → disk → `offline-cache-miss`); a disk hit resolves with zero HTTP, so a seeded cache makes offline scans deterministic. See `### Disk cache`.
+Empty directory: `generate <empty-dir>` emits a valid empty report and exits `0`:
 
 ```bash
-# offline scan (verified: exit 0; npm fixture resolves Unknown offline with
-# offline-cache-miss reasons, so never golden-match reason strings)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json --offline
-# generate parity (verified: exit 0, stdout byte-identical to the --input form above)
+mkdir -p /tmp/olaf-empty
+dotnet run --project src/Olaf.Cli -- generate /tmp/olaf-empty --format json --offline
+# {"summary":{"total":0,"resolved":0,"unknown":0},"licenses":[]}
+```
+
+## Formats
+
+| Format | Output |
+|--------|--------|
+| `json` | `{"summary":{"total":…,"resolved":…,"unknown":…},"licenses":[…]}`; 9 base keys (`ecosystem`, `name`, `version`, `spdx`, `licenseText`, `sourceUrl`, `status`, `reason`, `direct` last) (+ optional `purl|supplier|downloadUrl|hashes` enrichment keys after `direct`, omitted when null), sorted `ecosystem → name → version` |
+| `yaml` | Same shape as `json`, YAML-encoded |
+| `xml` | Same 9 base fields as `json`, XML-encoded (`<report><summary …/><licenses>…`) (enrichment omitted) |
+| `md` | Human-readable attribution report (header counts + per-package sections) |
+| `cyclonedx-json` | CycloneDX 1.5 SBOM |
+| `cyclonedx-xml` | Same CycloneDX 1.5 data as JSON, XML-encoded |
+| `spdx-json` | SPDX 2.3 SBOM |
+
+One example per format (all exit `0`):
+
+```bash
 dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json --offline
-# strict gate offline (verified: report on stdout + exit 1)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json --offline --strict
-# usage error stays exit 2 offline (verified)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format bogus --offline
-# file output (verified: exit 0, 0 stdout bytes, report in the file)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json --offline --out report.json --force
-# checksum pin (verified: exit 0)
-sha256sum -c tools/spdx-db.sha256
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format yaml --offline
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format xml --offline
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format md --offline
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format cyclonedx-json --offline
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format cyclonedx-xml --offline
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format spdx-json --offline
 ```
 
-### Disk cache (`--cache-dir` / `--no-cache` / `--refresh-cache` / `--cache-ttl-days`)
-
-License resolutions persist across runs in a JSON disk cache (`cache.json`), so a repeat scan skips HTTP for entries still within TTL. Within a run the in-memory L1 still serves first; disk is the L2 (lookup order memory → disk → resolve). Root + `generate` both accept all four flags with identical behavior.
-
-- Location: `--cache-dir <dir>` names a directory; the implementation appends `cache.json` (`<dir>/cache.json`). Precedence is flag > `OLAF_CACHE_DIR` > `XDG_CACHE_HOME` > OS fallback:
-
-| Source | Directory |
-|---|---|
-| `--cache-dir <dir>` | `<dir>/cache.json` (a present flag wins over everything) |
-| `OLAF_CACHE_DIR` | `$OLAF_CACHE_DIR/cache.json` |
-| `XDG_CACHE_HOME` | `$XDG_CACHE_HOME/olaf/cache.json` — when set and non-empty it wins on ALL OSes (not Linux-only) |
-| OS fallback | Linux `~/.cache/olaf/cache.json`; Windows `%LOCALAPPDATA%/olaf/cache.json`; macOS `~/Library/Caches/olaf/cache.json` |
-
-- TTL / store rules: `Resolved` entries live `--cache-ttl-days` (default `30`; must be a positive integer — missing/invalid → exit `2`); the flag scales ONLY `Resolved` entries, `Unknown`/not-found stays `1` day. Expiry is `age >= ttl`, so an entry exactly at TTL counts as expired (expiry evicts L1+L2). Transport/timeout/resolver-error results are never cached (reason prefixes `timeout:` / `transport-error:` / `offline-cache-miss` / `resolver-error:`). Keys normalize `Trim` + lowercase with `pypi`→`pip` unification (`CacheKey.Of`, e.g. `npm:lodash@4.17.21`). Entries with more than `1 MiB` of license text skip persist; `Enrichment` persists whole-or-null (omit-null, never re-scraped); `etag` is stored-but-unused.
-- Bypass / refresh: `--no-cache` skips reads AND writes; `--refresh-cache` skips reads but still writes. Both together → refresh wins (reads skipped, writes on).
-- Corrupt / concurrency: a corrupt or unreadable cache file warns on stderr (`Warning: corrupt license cache '<path>': …; starting empty.`) and the scan continues — never exit `2`. A malformed `fetchedAt` evicts that entry only (the rest load). Writes are atomic (temp file + rename) and thread-safe, one store per resolution, so there is no save-at-end loss window.
-- Offline composition: `--offline` reads the disk first — a disk hit resolves with zero HTTP (order memory → disk → `offline-cache-miss`); a miss stays `Unknown` (exit `0`, or exit `1` with `--strict`). Online, a disk hit skips HTTP; a miss resolves over HTTP then stores. The cache sits OUTSIDE the `LicenseTextFetcher` chain, so fetch ordering is unchanged (the #77 chain-head rule holds).
-
-Example shape (synthetic illustration — the `olaf-seeded-pkg-78@1.2.3` seed rows below use an illustrative package name, not a real registry package; `…` below abbreviates the JSON-parser detail in the quoted warning):
+Anything else (e.g. `--format bogus`, `txt`, `html`, `markdown`, `cyclonedx`) exits `2`:
 
 ```bash
-# seed a cache entry (lowercase on-disk schema), then scan offline against it
-# (verified: exit 0, summary total=1 resolved=1 unknown=0, spdx MIT;
-# a second identical run is stdout byte-identical)
-printf '{"entries":{"npm:olaf-seeded-pkg-78@1.2.3":{"spdx":"MIT","licenseText":null,"sourceUrl":null,"status":"Resolved","reason":null,"fetchedAt":"<utc-stamp>","etag":null}}}' > "$CACHEDIR/cache.json" # synthetic seed row (package name illustrative)
-dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR"
-# same via env (verified: exit 0, resolved=1) or XDG (verified: exit 0, resolved=1)
-OLAF_CACHE_DIR="$CACHEDIR" dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline
-XDG_CACHE_HOME="$XDG" dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline
-# bypass reads+writes (verified: seeded MIT ignored, exit 1 with --strict, cache bytes untouched)
-dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR" --no-cache --strict
-# skip reads, force writes (verified: seeded MIT ignored, exit 0, Unknown)
-dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR" --refresh-cache
-# corrupt cache warns and continues (verified: exit 0, `Warning: corrupt license cache …` on stderr)
-printf 'NOT-JSON' > "$CACHEDIR/cache.json"
-dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR"
-# bad TTL is a usage error (verified: exit 2, `Invalid --cache-ttl-days 'bogus': must be a positive integer number of days.`)
-dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --cache-ttl-days bogus
-# generate parity (verified: exit + stdout equal to the --input form)
-dotnet run --project src/Olaf.Cli -- generate <fixture-dir> --format json --offline --cache-dir "$CACHEDIR"
-```
-
-(`<fixture-dir>` is a temp dir holding a `package.json` that depends on the seeded package, `$CACHEDIR` a temp dir holding the seeded `cache.json`, `<utc-stamp>` a UTC timestamp e.g. `date -u +%Y-%m-%dT%H:%M:%SZ`; online second-run reuse — first run stores, second run skips HTTP — is pinned by unit tests with a throwing handler asserting zero sends, since live-network runs are not byte-stable.)
-
-Summary shape per format:
-
-- JSON: `{"summary":{"total":…,"resolved":…,"unknown":…},"licenses":[…]}` with 9 keys per entry (`direct` last).
-- YAML: `summary:` with `total`/`resolved`/`unknown` plus a `licenses:` list with the same 9 keys (`direct: true|false` last).
-- XML: `<report><summary total="…" resolved="…" unknown="…"/><licenses><license>` with the 9 fields as child elements (`<direct>` last).
-- HTML: `<p>Total: … · Resolved: … · Unknown: …</p>` plus a 9-column table (Ecosystem, Name, Version, SPDX, License, Source, Status, Reason, Direct; the SPDX cell falls back to status when `spdx` is null).
-- TXT: `Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …` plus one `name@version (ecosystem) direct=<true|false>` block per package (SPDX falls back to `Unknown`, plus source/status/reason lines).
-- MD (`markdown` alias): `# Third-Party Attribution` header with `Total: …, Resolved: …, Unknown: …`, a 9-column markdown table (`| Direct |` last), plus one `## name@version (ecosystem)` section per package carrying all 9 fields (`- Direct: true|false` last).
-- CycloneDX JSON (`cyclonedx-json`, `cyclonedx` alias): CycloneDX 1.5 SBOM — see `### CycloneDX JSON export` below.
-- CycloneDX XML (`cyclonedx-xml`, no alias): same CycloneDX 1.5 data as JSON, XML-encoded — see `### CycloneDX XML export` below.
-- SPDX JSON (`spdx-json`, no alias): SPDX 2.3 SBOM — see `### SPDX JSON export` below.
-
-Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `licenses` list, XML emits `<licenses />`, HTML emits an empty `<tbody>`, CycloneDX JSON emits an empty `components` array (envelope + `olaf:*` zero counts still present), CycloneDX XML emits `<components />` (envelope + `olaf:*` zero counts still present), SPDX JSON emits empty `packages` with a single self-`DESCRIBES` relationship (`SPDXRef-DOCUMENT` → `SPDXRef-DOCUMENT`), `documentDescribes: ["SPDXRef-DOCUMENT"]`, and the `olaf:total=0/resolved=0/unknown=0` counts comment still present.
-
-### CycloneDX JSON export
-
-`--format cyclonedx-json` (`cyclonedx` alias) emits a CycloneDX 1.5 SBOM (`{"bomFormat":"CycloneDX","specVersion":"1.5","version":1,…}`):
-
-- `serialNumber` is `urn:uuid:<guid>`, fresh on every run; `metadata.timestamp` is an ISO-8601 UTC timestamp (never golden-match either in tests).
-- `metadata.tools` is `[{vendor: olaf, name: olaf, version: <assembly>}]`; `metadata.component` is the constant `{type: application, name: olaf-scan}` (the formatter only sees the `ScanResult`, so the input path is unavailable at that layer).
-- `metadata.properties` carries the report counts (`olaf:total` / `olaf:resolved` / `olaf:unknown`, always equal to the `ScanResult` counts, so `--direct-only` filtering is reflected).
-- `components[]` is sorted `ecosystem → name → version`, one entry per license row with `type: library`:
-  - `scope` is `required` when direct, `optional` when transitive.
-  - `bom-ref` mirrors the CLI key `{ecosystem}:{name}@{version}`; duplicate triples get `-2`, `-3`, … suffixes so every ref is unique.
-  - `licenses`: single-token SPDX → `{"license":{"id":"…"}}`; multi-word SPDX → `{"license":{"name":"…"}}`; `Unknown` → empty `[]` plus `properties` entries `olaf:status`, `olaf:reason`, and `olaf:sourceUrl` (only when a source URL exists).
-  - `purl`: `npm` → `pkg:npm/…` (scoped `@scope/name` encodes `@` as `%40`), `pip`/`pypi` → `pkg:pypi/…`, `go` → `pkg:golang/…`, `maven`/`gradle` → `pkg:maven/<group>/<artifact>…` (split on the first `:`; a bare name without `:` falls back to `pkg:maven/<name>…`), everything else → `pkg:generic/…` (never throws). `maven`/`gradle` entries with `group:artifact` coordinates also carry a separate `group` field.
-
-### CycloneDX XML export
-
-`--format cyclonedx-xml` (no alias; `cyclonedx` stays JSON) emits the same CycloneDX 1.5 data as JSON, XML-encoded. Both formatters share one mapper (`CycloneDxComponentMapper`: sort, `bom-ref` dedup, purl, license rule, counts), so JSON↔XML field parity holds per component:
-
-- The spec version rides in the namespace — `<bom xmlns="http://cyclonedx.org/schema/bom/1.5" serialNumber="urn:uuid:…" version="1">` with NO `specVersion` attribute. Child order is pinned: `metadata` then `components`; `metadata` children are `timestamp`, `tools`, `component`, `properties`.
-- `scope` is an ELEMENT, always emitted (`required` when direct, `optional` when transitive) — never an attribute. Component child order is pinned: `group?`, `name`, `version`, `scope`, `licenses?`, `purl`, `properties?` (`purl` is unconditional; `group` only on `maven`/`gradle` `group:artifact` coordinates).
-- Properties carry values as element text (`<property name="olaf:total">3</property>`), not attributes — same `olaf:total` / `olaf:resolved` / `olaf:unknown` counts (filtered-set aware) plus per-component `olaf:status`, `olaf:reason`, `olaf:sourceUrl` (only when a source URL exists) on `Unknown` rows.
-- Escaping is owned by `XElement`/`XmlWriter` — values are never pre-encoded (double-escape ban), so `&<>"'` round-trip through a parse-back. Invalid XML control chars (e.g. `\u0001`) are stripped, never thrown.
-
-### SPDX JSON export
-
-`--format spdx-json` (no alias; `spdx` is rejected with exit `2`) emits an SPDX 2.3 SBOM (`{"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"olaf-scan",…}`):
-
-- `spdxVersion` is `SPDX-2.3`, `dataLicense` is `CC0-1.0`, `SPDXID` is the pinned literal `SPDXRef-DOCUMENT`, `name` is the constant `olaf-scan`. `documentNamespace` is `https://olaf.example/sbom/<uuid>`, fresh on every run; `creationInfo.created` is an ISO-8601 UTC timestamp and `creationInfo.creators` is `["Tool: olaf <assembly>"]` (never golden-match namespace/created in tests).
-- `packages[]` is sorted `ecosystem → name → version`, one entry per license row with child order pinned: `SPDXID`, `name`, `versionInfo`, `supplier`, `downloadLocation`, `filesAnalyzed`, `licenseConcluded`, `licenseDeclared`, `copyrightText`, `externalRefs`.
-- `SPDXID` is positional (`SPDXRef-Package-1..N` in sort order): the `bom-ref` charset (`eco:name@ver`) is illegal for SPDXID, and positional IDs avoid sanitize collisions.
-- `licenseConcluded`: single-token SPDX ids pass through, SPDX expressions with `AND`/`OR`/`WITH` (parens allowed) pass through; everything else — `Unknown`/`NONE`/`NOASSERTION`/null/empty/whitespace or multi-word text (e.g. `My Custom License`) — collapses to `NOASSERTION` (never `NONE`, never `""`, never an `Unknown` string leak). `licenseDeclared` always mirrors `licenseConcluded` (the resolver raw string no longer exists at the formatter layer, so no model change).
-- `copyrightText`: `"; "`-joined holders, or the literal `NOASSERTION` when holders are empty (see `### Copyright holders` below); `supplier` and `downloadLocation` stay the literal `NOASSERTION` when unenriched (`SourceUrl` is never copied — a registry page is not a download URI).
-- `externalRefs` is unconditional: every package (even `Unknown`) carries one `PACKAGE-MANAGER`/`purl` entry (same purl rule as CycloneDX; never throws).
-- `filesAnalyzed` is always `false`.
-- Relationships are flat-list honest (no tree is inferred): every package gets BOTH `DESCRIBES` and `CONTAINS` from `SPDXRef-DOCUMENT` (`relationships` count is `2 × packages`, referentially closed); `documentDescribes` lists every package `SPDXID`. An empty scan carries a single self-`DESCRIBES` (`SPDXRef-DOCUMENT` → `SPDXRef-DOCUMENT`) with `documentDescribes: ["SPDXRef-DOCUMENT"]`.
-- Counts ride in `comment` (`olaf:total=<n>/resolved=<n>/unknown=<n>`, always equal to the `ScanResult` counts, so `--direct-only` filtering is reflected).
-- SPDX 2.3 only: no 3.0 profile/context fields are emitted. A future SPDX-3.0 formatter ships as a separate format, not an extension — this output stays valid 2.3 input for converters (v3.0-ready in that sense, not by emitting 3.0 fields).
-
-### Copyright holders
-
-`Enrichment.CopyrightHolders` carries per-package notice owners (wired through the `npm`/`nuget`/`pip`/`cargo` resolvers). Pure in-memory scraping — no new HTTP: holders are extracted from a license text the resolver already fetched.
-
-- Per-package-only source rule: only tarball-extracted or `licenseUrl`-fetched texts are scraped (provenance tracked by `LicenseTextFetcher.TryFetchLicenseTextWithProvenanceAsync`). Curated SPDX-DB subset texts are NEVER scraped — a generic template holder (e.g. the Free Software Foundation notice inside the GPL text, the Apache Software Foundation notice, the AAL authors line) would false-attribute the package.
-- Precedence: scraped-text-first, metadata-author fallback ONLY when the per-package text yields zero holders. Bare email addresses are never promoted (`"Name <mail@host>"` yields `"Name"`; bare `"mail@host"` yields null).
-- Caps (live in `CopyrightScraper`, nowhere else): max 5 holders per package, deduped case-folded, hard-cut at 200 chars (no ellipsis — byte-stability). Formatters do zero re-truncation. Null/empty input yields null (omit-null downstream).
-- Denylist: `Free Software Foundation`, `Apache Software Foundation`, `aal-authors` / `attribution assurance`, `Gnomovision`, `Yoyodyne`, bare `contributors` / `the contributors`, and year/name placeholders (any `<…>`/`[…]` remnant or `XXXX`). Defense-in-depth behind the per-package-only structural rule. `"by "` prefixes and `"All rights reserved"` tails are stripped.
-- Outputs per format: `spdx-json` → `copyrightText` (`"; "`-joined holders, else literal `NOASSERTION` — the field is mandatory); `cyclonedx-json` → `evidence.copyright[]` (array-of-`{text}`, omit-when-empty, pinned after `externalReferences`); `cyclonedx-xml` → `<evidence><copyright><text>` per holder (after `<externalReferences>`, before `<properties>`); `txt` → `  Copyright: …` line per package; `md` → `- Copyright: …` bullet per detail section; `html` → `<p>Copyright: name@version: …</p>` per package. `json`/`yaml` omit holders (the 9-field shape plus the `purl`/`supplier`/`downloadUrl`/`hashes` enrichment keys only).
-- Supplier-vs-Holders: `Supplier` stays the publisher (registry author) and may differ from `Holders` (notice owners) — holder resolution never rewrites `Supplier`. When the text yields zero, the author fallback may make them equal; a bare-email supplier stays supplier-only (never promoted to holders).
-
-### Enrichment (component PURL + hashes + supplier + download)
-
-`ResolvedLicense` carries an optional 7th `Enrichment` record — `Enrichment(Purl, Hashes, Supplier, DownloadUrl, CopyrightHolders)` (default `null`, so unenriched output is byte-stable). `Hashes` entries are `algo:value` strings (e.g. `sha512:…`).
-
-NO-NEW-HTTP rule: enrichment is harvested ONLY from the response body the resolver already fetched for license resolution. No resolver issues a new `GET` for enrichment (the pre-existing license-text fetch stays license-text-only). Absent fields stay `null` (never `""` or fabricated values); when hashes, supplier, download URL, and copyright holders are ALL absent the whole `Enrichment` is `null`, and the purl is only emitted alongside real enrichment data.
-
-Per-resolver availability (payload → fields):
-
-| Resolver | Already-fetched payload | Hashes | Supplier | DownloadUrl |
-|----------|-------------------------|--------|----------|-------------|
-| `npm` | versioned registry JSON | `dist.integrity` (`algo-base64` → `algo:value`) | `author` then `maintainers[]` (name/email) | `dist.tarball` |
-| `nuget` | registration / catalog JSON (catalog doc only when already fetched for license resolution) | `packageHash` + `packageHashAlgorithm` (default `sha512`) | `authors` | `packageContent` |
-| `pip` | PyPI JSON API | `urls[].digests{algo: value}` | `info.author` | `urls[]` file URL |
-| `cargo` | crates.io JSON | `version.checksum` → `sha256:` | — (null) | `version.dl_path` (absolutized against `https://crates.io`) |
-| `composer` | packagist JSON | `dist.shasum` → `sha1:` | `authors[]` (name/email) | `dist.url` |
-| `maven` | fetched POM XML | — (null; POM carries no hashes) | `organization.name`, else `developers/developer/name` | project `<url>` (license `<url>` elements are never read) |
-| `bundler` | rubygems JSON (PARTIAL) | — (null; versioned sha lives on an unfetched endpoint) | `authors` | `gem_uri` |
-| `go` | proxy `.info` / license-file path (PARTIAL) | — (null; `.ziphash` endpoint unfetched) | — (null) | constructed `https://proxy.golang.org/<module>/@v/<version>.zip` (never fetched) |
-| `swift` / `cocoapods` / `vcpkg` / `conan` | current endpoints (NULL group) | — | — | — (endpoints lack enrichment data → `Enrichment` null) |
-| ClearlyDefined fallback | definitions JSON | `files[]` first `sha256`/`sha` (incl. nested `hashes.sha256`) → `sha256:` | `parties[]` (name, else url, else email; top-level or `licensed.parties`) | — (null) |
-
-Deferred parser hashes: `go.sum` `h1:` hashes and npm-lock `integrity` values are validated-but-deferred — parsed, never stored (`Hashes` stays `null` for them).
-
-PURL mapping (`PurlBuilder.Build` in `Olaf.Core` — the single home shared by resolvers and formatters; `CycloneDxPurl.Build` delegates to it, never forks; never throws, null/empty inputs degrade to the generic fallback):
-
-| Ecosystem input | PURL type | Notes |
-|-----------------|-----------|-------|
-| `npm` | `pkg:npm/…` | scoped `@scope/name` encodes `@` as `%40`, keeps `/` |
-| `pip` / `pypi` (alias) | `pkg:pypi/…` | — |
-| `go` / `golang` (alias) | `pkg:golang/…` | — |
-| `maven` / `gradle` | `pkg:maven/<group>/<artifact>…` | `group:artifact` split on the first `:`; bare name without `:` falls back to `pkg:maven/<name>…` |
-| `nuget` | `pkg:nuget/…` | — |
-| `cargo` | `pkg:cargo/…` | — |
-| `bundler` / `gem` (alias) | `pkg:gem/…` | — |
-| `composer` | `pkg:composer/…` | — |
-| `swift` | `pkg:swift/…` | — |
-| `cocoapods` | `pkg:cocoapods/…` | — |
-| `vcpkg` | `pkg:vcpkg/…` | — |
-| `conan` | `pkg:conan/…` | — |
-| `apk` / `dpkg` / `rpm` | `pkg:generic/…` | explicit: distro packages have no dedicated purl type here |
-| unmapped / null | `pkg:generic/…` | fallback, never throws |
-
-Qualifiers: `PurlBuilder.Build` accepts optional `qualifiers` (emitted as `?k=v&…` when non-empty, e.g. `pkg:npm/express@4.18.2?arch=x64`); null/empty means no suffix. All formatters pass `null` for now.
-
-SBOM consumption (omit-null everywhere — unenriched SBOM output is stable):
-
-- CycloneDX JSON: enriched purl is preferred (else the computed purl); `supplier` → `supplier: {name}`; `Hashes` → `hashes[]` (`{alg, content}`, alg names `SHA-512` style, unknown algos pass through uppercased); `DownloadUrl` → `externalReferences: [{type: distribution, url}]`. Optional order after `group`: `supplier`, `hashes`, `externalReferences`. Unparseable hash entries (no colon, blank halves) are dropped, never emitted, never throw.
-- CycloneDX XML: mirrors JSON — `supplier`, `hashes` (`<hash alg="…">`), `externalReferences` (`<reference type="distribution">`) after `<purl>`, before `<properties>`.
-- SPDX JSON: `supplier` → `supplier` (`Person: <name>` when enriched, else literal `NOASSERTION`); `DownloadUrl` → `downloadLocation` (else `NOASSERTION`); `Hashes` → `checksums[]` (`{algorithm, checksumValue}`, algorithm names `SHA256` style, unknown algos pass through uppercased without hyphens), omitted entirely when absent. `copyrightText` is `"; "`-joined holders, else `NOASSERTION` (see `### Copyright holders`).
-
-Legacy structured formats: JSON/YAML emit optional `purl` / `supplier` / `downloadUrl` / `hashes` keys AFTER `direct`, omitted-when-null (unenriched rows keep the 9-field shape).
-
-Fixed-shape human formats consciously omit enrichment except that `txt`, `md`, and `html` carry a holders-only `Copyright` line per package (see `### Copyright holders`); `xml` is fixed-shape with no holders line — SBOM (`cyclonedx-json`/`cyclonedx-xml`/`spdx-json`) and structured (`json`/`yaml`) formats carry enrichment.
-
-Null-tolerance + provenance rules: blank suppliers/URLs normalize to `null`; non-`http(s)` download URLs are rejected to `null`; blank hash entries are dropped. `SourceUrl` (a registry page) is NEVER copied into `DownloadUrl` (a download URI) — when no harvestable download URL exists, `DownloadUrl` stays `null` even though `SourceUrl` is set.
-
-```bash
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format md
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format cyclonedx-json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format cyclonedx-xml
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format spdx-json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cargo --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --ecosystem go --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cargo --ecosystem cargo --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/maven --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/gradle --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/maven --ecosystem maven --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/gradle --ecosystem gradle --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/composer --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/bundler --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/composer --ecosystem composer --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/bundler --ecosystem bundler --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/swift --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cocoapods --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/swift --ecosystem swift --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/cocoapods --ecosystem cocoapods --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/vcpkg --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/conan --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/vcpkg --ecosystem vcpkg --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/conan --ecosystem conan --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/pip --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/pip --ecosystem pip --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/apk --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/dpkg --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/apk --ecosystem apk --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/dpkg --ecosystem dpkg --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/rpm --format json
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/rpm --ecosystem rpm --format json
-# container image (docker-save/OCI tarball or exploded layout dir; apk/dpkg/rpm DBs routed per layer, binary rpm yields empty)
-dotnet run --project src/Olaf.Cli -- --input image.tar --format json
-dotnet run --project src/Olaf.Cli -- --input ./oci-dir --format json
-dotnet run --project src/Olaf.Cli -- --input image.tar --format json --max-image-mb 2048
-```
-
-### Custom attribution templates (`--template`)
-
-`--template <file>` renders the scan through a user-supplied attribution template instead of a built-in `--format`.
-
-- Flag: `--template <file>` (default null; CLI forms are `--input`/`--format` (root) and `generate [PATH]` (subcommand)).
-- Override contract: `--template` overrides `--format` — when both are given the template wins and `--verbose` prints `Template overrides --format '<f>'.` on stderr (quiet suppresses). There is no conflict exit.
-- Defaults stay hand-coded: the built-in `txt`/`md`/`html` formatters remain hand-coded C# (byte-stability for legal output); the template engine never renders them. Byte-parity snapshot tests pin `txt`/`md`/`html` output identical on empty + holders + special-chars scans.
-
-Engine choice (minimal built-in, zero new dependencies): templates render with a ~150-line built-in mustache-ish renderer (`TemplateEngine`, no NuGet package). The repo carries exactly 2 runtime dependencies (`System.CommandLine 2.0.0`, `YamlDotNet 16.3.0`); a template-library dependency would add a third plus a transitive restore surface. Air-gap rationale: the built-in builds fully offline against the existing pinned graph, while a library would require nuget.org at restore time on every clean/air-gapped build (restore failure = build failure). The engine executes no code and fetches nothing — no member access, no includes/partials, no remote fetch — so there is nothing to sandbox beyond hard caps: template input ≤ 256 KiB, expansion ≤ 1 MiB, loop iterations ≤ 10_000 (exceeding a cap fails the run with exit `2`).
-
-Syntax (exactly these four; no `{{else}}`, no filters, no sorting inside templates):
-
-- `{{field}}` — value lookup with dotted-path support; innermost scope wins (e.g. `{{spdx}}` inside `{{#each groups}}` resolves the group's `spdx`, while inside `{{#each licenses}}` it resolves the package's `spdx`). Top-level fields include `{{total}}`, `{{generatedAt}}`; per-package fields include `{{name}}`, `{{version}}`, `{{ecosystem}}`, `{{spdx}}`.
-- `{{#each licenses}}…{{/each}}` — repeats the block per package (row order is ecosystem → name → version, same as `txt`/`md`/`html`).
-- `{{#each groups}}…{{/each}}` with nested `{{#each items}}…{{/each}}` — repeats per SPDX group (`groups[]` is precomputed, grouped by `spdx`, sorted by `spdx` Ordinal; `items` sorted ecosystem → name → version), so no engine-level `group_by`/`sort`/`where` is needed.
-- `{{#if field}}…{{/if}}` — renders the block only when the field is truthy (non-empty string, non-zero count, `direct == true`); used for omit-when-empty lines such as `{{#if copyright}}…{{/if}}`.
-
-Model reference (exact field names — templates MUST use these; anything else renders empty):
-
-| Path | Meaning |
-|------|---------|
-| `total` | int — `== ScanResult.TotalCount` |
-| `resolved` | int — `== ScanResult.ResolvedCount` |
-| `unknown` | int — `== ScanResult.UnknownCount` |
-| `generatedAt` | string — ISO-8601 UTC (`DateTime.UtcNow.ToString("o")`) |
-| `toolVersion` | string — `"0.1.0-preview.1"` const (mirrors `Olaf.Cli.csproj` Version; no reflection) |
-| `licenses[]` | per-package rows, each with `name`, `version`, `ecosystem`, `direct` (bool), `spdx` (`LicenseDisplay.EffectiveSpdx`), `status`, `reason` (`""` when null, never a null literal), `sourceUrl` (`""` when null), `purl`, `supplier`, `downloadUrl` (`""` when null; #70 enrichment), `hashes` (`";"`-joined `algo:value`, lexical form preserved as stored, else `""`), `copyright` (`"; "`-joined holders, else `""` — omit-when-empty is the template's `{{#if}}` job, #72) |
-| `groups[]` | `{ spdx: string, count: int, items: licenses[] }` — grouped by `spdx`, sorted by `spdx` Ordinal; `items` sorted ecosystem → name → version |
-
-(`LicenseText` is NOT in the model — unbounded full text stays out; templates needing it are a follow-up.)
-
-Example 1 — header/footer/loop (`tests/Olaf.Tests/Fixtures/templates/header-footer-loop.scriban`):
-
-```text
-Third-Party Attribution
-Total: {{total}}, Resolved: {{resolved}}, Unknown: {{unknown}}
-{{#each licenses}}
-{{name}}@{{version}} ({{ecosystem}}) SPDX: {{spdx}}
-{{/each}}
-Generated by olaf {{toolVersion}} at {{generatedAt}}.
-```
-
-```bash
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/header-footer-loop.scriban
-```
-
-Example 2 — grouped by license (`tests/Olaf.Tests/Fixtures/templates/groups.scriban`):
-
-```text
-{{#each groups}}
-## {{spdx}} ({{count}})
-{{#each items}}
-- {{name}}@{{version}} ({{ecosystem}})
-{{/each}}
-{{/each}}
-```
-
-```bash
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/groups.scriban
-```
-
-Error matrix:
-
-| Condition | Exit | Stderr |
-|---|---|---|
-| `--template` file missing (path is also a directory — `File.Exists` is false for both) | `2` | `Template not found: '<p>'.` |
-| Unclosed/mismatched block or bad tag (e.g. unclosed `{{#each licenses}}`) | `2` | `template error line <N>: …` with the 1-based line number |
-| Render caps exceeded (256 KiB input / 1 MiB output / 10_000 loop iterations) | `2` | `template error…` / read-failure message |
-| Unknown field/path in template | `0` (renders empty string — never throws, never the `null` literal) | — |
-
-### Grouping by license (`--group-by-license`)
-
-`--group-by-license` groups the human-readable attribution formats (`txt`/`md`/`html`) by license instead of listing one flat block per package. Default output (flag absent) is byte-identical to before.
-
-- Flag: `--group-by-license` (bool, default false; CLI forms are `--input`/`--format` (root) and `generate [PATH]` (subcommand)). Composes with `--direct-only` (filter first, then group).
-- Group key: `LicenseDisplay.EffectiveSpdx` (trimmed SPDX id, or `"Unknown"` when unresolved) — not `Status`, so a `Resolved` row with an empty SPDX id still lands in the `Unknown` group and a stale `reason` on a resolved row never leaks into a license group.
-- Sort chain: groups ordered by SPDX id `Ordinal` ascending with `Unknown` LAST always (explicit rule — `Unknown` sorts last even though `U` < `Z` alphabetically). A count-descending secondary is vacuous by construction (group keys are distinct, so two groups never tie on a key to break by count). In-group bullets keep the existing `ecosystem → name → version` order.
-- Group header + text: `## {SPDX} ({n} packages)` per group (`<h2>` in `html`), with the full license text emitted ONCE per group — the first-sorted package's `LicenseText` wins (first in `ecosystem → name → version` order within the group; no longest-text, no concatenation).
-- Bullets: `- name@version (ecosystem)` plus holders (`; holder1; holder2` via `CopyrightHoldersFormat.Join`) with a package-identity fallback — when holders are absent the bullet still renders (omit-when-empty applies to the holders suffix, never the bullet). `md` cells escape `|`; `html` bullets render as `<li>` (HTML-encoded).
-- Unknown group: one `Unknown` bucket; every bullet keeps its own per-package reason (`- name@version (ecosystem): reason…` plus holders suffix when present). Unknown packages with different reasons stay as separate bullets.
-- Header counts: `X packages under Y licenses` (`Y` includes `Unknown` as one bucket) plus the usual `Total`/`Resolved`/`Unknown` line. Counts are computed post-`--direct-only`-filter on the list actually rendered. The `--strict`/`--allow`/`--deny` gates see the FLAT filtered list — grouping is display-only and never reorders or hides gate evaluation.
-- SBOM scope: `--group-by-license` is IGNORED for SBOM formats (`cyclonedx-json`/`cyclonedx`/`cyclonedx-xml`/`spdx-json`) with a `--verbose` note (`--group-by-license ignored for SBOM format '<f>'.` on stderr), not exit `2`. `json`/`yaml`/`xml` are likewise ungrouped.
-- Template scope: `--template` is out-of-scope — a custom template renders through the template engine only (`TemplateModel.Groups` already exists for `{{#each groups}}`), and `--group-by-license` has no effect on template output.
-
-Example (synthetic `ScanResult` illustration — shape only, not a live scan; holder names illustrative):
-
-```text
-Third-Party Attribution
-3 packages under 2 licenses
-Total: 3, Resolved: 2, Unknown: 1
-
-## MIT (2 packages)
-License: (The MIT License — full text emitted once per group; `…` below abbreviates it here)
-…
-
-- debug@4.3.4 (npm); Josh Junon (illustrative holder)
-- express@4.18.2 (npm); TJ Holowaychuk (illustrative holder)
-
-## Unknown (1 packages)
-- synthetic-unresolved@0.0.0 (npm): not-found: synthetic unresolved row (reason text illustrative).
-```
-
-Note: template `{{#each groups}}` (`TemplateModel.Groups`) sorts pure-`Ordinal` (no Unknown-last); only the `--group-by-license` display path (`LicenseGrouper`) pins `Unknown` last.
-
-```bash
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt --group-by-license
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format md --group-by-license
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format html --group-by-license
-```
-
-### Policy file (`--rules`)
-
-`--rules <file>` loads a YAML policy file that declares the license gate in version control instead of (or under) flags. Flag behavior without a file is unchanged.
-
-- Flag: `--rules <file>` (default null; CLI forms are `--input`/`--format` (root) and `generate [PATH]` (subcommand)).
-- Resolution order (no cwd search, no walk-up):
-  1. `--rules <file>` explicit (missing file → exit `2`: `Rules file not found: '<path>'.`).
-  2. Input-adjacent: file input uses its directory, dir input uses itself. Probes `.sbom-rules.yaml` THEN `.olaf-rules.yaml` in that dir. Both present → `.sbom-rules.yaml` wins + a `--verbose` note (`Using '.sbom-rules.yaml'; ignoring '.olaf-rules.yaml'.`), not an error.
-  3. None → flag behavior (a missing adjacent file is silent: no warning, no break).
-- Schema reference (all keys optional; unknown top-level keys and wrong types are schema errors — exit `2`, never `1`):
-
-| Key | Type | Default | Meaning |
-|-----|------|---------|---------|
-| `allow` | list of strings | `[]` | SPDX allow-list (fail licenses not in the list) |
-| `deny` | list of strings | `[]` | SPDX deny-list (fail licenses in the list) |
-| `excludeEcosystems` | list of strings | `[]` | Ecosystems filtered out pre-gate AND pre-report (`pypi` normalizes to `pip`) |
-| `failOnUnknown` | bool (`true`/`false`) | `false` | Fail on ANY `Status == Unknown` row |
-| `failOnUnresolved` | bool (`true`/`false`) | `false` | Fail only on the unresolved Unknown subset (see below) |
-| `exceptions` | list of mappings | `[]` | Per-package suppressions (see below) |
-
-Exception rows: `purl` and/or `name` (at least one required) + `license` (required) + `reason` (required, non-empty — empty is a schema error) + `expires` (optional ISO date-only `YYYY-MM-DD`; a datetime or any other shape is a schema error).
-
-- `failOnUnresolved` vs `failOnUnknown`: `unresolved` is the `Unknown` subset whose `Reason` carries one of the exact prefixes `transport`, `timeout`, `not-found`, `resolver-error` (case-insensitive prefix match). `failOnUnknown` gates ANY `Unknown` row regardless of reason; `failOnUnresolved` gates only that subset.
-- Precedence (flags > file > defaults, PER KEY):
-
-| Key | Absent flag | Present flag | Neither |
-|-----|-------------|--------------|---------|
-| `allow` / `deny` lists | file value | flag REPLACES the file list for that key (override, never union; "present" = the flag got a value token, even `--allow ""` which replaces with empty) | default empty set |
-| `failOnUnknown` / `failOnUnresolved` | file value | present `--strict` forces `failOnUnknown: true` (see below) | default `false` |
-| `excludeEcosystems` | file value | no flag exists → file only | default empty |
-| `exceptions` | file value | no flag exists → file only | default empty |
-
-- Explicit allow rescues: the allow-list is checked FIRST (existing gate order preserved) — a license on `allow` is never an offender even if it also appears on `deny`. A license missing from a non-empty `allow` is an offender regardless of `deny`.
-- `excludeEcosystems` vs `--ecosystem`: INTERSECT. File excludes apply within `--ecosystem` scope (`--ecosystem npm` + `excludeEcosystems: [npm]` → empty set → exit `0` with a 0-dep report). Excludes filter the resolved list post-scan/pre-format/pre-gate — the same point as `--direct-only` — so `summary` counts recompute and gates see the filtered set.
-- `--strict` vs file: token-present `--strict` forces `failOnUnknown: true`, winning over file `failOnUnknown: false`. File `failOnUnknown: true` alone does NOT imply full strict — it enables the unknown-gate only, while allow/deny enforcement keeps the existing `hasAllow`/`hasDeny` semantics. The `--allow/--deny without --strict; applying policy gate.` warning fires only when flag tokens drive the gate without `--strict`; file-driven gates declare intent in version control, so no warning text.
-- Exceptions (suppression scope + expiry): a row matches when (`purl` exact OR `name` exact, case-insensitive) AND `license` exact (effective SPDX, case-insensitive) — suppression is scoped to that license only, so the same package with a different license still offends. `expires` is an ISO date-only day compared at UTC midnight: `date >= today` is valid, missing `expires` is perpetual (valid forever). An expired exception lets the violation resume: exit `1` with the original reason plus the literal marker, e.g. `npm:express@^4.18.2 -> Unknown (exception expired: Triage pending.)`.
-- Error shapes: schema errors (unknown key, wrong type, bad exception row, bad `expires`) and YAML syntax errors exit `2` BEFORE any report write (no partial report, no `--out` file created). Validator errors carry best-effort line info `{file}:{line}:{col}` (`1:1` fallback when the node line is unavailable); a malformed-YAML failure uses the same `{file}:{line}:{col}: {message}` shape. Policy violations (exit `1`) keep report-write-first: the report is already written, then the gate fails.
-
-Example (`examples/sbom-rules.example.yaml`, committed; resolution-order comments live in the file header):
-
-```yaml
-allow:
-  - MIT
-  - Apache-2.0
-deny:
-  - GPL-3.0-only
-excludeEcosystems:
-  - apk
-failOnUnknown: false
-failOnUnresolved: false
-exceptions:
-  - name: example-vendored-dep
-    license: GPL-3.0-only
-    reason: "Vendored with written permission; re-evaluate on upgrade."
-    expires: 2099-01-01
-```
-
-```bash
-# explicit file (verified offline: report on stdout + exit 1 — the npm
-# fixture deps resolve Unknown here, tripping the file allow-list gate;
-# reason strings vary with network, so never golden-match them)
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --rules examples/sbom-rules.example.yaml --format json
-# input-adjacent discovery: copy package.json + the example renamed to
-# .sbom-rules.yaml into one dir, then scan with no --rules flag
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format bogus --offline
+# Unsupported format 'bogus'. Supported: json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json.
 ```
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
-| `1` | `--strict` found unresolved/`Unknown` licenses, `--allow`/`--deny` policy-gate offenders, or `--rules` policy-file offenders (allow/deny/`failOnUnknown`/`failOnUnresolved` gates, expired exceptions; excludes-filtered list) |
-| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, invalid `--cache-ttl-days` (`Invalid --cache-ttl-days '<v>': must be a positive integer number of days.`), corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive`, missing `--template` file, template syntax error (`template error line <N>` on stderr), template render-cap exceeded, missing `--rules` file (`Rules file not found: '<path>'.`), rules YAML syntax error or schema error (`{file}:{line}:{col}` on stderr, before any report write) |
+| `0` | Success — including runs with `Unknown` licenses (without `--strict`), empty-directory empty reports, `--help`/`--version` |
+| `1` | `--strict` found `Unknown` licenses (report is still written first) |
+| `2` | Usage/IO error: path not found, single-file input, unsupported `--format`, unknown option, `--out` exists without `--force`, scan/write failure |
 
-## Output contract
-
-- Report goes to stdout when `--out` is omitted (machine-parseable; e.g. stdout is pure JSON with `--format json`).
-- When `--out <file>` is given the report goes to the file and stdout stays empty.
-- Errors, the `--strict` notice, and `--verbose` logs go to stderr; `--version` prints to stdout.
-
-## License text
-
-`LicenseText` is filled text-only: the already-resolved SPDX id stands (no re-resolution — the fetcher returns `(Text, FailureReason)`, never an SPDX id).
-
-- Shared fetcher: one `LicenseTextFetcher` helper (`LicenseTextLimits` caps) dedupes the old npm/NuGet `TryFetchLicenseTextAsync` dup. Tarball URLs come from the already-fetched registry bodies via #70 `Enrichment.DownloadUrl` — no new discovery endpoints, no parser changes. Wired tarball paths: `npm` (tgz via `dist.tarball`), `nuget` (nupkg/zip via `packageContent`), `pip` (sdist/wheel tgz/zip via `urls[]` file URL), `cargo` (`.crate` tgz via `dl_path` absolutized against `https://crates.io`). `npm`/`nuget` also pass their registry `licenseUrl` as fallback (`cargo`/`pip` bodies carry no licenseUrl field, so they pass null); `go` keeps its existing module-zip path with caps added only (content still maps via `SpdxMapper`); all other resolvers stay DB-only (`SpdxLicenseTexts.GetText`).
-- Caps are consts, NOT CLI flags (`LicenseTextLimits`): per-package timeout `5`s via linked CTS; max download `1_048_576` bytes (`1 MiB`) via Content-Length gate + streaming truncation; archive max-entries `512`; max-entry-bytes `1 MiB`. Never `ExtractToFile` (file-name-only match, stream-read of the matched entry); symlinks, absolute paths, and `..`-escaping names are skipped. Single retry only — the fetcher calls `ResolverHttpRetry.GetAsync`, never a second retry layer.
-- Tarball shapes: tgz / zip / nupkg / wheel / crate. Content is magic-sniffed first (gzip `1F 8B` → tar, zip `PK 03 04` → zip) with a URL-extension-hint fallback (`.zip`/`.nupkg`/`.whl` → zip; `.tgz`/`.gz`/`.crate` → gzip+tar). Filename preference `LICENSE*` > `COPYING*` > `NOTICE*`, first-match-wins within a tier (`LICENSE*` returns immediately; the first `COPYING*`/`NOTICE*` hit is kept).
-- Encoding chain (never throws): UTF-8 BOM → UTF-16 BE/LE BOM → UTF-8 strict → Windows-1252 fallback, NULs stripped; whitespace-only decodes keep hunting.
-- Fallback chain (pinned): tarball-file text > `licenseUrl` fetch > embedded DB text > null. Non-`http(s)` license URLs are skipped with zero HTTP. Reason vocabulary (existing `prefix: detail` style): `tarball-miss:<detail>` (`not-found`, `status-<n>`, `transport`, `archive-error`, `no-license-file`) · `tarball-timeout` · `tarball-too-large:<bytes>` · `licenseurl-fetch-failed:<status|timeout|transport|empty>` · `spdxdb-miss:<id>`. First-failure wins: the first stage that fails pins `Reason`; later stages are still attempted for text but never overwrite it — every null-text `Resolved` carries a reason (no silent null). Caller cancellation (`OperationCanceledException` on the caller's token) is always rethrown, never swallowed.
-- Curated DB subset (35 ids, pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`, ~225KB of the ~500KB max): `MIT`, `Apache-2.0`, `Apache-1.1`, `ISC`, `BSD-2-Clause`, `BSD-3-Clause`, `BSD-4-Clause`, `GPL-1.0-only`, `GPL-2.0-only`, `GPL-3.0-only`, `GPL-2.0-or-later`, `GPL-3.0-or-later`, `LGPL-2.0-only`, `LGPL-2.1-only`, `LGPL-3.0-only`, `LGPL-2.1-or-later`, `LGPL-3.0-or-later`, `AGPL-1.0-only`, `AGPL-3.0-only`, `AGPL-3.0-or-later`, `MPL-1.0`, `MPL-1.1`, `MPL-2.0`, `CDDL-1.0`, `EPL-1.0`, `EPL-2.0`, `Unlicense`, `CC0-1.0`, `Artistic-2.0`, `AAL`, `MIT-0`, `BSL-1.0`, `Zlib`, `OFL-1.1`, `0BSD` (subset list mirrored in the `SpdxLicenseTexts.cs` comment; historical stubs kept byte-identical). The embedded offline DB + refresh script shipped in issue #77 (see `### Offline / air-gap`) — no runtime download-at-scan here. The DB path is air-gap safe: pure in-memory dictionary via `SpdxLicenseDb.TryGetText` (primary) + `SpdxLicenseTexts.TryGetText` (seed fallback), zero HTTP (no `HttpClient` in either file).
-- Cache: the whole record including text rides `CachingLicenseResolver` (in-memory L1 + disk L2 — see `### Disk cache`); `Unknown` (including text-stage failures) stays uncached in L1, and transport/timeout/resolver-error results never reach disk.
-- No new text-stage flags, no new text-stage exit codes: text-stage failures surface as `Unknown` + reason, never throw (the `--offline` flag itself shipped in issue #77 — see `### Offline / air-gap`):
+Strict gate (exit `1` on any `Unknown` row):
 
 ```bash
-dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json --offline --strict
 ```
+
+## Offline / air-gap (`--offline`)
+
+`--offline` resolves licenses from the embedded SPDX DB only — zero HTTP. A miss stays `Unknown` (exit `0`, or exit `1` with `--strict`). Reason strings vary with network, so never golden-match them.
+
+```bash
+sha256sum -c tools/spdx-db.sha256
+```
+
+The license-resolution cache is internal and always on (in-memory + on-disk, no flags). A stale on-disk cache starts empty with a stderr warning — never an error.
+
+## Help
+
+```bash
+dotnet run --project src/Olaf.Cli -- generate --help
+```
+
+Full command shape: `olaf generate <DIR> [--format <fmt>] [--out <file>] [--force] [--strict] [--offline]`.

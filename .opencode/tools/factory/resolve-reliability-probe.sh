@@ -2,8 +2,9 @@
 # resolve-reliability-probe.sh — unknown-package reliability probe for issue #2.
 # Builds CLI, scans a temp dir containing a definitely-missing npm package,
 # asserts: non-strict exit 0 + "Unknown" in stdout; --strict exit 1.
+# Issue #123: collapsed to `generate <DIR>` (legacy --input path removed).
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.1.1"
+VERSION="0.2.0"
 set -euo pipefail
 
 PKG_NAME="this-package-definitely-does-not-exist-olaf-xyz"
@@ -116,7 +117,7 @@ echo "fixture: $FIXTURE_DIR/package.json"
 # NOTE: scan exit codes captured explicitly with `set +e` (timeout/dotnet non-zero expected).
 echo "-- step 2: scan WITHOUT --strict (expect exit 0 + 'Unknown') --"
 set +e
-timeout "$TIMEOUT_SECS" dotnet run --project "$REPO_ROOT/src/Olaf.Cli" --no-build -- --input "$FIXTURE_DIR" >"$FIXTURE_DIR/out-plain.txt" 2>"$FIXTURE_DIR/out-plain.stderr"
+timeout "$TIMEOUT_SECS" dotnet run --project "$REPO_ROOT/src/Olaf.Cli" --no-build -- generate "$FIXTURE_DIR" >"$FIXTURE_DIR/out-plain.txt" 2>"$FIXTURE_DIR/out-plain.stderr"
 PLAIN_CODE=$?
 set -e
 echo "plain exit: $PLAIN_CODE"
@@ -128,7 +129,7 @@ if [[ "$PASS_PLAIN_UNKNOWN" -eq 1 ]]; then echo "PASS: non-strict stdout contain
 
 echo "-- step 3: scan WITH --strict (expect exit 1) --"
 set +e
-timeout "$TIMEOUT_SECS" dotnet run --project "$REPO_ROOT/src/Olaf.Cli" --no-build -- --input "$FIXTURE_DIR" --strict >"$FIXTURE_DIR/out-strict.txt" 2>"$FIXTURE_DIR/out-strict.stderr"
+timeout "$TIMEOUT_SECS" dotnet run --project "$REPO_ROOT/src/Olaf.Cli" --no-build -- generate "$FIXTURE_DIR" --strict >"$FIXTURE_DIR/out-strict.txt" 2>"$FIXTURE_DIR/out-strict.stderr"
 STRICT_CODE=$?
 set -e
 echo "strict exit: $STRICT_CODE"

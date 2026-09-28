@@ -3,8 +3,9 @@ using System.Text.Json;
 namespace Olaf.Tests.Cli;
 
 /// <summary>
-/// CLI end-to-end for swift/cocoapods (issue #14). Subprocess e2e via
-/// CliTestHelpers; fixtures are local files only (no live network). Phantom
+/// CLI end-to-end for swift/cocoapods (issue #14, generate-only shape for
+/// issue #123). Subprocess e2e via CliTestHelpers; each run scans a temp dir
+/// holding the committed fixture file (no live network). Phantom
 /// Package.swift/Podfile fixtures guarantee Unknown licenses (404 or offline
 /// cache-miss), so --strict deterministically exits 1.
 /// </summary>
@@ -28,64 +29,47 @@ public sealed class SwiftCocoaPodsCliTests
         return dir;
     }
 
-    [Fact]
-    public void Should_ExitZero_When_EcosystemSwiftFiltersPackageSwift()
+    private static string CopyFixtureToTempDir(string ecoDir, string fileName)
     {
-        var input = CliTestHelpers.FixturePath("swift", "Package.swift");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "swift");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Alamofire", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+        var dir = CliTestHelpers.CreateTempDir();
+        File.Copy(CliTestHelpers.FixturePath(ecoDir, fileName), Path.Combine(dir, fileName));
+        return dir;
     }
 
     [Fact]
-    public void Should_ExitZero_When_EcosystemCocoaPodsFiltersPodfile()
+    public void Should_ExitZero_When_GenerateSwiftFixture()
     {
-        var input = CliTestHelpers.FixturePath("cocoapods", "Podfile");
+        var dir = CopyFixtureToTempDir("swift", "Package.swift");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "cocoapods");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Alamofire", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Alamofire", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
-    public void Should_Exit2_When_EcosystemFilterMatchesNothing()
+    public void Should_ExitZero_When_GenerateCocoaPodsFixture()
     {
-        var input = CliTestHelpers.FixturePath("swift", "Package.swift");
+        var dir = CopyFixtureToTempDir("cocoapods", "Podfile");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "cocoapods");
-
-        Assert.Equal(2, result.ExitCode);
-    }
-
-    [Fact]
-    public void Should_Exit2WithSupportedList_When_EcosystemInvalidSpm()
-    {
-        var input = CliTestHelpers.FixturePath("swift", "Package.swift");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "spm");
-
-        Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("swift", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("cocoapods", result.Stderr, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_Exit2WithSupportedList_When_EcosystemInvalidConda()
-    {
-        var input = CliTestHelpers.FixturePath("cocoapods", "Podfile");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "conda");
-
-        Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("swift", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("cocoapods", result.Stderr, StringComparison.Ordinal);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("Alamofire", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
@@ -94,7 +78,7 @@ public sealed class SwiftCocoaPodsCliTests
         var fixtureDir = CreateSwiftStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -110,7 +94,7 @@ public sealed class SwiftCocoaPodsCliTests
         var fixtureDir = CreateCocoaPodsStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -126,7 +110,7 @@ public sealed class SwiftCocoaPodsCliTests
         var fixtureDir = CreateSwiftStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--offline");
 
             Assert.Equal(0, result.ExitCode);
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));

@@ -1,8 +1,8 @@
 namespace Olaf.Tests.Parsers;
 
 /// <summary>
-/// Red tests for file|dir scan + ecosystem detection.
-/// Expects a ParserRegistry (file-or-dir scan, auto-detect, --ecosystem filter).
+/// Red tests for dir scan + ecosystem detection (issue #123 shape: dir-only
+/// Scan with an optional ecosystem parameter the CLI always leaves null).
 /// All tests require the registry type first so failures are NotImplementedException (right Red reason).
 /// </summary>
 public sealed class DetectionTests
@@ -130,7 +130,8 @@ public sealed class DetectionTests
         ParserTestHelpers.RequireRegistryType();
         var parsers = ParserTestHelpers.ResolveAllParsers();
 
-        // --ecosystem npm should limit scan to npm parser only (CanHandle filter).
+        // The optional Scan(dir, ecosystem) parameter limits the scan to the
+        // npm parser only (CanHandle filter).
         const string ecosystemOverride = "npm";
         var filtered = parsers
             .Where(p => string.Equals(p.Ecosystem, ecosystemOverride, StringComparison.OrdinalIgnoreCase))

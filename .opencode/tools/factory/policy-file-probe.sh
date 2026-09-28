@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): RulesLoader + .sbom-rules.yaml policy surface deleted — no policy-file surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # policy-file-probe.sh — Policy-file probe for issue #75 (.sbom-rules.yaml).
 # Promoted v0.1.0 (2 uses ≥ bar: scratch prototype 1st use + promote-verify
 #   2nd use).

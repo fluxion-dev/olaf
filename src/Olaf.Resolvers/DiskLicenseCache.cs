@@ -13,8 +13,7 @@ namespace Olaf.Resolvers;
 // fetchedAt (UTC), etag} + full Enrichment when non-null (omit-null, never
 // re-scraped). licenseText > 1MiB is skipped for persist (per #71).
 //
-// TTL (B2): Resolved entries live `resolvedTtl` (default 30d, scaled ONLY by
-// --cache-ttl-days); Unknown/not-found entries live 1d. Transport, timeout,
+// TTL (B2): Resolved entries live `resolvedTtl` (default 30d); Unknown/not-found entries live 1d. Transport, timeout,
 // and resolver-error reasons are NEVER cached (reason-prefix predicate).
 // Expiry uses `age >= ttl` (exactly-at-TTL counts as expired) and evicts L2
 // (the matching L1 key is evicted on the resolver miss path).
@@ -25,14 +24,20 @@ namespace Olaf.Resolvers;
 // (tmp+rename atomic under a shared SemaphoreSlim): a crash loses nothing
 // already persisted; there is no save-at-end loss window.
 //
-// Paths (B3): --cache-dir directory (implementation appends cache.json) +
-// OLAF_CACHE_DIR. Precedence: flag > OLAF_CACHE_DIR > XDG_CACHE_HOME > OS
+// Paths (B3): explicit directory override (tests-only; the #123 CLI passes
+// null and always lands on the OS-default cache file) + OLAF_CACHE_DIR.
+// Precedence: explicit dir > OLAF_CACHE_DIR > XDG_CACHE_HOME > OS
 // fallback (~/.cache/olaf, %LOCALAPPDATA%/olaf, ~/Library/Caches/olaf).
 // Pinned decision: XDG_CACHE_HOME, when set and non-empty, wins on ALL OSes
 // (not Linux-only); otherwise the OS-native fallback applies.
 public sealed class DiskLicenseCache
 {
     public const int MaxLicenseTextChars = 1024 * 1024;
+
+    // Issue #123: on-disk schema version. Load validates it; a mismatch
+    // (stale Unknown entries from an older schema) starts empty with a
+    // stderr warning instead of serving stale records.
+    public const int SchemaVersion = 2;
 
     public static readonly TimeSpan NotFoundTtl = TimeSpan.FromDays(1);
 
@@ -222,6 +227,15 @@ public sealed class DiskLicenseCache
 
         using (doc)
         {
+            if (!TryGetPropertyCaseInsensitive(doc.RootElement, "version", out var versionEl)
+                || versionEl.ValueKind != JsonValueKind.Number
+                || !versionEl.TryGetInt32(out var version)
+                || version != SchemaVersion)
+            {
+                Console.Error.WriteLine($"Warning: unsupported license cache schema in '{FilePath}': expected version {SchemaVersion}; starting empty.");
+                return;
+            }
+
             if (!TryGetPropertyCaseInsensitive(doc.RootElement, "entries", out var entries)
                 || entries.ValueKind != JsonValueKind.Object)
             {
@@ -312,7 +326,7 @@ public sealed class DiskLicenseCache
             }
 
             var payload = new Dictionary<string, CacheEntry>(_entries, StringComparer.OrdinalIgnoreCase);
-            var text = JsonSerializer.Serialize(new CacheFile(1, payload), JsonOptions);
+            var text = JsonSerializer.Serialize(new CacheFile(SchemaVersion, payload), JsonOptions);
             var tmpPath = FilePath + ".tmp";
             try
             {

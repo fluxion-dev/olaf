@@ -173,7 +173,7 @@ run_scan() {
   # run_scan <tag> <inputdir> <format> [extra args...]; stdout-><tag>.stdout
   local tag="$1" input="$2" fmt="$3"; shift 3
   set +e
-  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --input "$input" --format "$fmt" "$@" >"$WORKDIR/$tag.stdout" 2>"$WORKDIR/$tag.stderr"
+  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- generate "$input" --format "$fmt" "$@" >"$WORKDIR/$tag.stdout" 2>"$WORKDIR/$tag.stderr"
   RC=$?
   set -e
   if [[ "$RC" -eq 124 ]]; then
@@ -495,7 +495,7 @@ fi
 r1_matrix_regression() {
   # r1_matrix_regression [formats...]; default: json yaml xml html.
   local formats=("$@")
-  (( ${#formats[@]} )) || formats=(json yaml xml html)
+  (( ${#formats[@]} )) || formats=(json yaml xml)
   local R1FAIL=0 f pat
   echo "-- R1 format-matrix regression --"
   for f in "${formats[@]}"; do

@@ -6,11 +6,13 @@ using Olaf.Tests.Parsers;
 namespace Olaf.Tests.Formatters;
 
 /// <summary>
-/// Issue #66 registry/doc coverage (offline, fixture-based):
-/// (1) every format resolved through FormatterRegistry (the --format path)
-/// exposes the direct field; (2) the Direct flag surfaced in reports derives
-/// from parser IsTransitive values with the documented heuristic (manifest
-/// entries direct, lock entries transitive) on real fixtures.
+/// Issue #66 registry/doc coverage (offline, fixture-based, #123 shape — 7
+/// canonical formats, zero aliases):
+/// (1) every kept human format resolved through FormatterRegistry (the
+/// --format path) exposes the direct field; (2) the Direct flag surfaced in
+/// reports derives from parser IsTransitive values with the documented
+/// heuristic (manifest entries direct, lock entries transitive) on real
+/// fixtures.
 /// </summary>
 public sealed class TransitiveCoverageTests
 {
@@ -35,7 +37,7 @@ public sealed class TransitiveCoverageTests
                 "not-found."),
         });
 
-        foreach (var format in new[] { "json", "yaml", "xml", "html", "txt", "md" })
+        foreach (var format in new[] { "json", "yaml", "xml", "md" })
         {
             var formatter = FormatterTestHelpers.GetFormatterViaRegistry(format);
             var output = formatter.FormatResult(scan);
@@ -72,8 +74,8 @@ public sealed class TransitiveCoverageTests
     /// <summary>
     /// Issue #67 scope contract (offline, constructed ScanResult): every
     /// component resolved through FormatterRegistry for `cyclonedx-json`
-    /// and the `cyclonedx` alias carries `scope` = required (direct) or
-    /// optional (transitive). Separate helper + loop — AssertDirectFieldPresent
+    /// carries `scope` = required (direct) or optional (transitive).
+    /// Separate helper + single-format asserts — AssertDirectFieldPresent
     /// is NOT extended (BOM has no `direct` field).
     /// </summary>
     private static void AssertScopePresent(string output)
@@ -91,7 +93,7 @@ public sealed class TransitiveCoverageTests
     }
 
     [Fact]
-    public void Should_ExposeScopeField_When_CycloneDxFormatsResolvedViaRegistry()
+    public void Should_ExposeScopeField_When_CycloneDxJsonResolvedViaRegistry()
     {
         var scan = new ScanResult(new List<ResolvedLicense>
         {
@@ -111,18 +113,15 @@ public sealed class TransitiveCoverageTests
                 "not-found."),
         });
 
-        foreach (var format in new[] { "cyclonedx-json", "cyclonedx" })
-        {
-            var formatter = FormatterTestHelpers.GetFormatterViaRegistry(format);
-            var output = formatter.FormatResult(scan);
-            AssertScopePresent(output);
+        var formatter = FormatterTestHelpers.GetFormatterViaRegistry("cyclonedx-json");
+        var output = formatter.FormatResult(scan);
+        AssertScopePresent(output);
 
-            // Scope mapping pinned: direct → required, transitive → optional.
-            using var doc = JsonDocument.Parse(output);
-            var byName = doc.RootElement.GetProperty("components").EnumerateArray()
-                .ToDictionary(c => c.GetProperty("name").GetString()!);
-            Assert.Equal("required", byName["express"].GetProperty("scope").GetString());
-            Assert.Equal("optional", byName["shadow-dep"].GetProperty("scope").GetString());
-        }
+        // Scope mapping pinned: direct → required, transitive → optional.
+        using var doc = JsonDocument.Parse(output);
+        var byName = doc.RootElement.GetProperty("components").EnumerateArray()
+            .ToDictionary(c => c.GetProperty("name").GetString()!);
+        Assert.Equal("required", byName["express"].GetProperty("scope").GetString());
+        Assert.Equal("optional", byName["shadow-dep"].GetProperty("scope").GetString());
     }
 }

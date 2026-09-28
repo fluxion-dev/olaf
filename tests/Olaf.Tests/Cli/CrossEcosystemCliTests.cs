@@ -3,11 +3,11 @@ using System.Text.Json;
 namespace Olaf.Tests.Cli;
 
 /// <summary>
-/// CLI end-to-end for cross-ecosystem consistency (issue #43). Subprocess e2e
-/// via CliTestHelpers; fixture is a local temp dir only (no live network).
-/// Phantom npm/pip fixtures guarantee Unknown licenses (404 or offline
-/// cache-miss), so assertions stay tolerant on resolved/unknown counts and
-/// never pin SPDX values.
+/// CLI end-to-end for cross-ecosystem consistency (issue #43, generate-only
+/// shape for issue #123). Subprocess e2e via CliTestHelpers; fixture is a
+/// local temp dir only (no live network). Phantom npm/pip fixtures guarantee
+/// Unknown licenses (404 or offline cache-miss), so assertions stay tolerant
+/// on resolved/unknown counts and never pin SPDX values.
 /// </summary>
 public sealed class CrossEcosystemCliTests
 {
@@ -41,7 +41,7 @@ public sealed class CrossEcosystemCliTests
             "aaa-pip-phantom-olaf-xyz==9.9.7\nmmm-pip-phantom-olaf-xyz==9.9.6\n");
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json");
 
             Assert.Equal(0, result.ExitCode);
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));

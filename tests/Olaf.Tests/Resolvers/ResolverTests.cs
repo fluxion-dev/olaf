@@ -613,6 +613,34 @@ public sealed class FallbackResolverTests
         Assert.Equal("Unknown", result.Status);
         Assert.Null(result.SpdxId);
     }
+
+    [Fact]
+    public async Task Should_ResolveConanViaClearlyDefined_When_NoPrimaryResolver()
+    {
+        // Issue #123: Conan primary deleted (dead conan.io/center/api
+        // endpoint); the conancenter fallback arm stays and still resolves
+        // online. Relocated from ConanResolverTests (resolver deleted).
+        var handler = new StubHttpMessageHandler((req, _) =>
+        {
+            var url = req.RequestUri?.ToString() ?? string.Empty;
+            if (url.Contains("clearlydefined", StringComparison.OrdinalIgnoreCase))
+            {
+                return StubHttpMessageHandler.Json(new { licensed = new { declared = "Apache-2.0" } });
+            }
+
+            return StubHttpMessageHandler.NotFound();
+        });
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "fmt", "11.0.2", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Apache-2.0", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.NotNull(result.SourceUrl);
+        Assert.Contains("clearlydefined", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public sealed class CacheResolverTests

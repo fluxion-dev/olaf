@@ -294,7 +294,7 @@ public sealed class EnrichmentResolverTests
     [Fact]
     public async Task Should_ReturnNullEnrichment_When_NullGroupEcosystemResolves()
     {
-        // NULL group: swift + conan endpoints lack enrichment data.
+        // NULL group: swift endpoint lacks enrichment data.
         var swiftHandler = new StubHttpMessageHandler((req, _) =>
             StubHttpMessageHandler.Json(new { license = new { spdx_id = "MIT" } }));
         using var swiftHttp = ResolverTestHelpers.CreateClient(swiftHandler);
@@ -303,15 +303,6 @@ public sealed class EnrichmentResolverTests
 
         Assert.Equal("MIT", swiftResult.SpdxId);
         Assert.Null(swiftResult.Enrichment);
-
-        var conanHandler = new StubHttpMessageHandler((req, _) =>
-            StubHttpMessageHandler.Json(new { license = "MIT" }));
-        using var conanHttp = ResolverTestHelpers.CreateClient(conanHandler);
-        var conanResult = await new ConanLicenseResolver(conanHttp)
-            .ResolveAsync(new Dependency("conan", "fmt", "10.2.1", false));
-
-        Assert.Equal("MIT", conanResult.SpdxId);
-        Assert.Null(conanResult.Enrichment);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): apk/dpkg/rpm parsers deleted — no OS-DB surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # os-db-probe: OS database parser probe (issue #65).
 # Scans checked-in OS fixtures + synth temp DBs directly via
 # `dotnet run --project src/Olaf.Cli -- --input <path> --format json` and

@@ -19,7 +19,8 @@ public sealed class CachingLicenseResolver : ILicenseResolver
     }
 
     // Issue #78: disk is the L2 (B5). refreshCache skips L2 reads but keeps
-    // L2 writes; a null disk bypasses L2 entirely (--no-cache).
+    // L2 writes; a null disk bypasses L2 entirely (the #123 CLI always
+    // passes a disk; null is the tests-only bypass).
     public CachingLicenseResolver(
         HttpClient httpClient,
         bool offline = false,
@@ -131,7 +132,7 @@ public sealed class CachingLicenseResolver : ILicenseResolver
     }
 
     // Single home for ecosystem -> primary-resolver mapping. ClearlyDefinedFallbackResolver
-    // stays fallback-only (no CreatePrimary duplicate); primary+fallback orchestration lives in Program.cs.
+    // stays fallback-only (no CreatePrimary duplicate); primary+fallback orchestration lives in ScanRunner.
     private ILicenseResolver? CreatePrimary(Dependency dependency)
     {
         if (dependency.Ecosystem.Equals("nuget", StringComparison.OrdinalIgnoreCase))
@@ -192,11 +193,11 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new VcpkgLicenseResolver(_http);
         }
 
-        if (dependency.Ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ConanLicenseResolver(_http);
-        }
-
+        // Issue #123: no Conan primary — conan.io/center/api 404s for
+        // existing recipes (E2E snapshot 2026-09-28 + live re-probe), so
+        // conan falls through to "unsupported ecosystem" Unknown here while
+        // the ClearlyDefined fallback (conancenter arm, kept) still resolves
+        // online at the ScanRunner callsite.
         return null;
     }
 }
