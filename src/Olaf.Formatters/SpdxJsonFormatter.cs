@@ -45,8 +45,12 @@ public sealed class SpdxJsonFormatter : ILicenseFormatter
                 // licenseDeclared mirrors licenseConcluded: the resolver raw string
                 // no longer exists at the formatter layer (no model change).
                 ["licenseDeclared"] = concluded,
-                // pre-#72: no copyright scraping; literal NOASSERTION.
-                ["copyrightText"] = "NOASSERTION",
+                // Issue #72: copyrightText = "; "-joined holders, or
+                // NOASSERTION when empty (omit-null has no meaning in SPDX —
+                // the field is mandatory, so empty stays the literal).
+                ["copyrightText"] = license.Enrichment?.CopyrightHolders is { Length: > 0 } holders
+                    ? string.Join("; ", holders)
+                    : "NOASSERTION",
                 // PURL is unconditional (always emitted).
                 ["externalRefs"] = new[]
                 {

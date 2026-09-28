@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 698 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 722 passing (`dotnet test`).
 
 ## Usage
 
@@ -149,18 +149,29 @@ Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `l
 - `packages[]` is sorted `ecosystem → name → version`, one entry per license row with child order pinned: `SPDXID`, `name`, `versionInfo`, `supplier`, `downloadLocation`, `filesAnalyzed`, `licenseConcluded`, `licenseDeclared`, `copyrightText`, `externalRefs`.
 - `SPDXID` is positional (`SPDXRef-Package-1..N` in sort order): the `bom-ref` charset (`eco:name@ver`) is illegal for SPDXID, and positional IDs avoid sanitize collisions.
 - `licenseConcluded`: single-token SPDX ids pass through, SPDX expressions with `AND`/`OR`/`WITH` (parens allowed) pass through; everything else — `Unknown`/`NONE`/`NOASSERTION`/null/empty/whitespace or multi-word text (e.g. `My Custom License`) — collapses to `NOASSERTION` (never `NONE`, never `""`, never an `Unknown` string leak). `licenseDeclared` always mirrors `licenseConcluded` (the resolver raw string no longer exists at the formatter layer, so no model change).
-- `copyrightText`, `supplier`, and `downloadLocation` are the literal `NOASSERTION` on every package (pre-issue #72: no copyright scraping; `SourceUrl` is never copied — a registry page is not a download URI). Copyright scraping is owned by issue #72.
+- `copyrightText`: `"; "`-joined holders, or the literal `NOASSERTION` when holders are empty (see `### Copyright holders` below); `supplier` and `downloadLocation` stay the literal `NOASSERTION` when unenriched (`SourceUrl` is never copied — a registry page is not a download URI).
 - `externalRefs` is unconditional: every package (even `Unknown`) carries one `PACKAGE-MANAGER`/`purl` entry (same purl rule as CycloneDX; never throws).
 - `filesAnalyzed` is always `false`.
 - Relationships are flat-list honest (no tree is inferred): every package gets BOTH `DESCRIBES` and `CONTAINS` from `SPDXRef-DOCUMENT` (`relationships` count is `2 × packages`, referentially closed); `documentDescribes` lists every package `SPDXID`. An empty scan carries a single self-`DESCRIBES` (`SPDXRef-DOCUMENT` → `SPDXRef-DOCUMENT`) with `documentDescribes: ["SPDXRef-DOCUMENT"]`.
 - Counts ride in `comment` (`olaf:total=<n>/resolved=<n>/unknown=<n>`, always equal to the `ScanResult` counts, so `--direct-only` filtering is reflected).
 - SPDX 2.3 only: no 3.0 profile/context fields are emitted. A future SPDX-3.0 formatter ships as a separate format, not an extension — this output stays valid 2.3 input for converters (v3.0-ready in that sense, not by emitting 3.0 fields).
 
+### Copyright holders
+
+`Enrichment.CopyrightHolders` carries per-package notice owners (wired through the `npm`/`nuget`/`pip`/`cargo` resolvers). Pure in-memory scraping — no new HTTP: holders are extracted from a license text the resolver already fetched.
+
+- Per-package-only source rule: only tarball-extracted or `licenseUrl`-fetched texts are scraped (provenance tracked by `LicenseTextFetcher.TryFetchLicenseTextWithProvenanceAsync`). Curated SPDX-DB subset texts are NEVER scraped — a generic template holder (e.g. the Free Software Foundation notice inside the GPL text, the Apache Software Foundation notice, the AAL authors line) would false-attribute the package.
+- Precedence: scraped-text-first, metadata-author fallback ONLY when the per-package text yields zero holders. Bare email addresses are never promoted (`"Name <mail@host>"` yields `"Name"`; bare `"mail@host"` yields null).
+- Caps (live in `CopyrightScraper`, nowhere else): max 5 holders per package, deduped case-folded, hard-cut at 200 chars (no ellipsis — byte-stability). Formatters do zero re-truncation. Null/empty input yields null (omit-null downstream).
+- Denylist: `Free Software Foundation`, `Apache Software Foundation`, `aal-authors` / `attribution assurance`, `Gnomovision`, `Yoyodyne`, bare `contributors` / `the contributors`, and year/name placeholders (any `<…>`/`[…]` remnant or `XXXX`). Defense-in-depth behind the per-package-only structural rule. `"by "` prefixes and `"All rights reserved"` tails are stripped.
+- Outputs per format: `spdx-json` → `copyrightText` (`"; "`-joined holders, else literal `NOASSERTION` — the field is mandatory); `cyclonedx-json` → `evidence.copyright[]` (array-of-`{text}`, omit-when-empty, pinned after `externalReferences`); `cyclonedx-xml` → `<evidence><copyright><text>` per holder (after `<externalReferences>`, before `<properties>`); `txt` → `  Copyright: …` line per package; `md` → `- Copyright: …` bullet per detail section; `html` → `<p>Copyright: name@version: …</p>` per package. `json`/`yaml` omit holders (the 9-field shape plus the `purl`/`supplier`/`downloadUrl`/`hashes` enrichment keys only).
+- Supplier-vs-Holders: `Supplier` stays the publisher (registry author) and may differ from `Holders` (notice owners) — holder resolution never rewrites `Supplier`. When the text yields zero, the author fallback may make them equal; a bare-email supplier stays supplier-only (never promoted to holders).
+
 ### Enrichment (component PURL + hashes + supplier + download)
 
-`ResolvedLicense` carries an optional 7th `Enrichment` record — `Enrichment(Purl, Hashes, Supplier, DownloadUrl)` (default `null`, so unenriched output is byte-stable). `Hashes` entries are `algo:value` strings (e.g. `sha512:…`).
+`ResolvedLicense` carries an optional 7th `Enrichment` record — `Enrichment(Purl, Hashes, Supplier, DownloadUrl, CopyrightHolders)` (default `null`, so unenriched output is byte-stable). `Hashes` entries are `algo:value` strings (e.g. `sha512:…`).
 
-NO-NEW-HTTP rule: enrichment is harvested ONLY from the response body the resolver already fetched for license resolution. No resolver issues a new `GET` for enrichment (the pre-existing license-text fetch stays license-text-only). Absent fields stay `null` (never `""` or fabricated values); when hashes, supplier, and download URL are ALL absent the whole `Enrichment` is `null`, and the purl is only emitted alongside real enrichment data.
+NO-NEW-HTTP rule: enrichment is harvested ONLY from the response body the resolver already fetched for license resolution. No resolver issues a new `GET` for enrichment (the pre-existing license-text fetch stays license-text-only). Absent fields stay `null` (never `""` or fabricated values); when hashes, supplier, download URL, and copyright holders are ALL absent the whole `Enrichment` is `null`, and the purl is only emitted alongside real enrichment data.
 
 Per-resolver availability (payload → fields):
 
@@ -204,11 +215,11 @@ SBOM consumption (omit-null everywhere — unenriched SBOM output is stable):
 
 - CycloneDX JSON: enriched purl is preferred (else the computed purl); `supplier` → `supplier: {name}`; `Hashes` → `hashes[]` (`{alg, content}`, alg names `SHA-512` style, unknown algos pass through uppercased); `DownloadUrl` → `externalReferences: [{type: distribution, url}]`. Optional order after `group`: `supplier`, `hashes`, `externalReferences`. Unparseable hash entries (no colon, blank halves) are dropped, never emitted, never throw.
 - CycloneDX XML: mirrors JSON — `supplier`, `hashes` (`<hash alg="…">`), `externalReferences` (`<reference type="distribution">`) after `<purl>`, before `<properties>`.
-- SPDX JSON: `supplier` → `supplier` (`Person: <name>` when enriched, else literal `NOASSERTION`); `DownloadUrl` → `downloadLocation` (else `NOASSERTION`); `Hashes` → `checksums[]` (`{algorithm, checksumValue}`, algorithm names `SHA256` style, unknown algos pass through uppercased without hyphens), omitted entirely when absent. `copyrightText` stays `NOASSERTION` (no copyright scraping).
+- SPDX JSON: `supplier` → `supplier` (`Person: <name>` when enriched, else literal `NOASSERTION`); `DownloadUrl` → `downloadLocation` (else `NOASSERTION`); `Hashes` → `checksums[]` (`{algorithm, checksumValue}`, algorithm names `SHA256` style, unknown algos pass through uppercased without hyphens), omitted entirely when absent. `copyrightText` is `"; "`-joined holders, else `NOASSERTION` (see `### Copyright holders`).
 
 Legacy structured formats: JSON/YAML emit optional `purl` / `supplier` / `downloadUrl` / `hashes` keys AFTER `direct`, omitted-when-null (unenriched rows keep the 9-field shape).
 
-Fixed-shape human formats consciously omit enrichment: `xml` (fixed-shape report), `html`/`md` (fixed-column tables), `txt` (fixed-line attribution) — SBOM (`cyclonedx-json`/`cyclonedx-xml`/`spdx-json`) and structured (`json`/`yaml`) formats carry enrichment.
+Fixed-shape human formats consciously omit enrichment (`xml` fixed-shape report; `html`/`md` fixed-column tables; `txt` fixed-line attribution) except the holders-only `Copyright` line per package (see `### Copyright holders`) — SBOM (`cyclonedx-json`/`cyclonedx-xml`/`spdx-json`) and structured (`json`/`yaml`) formats carry enrichment.
 
 Null-tolerance + provenance rules: blank suppliers/URLs normalize to `null`; non-`http(s)` download URLs are rejected to `null`; blank hash entries are dropped. `SourceUrl` (a registry page) is NEVER copied into `DownloadUrl` (a download URI) — when no harvestable download URL exists, `DownloadUrl` stays `null` even though `SourceUrl` is set.
 

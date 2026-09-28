@@ -83,6 +83,20 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
                 };
             }
 
+            // Issue #72: evidence.copyright[] = array-of-{text}; omit-when-
+            // empty (unenriched output is byte-stable). Pinned AFTER
+            // externalReferences (B10 child order: ..., externalReferences?,
+            // evidence?, properties?).
+            if (item.CopyrightHolders is { Length: > 0 })
+            {
+                component["evidence"] = new Dictionary<string, object?>
+                {
+                    ["copyright"] = item.CopyrightHolders
+                        .Select(h => new Dictionary<string, string?> { ["text"] = h })
+                        .ToArray(),
+                };
+            }
+
             components.Add(component);
         }
 

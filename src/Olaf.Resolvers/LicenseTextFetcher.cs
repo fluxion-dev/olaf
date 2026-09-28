@@ -68,6 +68,26 @@ internal static class LicenseTextFetcher
         string spdxId,
         CancellationToken cancellationToken)
     {
+        // Provenance-blind wrapper: existing callers keep the 2-tuple.
+        // Copyright scraping (issue #72) uses the provenance overload.
+        var (text, reason, _) = await TryFetchLicenseTextWithProvenanceAsync(
+            http, tarballUrl, licenseUrl, spdxId, cancellationToken).ConfigureAwait(false);
+        return (text, reason);
+    }
+
+    /// <summary>
+    /// Provenance overload (issue #72, B1): <c>IsPerPackage</c> is true
+    /// ONLY for tarball-extracted or licenseUrl-fetched texts — the two
+    /// per-package stages. DB-subset texts report false so callers NEVER
+    /// scrape them for copyright holders (structural anti-FSF rule).
+    /// </summary>
+    public static async Task<(string? Text, string? FailureReason, bool IsPerPackage)> TryFetchLicenseTextWithProvenanceAsync(
+        HttpClient http,
+        string? tarballUrl,
+        string? licenseUrl,
+        string spdxId,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         string? firstFailure = null;
@@ -77,7 +97,7 @@ internal static class LicenseTextFetcher
             var (tarballText, tarballReason) = await TryFetchFromTarballAsync(http, tarballUri, cancellationToken).ConfigureAwait(false);
             if (tarballText is not null)
             {
-                return (tarballText, null);
+                return (tarballText, null, true);
             }
 
             firstFailure ??= tarballReason;
@@ -88,7 +108,7 @@ internal static class LicenseTextFetcher
             var (urlText, urlReason) = await TryFetchFromLicenseUrlAsync(http, licenseUri, cancellationToken).ConfigureAwait(false);
             if (urlText is not null)
             {
-                return (urlText, null);
+                return (urlText, null, true);
             }
 
             firstFailure ??= urlReason;
@@ -96,11 +116,11 @@ internal static class LicenseTextFetcher
 
         if (SpdxLicenseTexts.TryGetText(spdxId, out var dbText) && !string.IsNullOrWhiteSpace(dbText))
         {
-            return (dbText, null);
+            return (dbText, null, false);
         }
 
         firstFailure ??= $"spdxdb-miss:{spdxId}";
-        return (null, firstFailure);
+        return (null, firstFailure, false);
     }
 
     internal static bool TryCreateHttpUri(string? value, out Uri? uri)
