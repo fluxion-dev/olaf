@@ -68,6 +68,29 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: ./bundles
-      - run: gh release create "${{ github.ref_name }}" ./bundles/olaf-*/*
+      - name: Rename apphosts to unique release asset names
+        run: |
+          mv ./bundles/olaf-linux-x64/Olaf.Cli ./bundles/olaf-linux-x64/olaf-linux-x64
+          mv ./bundles/olaf-osx-arm64/Olaf.Cli ./bundles/olaf-osx-arm64/olaf-osx-arm64
+          mv ./bundles/olaf-win-x64/Olaf.Cli.exe ./bundles/olaf-win-x64/olaf-win-x64.exe
+          chmod +x ./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64
+      - name: Assert release asset count and unique names
+        run: |
+          shopt -s nullglob
+          files=(./bundles/olaf-*/*)
+          if [ ${#files[@]} -ne 3 ]; then
+            echo "Expected 3 release assets, found ${#files[@]}: ${files[*]}" >&2
+            exit 1
+          fi
+          if [ "$(printf '%s\n' "${files[@]##*/}" | sort -u | wc -l)" -ne 3 ]; then
+            echo "Release asset basenames are not unique: ${files[*]}" >&2
+            exit 1
+          fi
+          if [ ! -f ./bundles/olaf-win-x64/olaf-win-x64.exe ]; then
+            echo "Windows asset olaf-win-x64.exe missing" >&2
+            exit 1
+          fi
+          ls -la ./bundles/olaf-*/*
+      - run: gh release create "${{ github.ref_name }}" --prerelease ./bundles/olaf-*/*
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
