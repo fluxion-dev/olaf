@@ -11,9 +11,11 @@ namespace Olaf.Tests.Resolvers;
 /// Repos/pods are pinned versions with stable, well-known licenses.
 /// Shared client E2ETestHelpers.CreateRealClient(useUserAgent: true);
 /// GitHub 403 rationale lives in the helper remarks.
-/// NOTE: both resolvers ignore Dependency.Version (URLs are built from the
-/// name only), so not-found tests use phantom NAMES, not bad versions
-/// (Composer precedent).
+/// NOTE: the Swift resolver ignores Dependency.Version (URLs are built from
+/// the name only), so Swift not-found tests use phantom NAMES, not bad
+/// versions (Composer precedent). The CocoaPods resolver uses
+/// Dependency.Version verbatim in the CDN podspec path (null/empty/* ->
+/// latest from the already-fetched trunk versions).
 /// </summary>
 public sealed class SwiftCocoaPodsResolverE2ETests
 {
@@ -87,21 +89,23 @@ public sealed class SwiftCocoaPodsResolverE2ETests
 
     [Fact]
     [Trait("Category", "E2E")]
-    public async Task Should_ReturnLicenseUnknown_When_RealTrunkCall()
+    public async Task Should_ResolveAlamofire_MIT_When_RealPodspecCall()
     {
-        // pending #84: live trunk returns owners + versions only (no license
-        // payload), so the real-pod arm pins license-unknown until podspec
-        // license fetch lands. NOT Resolved by design.
+        // Issue #84: trunk returns owners + versions only (no license
+        // payload), so the resolver falls back to the CDN podspec — the
+        // real-pod arm is Resolved MIT by design.
         using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new CocoaPodsLicenseResolver(http);
         var dep = new Dependency("cocoapods", "Alamofire", "5.8.1", false);
 
         var result = await resolver.ResolveAsync(dep);
 
-        Assert.Equal("Unknown", result.Status);
-        Assert.Null(result.SpdxId);
-        Assert.NotNull(result.Reason);
-        Assert.Contains("license-unknown", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.Equal(dep, result.Dependency);
+        Assert.False(string.IsNullOrWhiteSpace(result.LicenseText));
+        Assert.NotNull(result.SourceUrl);
+        Assert.Contains("cocoapods.org", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
