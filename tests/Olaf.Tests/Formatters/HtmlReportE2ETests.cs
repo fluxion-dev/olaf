@@ -12,19 +12,15 @@ namespace Olaf.Tests.Formatters;
 /// [Trait("Category", "E2E")] so CI can filter with --filter "Category!=E2E".
 /// HTML divergences: SpdxId ?? Status (phantom SPDX renders Unknown, not null),
 /// nulls render as empty cells, 8-column table with summary paragraph.
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// </summary>
 public sealed class HtmlReportE2ETests
 {
     private const string PhantomName = "this-package-definitely-does-not-exist-olaf-xyz";
 
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     private static async Task<(ScanResult Scan, string Output)> BuildRealHtmlReportAsync(bool phantomFirst = false)
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("npm", http);
         var express = await resolver.ResolveAsync(new Dependency("npm", "express", "4.18.2", false));
         var lodash = await resolver.ResolveAsync(new Dependency("npm", "lodash", "4.17.21", false));

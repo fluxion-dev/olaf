@@ -9,26 +9,19 @@ namespace Olaf.Tests.Resolvers;
 /// Marked with [Trait("Category", "E2E")] so CI can
 /// filter with --filter "Category!=E2E" to keep unit tests fast.
 /// Repos/pods are pinned versions with stable, well-known licenses.
-/// GitHub requires a User-Agent header (else 403), so the client sets
-/// "olaf-license-scanner" (Cargo precedent).
+/// Shared client E2ETestHelpers.CreateRealClient(useUserAgent: true);
+/// GitHub 403 rationale lives in the helper remarks.
 /// NOTE: both resolvers ignore Dependency.Version (URLs are built from the
 /// name only), so not-found tests use phantom NAMES, not bad versions
 /// (Composer precedent).
 /// </summary>
 public sealed class SwiftCocoaPodsResolverE2ETests
 {
-    private static HttpClient CreateRealClient()
-    {
-        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-        http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "olaf-license-scanner");
-        return http;
-    }
-
     [Fact]
     [Trait("Category", "E2E")]
     public async Task Should_ResolveAlamofire_MIT_When_RealGitHubCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new SwiftLicenseResolver(http);
         var dep = new Dependency("swift", "Alamofire/Alamofire", "5.8.1", false);
 
@@ -46,7 +39,7 @@ public sealed class SwiftCocoaPodsResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveArgumentParser_Apache2_When_RealGitHubCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new SwiftLicenseResolver(http);
         var dep = new Dependency("swift", "apple/swift-argument-parser", "1.2.0", false);
 
@@ -63,7 +56,7 @@ public sealed class SwiftCocoaPodsResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_SwiftPackageNotFound()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new SwiftLicenseResolver(http);
         var dep = new Dependency("swift", "example/this-package-definitely-does-not-exist-olaf-xyz", "9.9.9", false);
 
@@ -80,7 +73,7 @@ public sealed class SwiftCocoaPodsResolverE2ETests
     public async Task Should_ReturnLicenseUnknown_When_SwiftNameHasNoOwner()
     {
         // No owner segment → license-unknown with zero HTTP (instant return).
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new SwiftLicenseResolver(http);
         var dep = new Dependency("swift", "some-lib-without-owner", "1.0.0", false);
 
@@ -99,7 +92,7 @@ public sealed class SwiftCocoaPodsResolverE2ETests
         // pending #84: live trunk returns owners + versions only (no license
         // payload), so the real-pod arm pins license-unknown until podspec
         // license fetch lands. NOT Resolved by design.
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new CocoaPodsLicenseResolver(http);
         var dep = new Dependency("cocoapods", "Alamofire", "5.8.1", false);
 
@@ -115,7 +108,7 @@ public sealed class SwiftCocoaPodsResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_PodNotFound()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient(useUserAgent: true);
         var resolver = new CocoaPodsLicenseResolver(http);
         var dep = new Dependency("cocoapods", "this-pod-definitely-does-not-exist-olaf-xyz", "9.9.9", false);
 

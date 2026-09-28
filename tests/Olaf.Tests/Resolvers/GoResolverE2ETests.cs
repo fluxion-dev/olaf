@@ -8,19 +8,15 @@ namespace Olaf.Tests.Resolvers;
 /// [Trait("Category", "E2E")] so CI can filter with
 /// --filter "Category!=E2E" to keep unit tests fast.
 /// Packages are pinned versions with stable, well-known licenses.
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// </summary>
 public sealed class GoResolverE2ETests
 {
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     [Fact]
     [Trait("Category", "E2E")]
     public async Task Should_ResolveCobra_Apache2_When_RealGoProxyCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("go", http);
         var dep = new Dependency("go", "github.com/spf13/cobra", "v1.8.0", false);
 
@@ -38,7 +34,7 @@ public sealed class GoResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveGin_MIT_When_RealGoProxyCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("go", http);
         var dep = new Dependency("go", "github.com/gin-gonic/gin", "v1.9.1", false);
 
@@ -53,7 +49,7 @@ public sealed class GoResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveGolangText_BSD3_When_RealGoProxyCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("go", http);
         var dep = new Dependency("go", "golang.org/x/text", "v0.14.0", false);
 
@@ -68,7 +64,7 @@ public sealed class GoResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_ModuleNotFound()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("go", http);
         var dep = new Dependency("go", "example.com/this-module-definitely-does-not-exist-olaf-xyz", "v9.9.9", false);
 
@@ -84,7 +80,7 @@ public sealed class GoResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_VersionDoesNotExist()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("go", http);
         var dep = new Dependency("go", "github.com/spf13/cobra", "v999.999.999", false);
 

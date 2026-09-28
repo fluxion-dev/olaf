@@ -8,19 +8,15 @@ namespace Olaf.Tests.Resolvers;
 /// [Trait("Category", "E2E")] so CI can filter with
 /// --filter "Category!=E2E" to keep unit tests fast.
 /// Packages are pinned versions with stable, well-known licenses.
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// </summary>
 public sealed class NuGetResolverE2ETests
 {
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     [Fact]
     [Trait("Category", "E2E")]
     public async Task Should_ResolveNewtonsoftJson_MIT_When_RealNuGetCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
         var dep = new Dependency("nuget", "Newtonsoft.Json", "13.0.3", false);
 
@@ -38,7 +34,7 @@ public sealed class NuGetResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveSerilog_Apache2_When_RealNuGetCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
         var dep = new Dependency("nuget", "Serilog", "3.1.1", false);
 
@@ -53,7 +49,7 @@ public sealed class NuGetResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveDapper_Apache2_When_RealNuGetCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
         var dep = new Dependency("nuget", "Dapper", "2.1.35", false);
 
@@ -68,7 +64,7 @@ public sealed class NuGetResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_PackageNotFound()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
         var dep = new Dependency("nuget", "this-package-definitely-does-not-exist-olaf-xyz", "9.9.9", false);
 
@@ -84,7 +80,7 @@ public sealed class NuGetResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_VersionDoesNotExist()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("nuget", http);
         var dep = new Dependency("nuget", "Newtonsoft.Json", "999.999.999", false);
 
