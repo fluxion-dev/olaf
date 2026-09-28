@@ -14,8 +14,20 @@
 #     existence+order still asserted), never FAIL.
 #   no-tagged-release — contradiction gate: FAIL if case-insensitive
 #     `no tagged release yet` coexists with the `v* tag builds` paragraph.
+#   pin-consistency — all `v*`/--version pins in README resolve to a single
+#     tag and equal src/Olaf.Cli/Olaf.Cli.csproj <Version> (normalized
+#     leading-v stripped; FAIL lists the distinct set).
+#   asset-URL identity — README `releases/download/<tag>/…` URLs
+#     byte-identical to `gh release view <tag> --json assets` names+URLs
+#     (tag derived from pin-consistency); FAIL on bare `Olaf.Cli[.exe]`
+#     asset names. Repo is PRIVATE: `gh release view` (API path), never
+#     anonymous curl (returns 404). Reuses release-verify-probe Arm-2
+#     patterns (run_gate + python3 JSON parse) without reinvention.
+#   private-note — if direct download URLs present, require an adjacent
+#     `gh release download` command + private-404 note (presence + order +
+#     20-line adjacency window above the first URL line).
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -35,7 +47,9 @@ Usage: $(basename "$0") [options]
 README docs-drift asserts for the single-file publish surface (ASSERTS ONLY,
 never rewrites): Tests:N vs live dotnet test, 3-RID size-table rows
 (existence+order+MiB +-5, missing publish dirs SKIP), no-tagged-release
-contradiction gate.
+contradiction gate, pin-consistency (README v*/--version pins == csproj
+<Version>), asset-URL identity (README download URLs == gh release assets),
+private-note (gh-download + private-404 adjacency).
 
 Options:
   --repo-root <dir>     Repo root (default: git top-level or script-relative fallback)
@@ -255,6 +269,136 @@ if grep -qi 'no tagged release yet' "$README"; then
   fi
 else
   pass "no-tagged-release: no stale hedge"
+fi
+
+# ---- Arm 4: pin-consistency (sets TAG for Arms 5-6) ----
+echo "-- pin-consistency --"
+TAG=""
+CSPROJ_VER="$(grep -oE '<Version>[^<]+</Version>' "$REPO_ROOT/src/Olaf.Cli/Olaf.Cli.csproj" | head -1 | sed -E 's|</?Version>||g' || true)"
+if [[ -z "$CSPROJ_VER" ]]; then
+  fail_msg "pin-consistency: cannot parse <Version> from src/Olaf.Cli/Olaf.Cli.csproj"
+else
+  TAG="v$CSPROJ_VER"
+  PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
+  if [[ -z "$PINS" ]]; then
+    fail_msg "pin-consistency: no v*/--version pins in README.md (csproj $CSPROJ_VER)"
+  else
+    PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
+    UNIQUES="$(printf '%s\n' "$PINS" | sed -E 's/^v//' | sort -u | tr '\n' ' ')"
+    NUNIQ="$(printf '%s\n' "$PINS" | sed -E 's/^v//' | sort -u | wc -l | tr -d ' ')"
+    if [[ "$NUNIQ" -ne 1 ]]; then
+      fail_msg "pin-consistency: README pins resolve to $NUNIQ distinct versions ($UNIQUES), want exactly 1"
+      TAG=""
+    elif [[ "${UNIQUES% }" != "$CSPROJ_VER" ]]; then
+      fail_msg "pin-consistency: README pin ${UNIQUES% } != csproj $CSPROJ_VER"
+      TAG=""
+    else
+      pass "pin-consistency: $PIN_LINES README pin lines resolve to single tag $TAG == csproj $CSPROJ_VER"
+    fi
+  fi
+fi
+
+# ---- Arm 5: asset-URL identity (live source: release-verify-probe Arm 2) ----
+echo "-- asset-URL identity --"
+if [[ -z "${TAG:-}" ]]; then
+  fail_msg "asset-URL identity: SKIP — no single TAG from pin-consistency"
+elif ! command -v gh >/dev/null 2>&1; then
+  fail_msg "asset-URL identity: missing required command: gh (private repo — gh API path, never anonymous curl)"
+else
+  DOC_URLS="$(grep -oE 'https://github\.com/[^ '"'"'`)]*releases/download/[^ '"'"'`)]+' "$README" || true)"
+  if [[ -z "$DOC_URLS" ]]; then
+    pass "asset-URL identity: no direct download URLs in README — nothing to check"
+  else
+    BADTAG="$(printf '%s\n' "$DOC_URLS" | grep -vF "/$TAG/" || true)"
+    if [[ -n "$BADTAG" ]]; then
+      fail_msg "asset-URL identity: README URLs not under $TAG: $(printf '%s' "$BADTAG" | tr '\n' ' ')"
+    else
+      pass "asset-URL identity: all README download URLs carry $TAG"
+    fi
+    DOC_NAMES="$(printf '%s\n' "$DOC_URLS" | sed -E 's|.*/||')"
+    BARE="$(printf '%s\n' "$DOC_NAMES" | grep -xE 'Olaf\.Cli(\.exe)?' || true)"
+    if [[ -n "$BARE" ]]; then
+      fail_msg "asset-URL identity: bare apphost asset name(s) in README: $(printf '%s' "$BARE" | tr '\n' ' ')"
+    else
+      pass "asset-URL identity: no bare Olaf.Cli[.exe] names in README URLs"
+    fi
+    printf '%s\n' "$DOC_URLS" | sort -u >"$WORKDIR/doc-urls.txt"
+    run_gate "$WORKDIR/release-view-assets.json" -- gh release view "$TAG" --json assets
+    if [[ "$RC" -ne 0 ]]; then
+      fail_msg "asset-URL identity: gh release view $TAG exited $RC (private repo — use gh, never anonymous curl which 404s)"
+    else
+      LIVE_NAMES="$(python3 - "$WORKDIR/release-view-assets.json" <<'PY' 2>/dev/null
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+for a in data.get("assets", []):
+    if isinstance(a, dict) and a.get("name"):
+        print(a["name"])
+PY
+)"
+      if [[ -z "$LIVE_NAMES" ]]; then
+        fail_msg "asset-URL identity: release $TAG carries zero assets"
+      else
+        LIVE_BARE="$(printf '%s\n' "$LIVE_NAMES" | grep -xE 'Olaf\.Cli(\.exe)?' || true)"
+        if [[ -n "$LIVE_BARE" ]]; then
+          fail_msg "asset-URL identity: bare apphost asset name(s) on release: $(printf '%s' "$LIVE_BARE" | tr '\n' ' ')"
+        else
+          pass "asset-URL identity: no bare Olaf.Cli[.exe] names on release $TAG"
+        fi
+        cmp_rc=0
+        cmp_out="$(python3 - "$WORKDIR/doc-urls.txt" "$WORKDIR/release-view-assets.json" <<'PY' 2>/dev/null
+import json, sys
+doc = sorted(set(l.strip() for l in open(sys.argv[1]) if l.strip()))
+data = json.load(open(sys.argv[2]))
+live_urls = sorted(set(a.get("url", "") for a in data.get("assets", []) if isinstance(a, dict) and a.get("url")))
+live_names = sorted(set(a.get("name", "") for a in data.get("assets", []) if isinstance(a, dict) and a.get("name")))
+doc_names = sorted(set(u.rstrip("/").split("/")[-1] for u in doc))
+print("DOC_URLS=" + " ".join(doc))
+print("LIVE_URLS=" + " ".join(live_urls))
+print("DOC_NAMES=" + " ".join(doc_names))
+print("LIVE_NAMES=" + " ".join(live_names))
+sys.exit(0 if (doc == live_urls and doc_names == live_names) else 1)
+PY
+)" || cmp_rc=$?
+        if (( cmp_rc != 0 )); then
+          fail_msg "asset-URL identity: README URLs/names != release $TAG assets — $cmp_out"
+        else
+          pass "asset-URL identity: README URLs byte-identical to gh release view $TAG names+URLs"
+        fi
+      fi
+    fi
+  fi
+fi
+
+# ---- Arm 6: private-note ----
+echo "-- private-note --"
+if ! grep -qF 'releases/download/' "$README"; then
+  pass "private-note: no direct download URLs — note N/A"
+else
+  FIRST_URL_LINE="$(grep -nF 'releases/download/' "$README" | head -1 | cut -d: -f1)"
+  GH_LINE="$(grep -nF 'gh release download' "$README" | head -1 | cut -d: -f1 || true)"
+  PRIV_LINE="$(grep -ni 'private' "$README" | head -1 | cut -d: -f1 || true)"
+  NOTFOUND_LINE="$(grep -n '404' "$README" | head -1 | cut -d: -f1 || true)"
+  note_bad=0
+  if [[ -z "$GH_LINE" ]]; then
+    fail_msg "private-note: direct download URLs present but no 'gh release download' command in README"
+    note_bad=1
+  elif (( GH_LINE > FIRST_URL_LINE )) || (( FIRST_URL_LINE - GH_LINE > 20 )); then
+    fail_msg "private-note: 'gh release download' (L$GH_LINE) not adjacent above first URL (L$FIRST_URL_LINE, want <=20 lines above)"
+    note_bad=1
+  fi
+  if [[ -z "$PRIV_LINE" || -z "$NOTFOUND_LINE" ]]; then
+    fail_msg "private-note: direct download URLs present but private-404 note missing (want 'private' + '404')"
+    note_bad=1
+  elif (( PRIV_LINE > FIRST_URL_LINE )) || (( FIRST_URL_LINE - PRIV_LINE > 20 )); then
+    fail_msg "private-note: private note (L$PRIV_LINE) not adjacent above first URL (L$FIRST_URL_LINE, want <=20 lines above)"
+    note_bad=1
+  fi
+  if (( ! note_bad )); then
+    pass "private-note: gh-download command + private-404 note adjacent above first URL (L$FIRST_URL_LINE)"
+  fi
 fi
 
 echo "== summary =="
