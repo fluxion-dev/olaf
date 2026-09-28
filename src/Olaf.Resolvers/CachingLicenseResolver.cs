@@ -9,23 +9,73 @@ public sealed class CachingLicenseResolver : ILicenseResolver
 
     private readonly HttpClient _http;
     private readonly bool _offline;
+    private readonly DiskLicenseCache? _disk;
+    private readonly TimeSpan _resolvedTtl;
+    private readonly bool _readDisk;
 
     public CachingLicenseResolver(HttpClient httpClient, bool offline = false)
+        : this(httpClient, offline, disk: null)
+    {
+    }
+
+    // Issue #78: disk is the L2 (B5). refreshCache skips L2 reads but keeps
+    // L2 writes; a null disk bypasses L2 entirely (--no-cache).
+    public CachingLicenseResolver(
+        HttpClient httpClient,
+        bool offline = false,
+        DiskLicenseCache? disk = null,
+        TimeSpan? resolvedTtl = null,
+        bool refreshCache = false)
     {
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _offline = offline;
+        _disk = disk;
+        _resolvedTtl = resolvedTtl ?? TimeSpan.FromDays(30);
+        _readDisk = disk is not null && !refreshCache;
     }
 
     internal static void ClearCache() => Cache.Clear();
 
+    // Late-hit fallback shared by the transport arms below (B5): a record
+    // cached concurrently (L1) or already on disk (L2) rescues a failed
+    // resolve. Ordering lives here + the L1→L2 head above — never inside the
+    // LicenseTextFetcher chain (facade-double-lookup rule).
+    private ResolvedLicense? TryLateHit(string key, Dependency dependency)
+    {
+        if (Cache.TryGetValue(key, out var hit))
+        {
+            return hit;
+        }
+
+        if (_readDisk && _disk!.TryGet(dependency, _resolvedTtl, out var diskHit) && diskHit is not null)
+        {
+            Cache[key] = diskHit;
+            return diskHit;
+        }
+
+        return null;
+    }
+
     public async Task<ResolvedLicense> ResolveAsync(Dependency dependency, CancellationToken cancellationToken = default)
     {
-        var key = $"{dependency.Ecosystem.ToLowerInvariant()}:{dependency.Name.ToLowerInvariant()}@{dependency.Version.ToLowerInvariant()}";
+        var key = CacheKey.Of(dependency);
 
         if (Cache.TryGetValue(key, out var cached))
         {
             return cached;
         }
+
+        // Issue #78 (B5): L1 -> L2 disk -> offline-miss. A disk hit rescues
+        // offline runs and skips HTTP online (ordering stays OUTSIDE the
+        // LicenseTextFetcher chain — facade-double-lookup rule). A disk miss
+        // (absent or TTL-expired) also evicts any matching L1 key.
+        if (_readDisk && _disk!.TryGet(dependency, _resolvedTtl, out var diskHit) && diskHit is not null)
+        {
+            Cache[key] = diskHit;
+            return diskHit;
+        }
+
+        Cache.TryRemove(key, out _);
 
         if (_offline)
         {
@@ -42,8 +92,10 @@ public sealed class CachingLicenseResolver : ILicenseResolver
 
             var result = await inner.ResolveAsync(dependency, cancellationToken).ConfigureAwait(false);
             // In-memory only (whole record incl. LicenseText). Unknown —
-            // including text-stage failures — stays uncached. #78 owns disk
-            // cache: no disk code here by design.
+            // including text-stage failures — stays uncached in L1. #78 disk
+            // L2 persists Resolved (30d default) + not-found Unknown (1d);
+            // transport/timeout/resolver-error never persist (B2 predicate
+            // inside DiskLicenseCache.Store).
             if (result.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase))
             {
                 Cache[key] = result;
@@ -53,6 +105,8 @@ public sealed class CachingLicenseResolver : ILicenseResolver
                 return lateHit;
             }
 
+            _disk?.Store(result);
+
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -61,30 +115,18 @@ public sealed class CachingLicenseResolver : ILicenseResolver
         }
         catch (TaskCanceledException ex)
         {
-            if (Cache.TryGetValue(key, out var hit))
-            {
-                return hit;
-            }
-
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: request timed out: {ex.Message}");
+            return TryLateHit(key, dependency)
+                ?? new ResolvedLicense(dependency, null, null, null, "Unknown", $"timeout: request timed out: {ex.Message}");
         }
         catch (HttpRequestException)
         {
-            if (Cache.TryGetValue(key, out var hit))
-            {
-                return hit;
-            }
-
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", "offline-cache-miss: no cached entry and no network.");
+            return TryLateHit(key, dependency)
+                ?? new ResolvedLicense(dependency, null, null, null, "Unknown", "offline-cache-miss: no cached entry and no network.");
         }
         catch (Exception ex)
         {
-            if (Cache.TryGetValue(key, out var hit))
-            {
-                return hit;
-            }
-
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+            return TryLateHit(key, dependency)
+                ?? new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
     }
 
