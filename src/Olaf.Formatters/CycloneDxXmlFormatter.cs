@@ -36,7 +36,9 @@ public sealed class CycloneDxXmlFormatter : ILicenseFormatter
         var components = new XElement(ns + "components",
             mapped.Select(item =>
             {
-                // Pinned child order: group?, name, version, scope, licenses?, purl, properties?.
+                // Pinned child order: group?, name, version, scope, licenses?, purl,
+                // supplier?, hashes?, externalReferences?, properties?.
+                // (Enrichment slots are omit-null; unenriched order is unchanged.)
                 // scope is an ELEMENT (always emitted); value text is never pre-encoded —
                 // XElement/XmlWriter own all escaping (double-escape ban).
                 var element = new XElement(ns + "component",
@@ -64,6 +66,43 @@ public sealed class CycloneDxXmlFormatter : ILicenseFormatter
                 }
 
                 element.Add(new XElement(ns + "purl", Sanitize(item.Purl)));
+
+                // Issue #70 enrichment (omit-null: unenriched output is stable).
+                // Mirrors the JSON optional order: supplier, hashes,
+                // externalReferences — all after purl, before properties.
+                if (item.Supplier is not null)
+                {
+                    element.Add(new XElement(ns + "supplier",
+                        new XElement(ns + "name", Sanitize(item.Supplier))));
+                }
+
+                if (item.Hashes is { Length: > 0 })
+                {
+                    var hashElements = new List<XElement>();
+                    foreach (var entry in item.Hashes)
+                    {
+                        if (CycloneDxComponentMapper.TrySplitHash(entry, out var algo, out var content))
+                        {
+                            hashElements.Add(new XElement(ns + "hash",
+                                new XAttribute("alg", Sanitize(CycloneDxComponentMapper.ToCycloneDxAlg(algo))),
+                                Sanitize(content)));
+                        }
+                    }
+
+                    if (hashElements.Count > 0)
+                    {
+                        element.Add(new XElement(ns + "hashes", hashElements));
+                    }
+                }
+
+                if (item.DownloadUrl is not null)
+                {
+                    element.Add(new XElement(ns + "externalReferences",
+                        new XElement(ns + "reference",
+                            new XAttribute("type", "distribution"),
+                            new XElement(ns + "url", Sanitize(item.DownloadUrl)))));
+                }
+
                 if (item.Properties.Count > 0)
                 {
                     element.Add(new XElement(ns + "properties",

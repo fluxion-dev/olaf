@@ -326,18 +326,18 @@ public sealed class CycloneDxFormatterTests
     }
 
     [Fact]
-    public void Should_FallbackToGenericPurl_When_EcosystemUnmapped()
+    public void Should_MapConanPurl_When_ConanEcosystem()
     {
         var scan = new ScanResult(new List<ResolvedLicense>
         {
             new(new Dependency("conan", "fmt", "10.2.1", false), "MIT", null, null, "Resolved", null),
         });
 
-        // Must never throw for unmapped ecosystems.
+        // Issue #70 B4: conan has a dedicated purl type (never generic).
         var output = FormatterTestHelpers.ResolveFormatter("cyclonedx-json").FormatResult(scan);
 
         var component = ComponentList(RootComponents(output)).Single();
-        Assert.Equal("pkg:generic/fmt@10.2.1", component.GetProperty("purl").GetString());
+        Assert.Equal("pkg:conan/fmt@10.2.1", component.GetProperty("purl").GetString());
         Assert.False(component.TryGetProperty("group", out _));
     }
 

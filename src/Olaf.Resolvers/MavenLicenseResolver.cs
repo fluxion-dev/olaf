@@ -1,3 +1,4 @@
+using System.Xml;
 using System.Xml.Linq;
 using Olaf.Core;
 
@@ -64,7 +65,12 @@ public sealed class MavenLicenseResolver : ILicenseResolver
                 {
                     var text = SpdxLicenseTexts.GetText(spdx);
                     var source = $"https://mvnrepository.com/artifact/{groupId}/{artifactId}/{version}";
-                    return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+                    // Enrichment reads the same already-fetched POM XML
+                    // (NO-NEW-HTTP): organization/developers -> Supplier, project
+                    // <url> -> DownloadUrl (hash: none in POM -> null).
+                    // Never copies SourceUrl to download.
+                    var enrichment = ParseMavenEnrichment(current!, dependency);
+                    return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
                 }
 
                 var parent = ParseParentCoordinates(current!);
@@ -118,6 +124,57 @@ public sealed class MavenLicenseResolver : ILicenseResolver
         return (groupId, artifactId);
     }
 
+    internal static Enrichment? ParseMavenEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return null;
+            }
+
+            var doc = XDocument.Parse(body);
+            var root = doc.Root;
+            if (root is null)
+            {
+                return null;
+            }
+
+            string? supplier = null;
+            var organization = root.Elements().FirstOrDefault(e => e.Name.LocalName == "organization");
+            var orgName = organization?.Elements().FirstOrDefault(e => e.Name.LocalName == "name")?.Value;
+            if (!string.IsNullOrWhiteSpace(orgName))
+            {
+                supplier = orgName.Trim();
+            }
+            else
+            {
+                var developer = root.Descendants()
+                    .FirstOrDefault(e => e.Name.LocalName == "developers")
+                    ?.Elements().FirstOrDefault(e => e.Name.LocalName == "developer");
+                var devName = developer?.Elements().FirstOrDefault(e => e.Name.LocalName == "name")?.Value;
+                if (!string.IsNullOrWhiteSpace(devName))
+                {
+                    supplier = devName.Trim();
+                }
+            }
+
+            // Project <url> is a direct child of <project>; license <url>
+            // elements nest under <licenses> and are never read here.
+            var projectUrl = root.Elements().FirstOrDefault(e => e.Name.LocalName == "url")?.Value;
+
+            return EnrichmentHelpers.Create(
+                dependency,
+                hashes: null,
+                supplier,
+                projectUrl);
+        }
+        catch (XmlException)
+        {
+            return null;
+        }
+    }
+
     internal static string? ParsePomLicenses(string body)
     {
         try
@@ -156,7 +213,7 @@ public sealed class MavenLicenseResolver : ILicenseResolver
 
             return found.Count == 1 ? found[0] : string.Join(" AND ", found);
         }
-        catch (System.Xml.XmlException)
+        catch (XmlException)
         {
             return null;
         }
@@ -195,7 +252,7 @@ public sealed class MavenLicenseResolver : ILicenseResolver
 
             return (groupId, artifactId, version);
         }
-        catch (System.Xml.XmlException)
+        catch (XmlException)
         {
             return null;
         }

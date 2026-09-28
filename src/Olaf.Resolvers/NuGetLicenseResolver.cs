@@ -48,9 +48,11 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
             // (not an inline object), so the first doc has no license fields.
             // Follow the catalog URL once via the shared retry helper and parse
             // licenseExpression/licenseUrl from the catalog doc.
+            string? catalogBody = null;
             if (spdx is null)
             {
-                var (catalogExpression, catalogLicenseUrl) = await FollowCatalogEntryAsync(body, cancellationToken).ConfigureAwait(false);
+                var (catalogExpression, catalogLicenseUrl, fetchedCatalogBody) = await FollowCatalogEntryAsync(body, cancellationToken).ConfigureAwait(false);
+                catalogBody = fetchedCatalogBody;
                 if (catalogExpression is not null)
                 {
                     expression = catalogExpression;
@@ -80,7 +82,14 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
                 ? $"https://www.nuget.org/packages/{dependency.Name}/{dependency.Version}"
                 : licenseUrl;
 
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // Enrichment reads the same already-fetched registration/catalog JSON
+            // (NO-NEW-HTTP): packageHash+algorithm -> Hashes, authors ->
+            // Supplier, packageContent -> DownloadUrl. Prefers the catalog doc
+            // only when it was already fetched for license resolution above.
+            // Never copies SourceUrl to download.
+            var enrichment = ParseNuGetEnrichment(catalogBody ?? body, dependency)
+                ?? (catalogBody is null ? null : ParseNuGetEnrichment(body, dependency));
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -104,22 +113,23 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
         }
     }
 
-    private async Task<(string? Expression, string? LicenseUrl)> FollowCatalogEntryAsync(string body, CancellationToken ct)
+    private async Task<(string? Expression, string? LicenseUrl, string? CatalogBody)> FollowCatalogEntryAsync(string body, CancellationToken ct)
     {
         var catalogUrl = ExtractCatalogEntryUrl(body);
         if (!TryCreateAbsoluteHttpUri(catalogUrl, out var catalogUri) || catalogUri is null)
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         using var catalogResponse = await ResolverHttpRetry.GetAsync(_http, catalogUri, ct).ConfigureAwait(false);
         if (!catalogResponse.IsSuccessStatusCode)
         {
-            return (null, null);
+            return (null, null, null);
         }
 
         var catalogBody = await ReadBodyAsync(catalogResponse, ct).ConfigureAwait(false);
-        return ParseBody(catalogBody);
+        var (expression, licenseUrl) = ParseBody(catalogBody);
+        return (expression, licenseUrl, catalogBody);
     }
 
     private static bool TryCreateAbsoluteHttpUri(string? catalogUrl, out Uri? catalogUri)
@@ -143,6 +153,66 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
 
         catalogUri = uri;
         return true;
+    }
+
+    internal static Enrichment? ParseNuGetEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(body) || IsXmlBody(body))
+            {
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            // Scan the root plus every inline catalogEntry candidate, mirroring
+            // ParseRegistrationJson: first entry carrying enrichment fields wins.
+            var scopes = new List<JsonElement> { root };
+            scopes.AddRange(EnumerateCatalogEntryCandidates(root));
+            foreach (var scope in scopes)
+            {
+                if (scope.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                string? hash = null;
+                if (EnrichmentHelpers.TryGetString(scope, "packageHash", out var packageHash))
+                {
+                    var algo = "sha512";
+                    if (EnrichmentHelpers.TryGetString(scope, "packageHashAlgorithm", out var rawAlgo)
+                        && !string.IsNullOrWhiteSpace(rawAlgo))
+                    {
+                        algo = rawAlgo!.Trim().ToLowerInvariant();
+                    }
+
+                    hash = algo + ":" + packageHash!.Trim();
+                }
+
+                EnrichmentHelpers.TryGetString(scope, "authors", out var authors);
+                EnrichmentHelpers.TryGetString(scope, "packageContent", out var packageContent);
+                if (hash is not null || authors is not null || packageContent is not null)
+                {
+                    return EnrichmentHelpers.Create(
+                        dependency,
+                        EnrichmentHelpers.HashList(hash),
+                        authors,
+                        packageContent);
+                }
+            }
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static (string? Expression, string? LicenseUrl) ParseBody(string body)

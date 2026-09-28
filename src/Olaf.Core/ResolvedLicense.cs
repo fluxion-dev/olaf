@@ -6,4 +6,5 @@ public sealed record ResolvedLicense(
     string? LicenseText,
     string? SourceUrl,
     string Status,
-    string? Reason);
+    string? Reason,
+    Enrichment? Enrichment = null);

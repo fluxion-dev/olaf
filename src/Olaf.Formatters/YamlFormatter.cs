@@ -11,17 +11,43 @@ public sealed class YamlFormatter : ILicenseFormatter
     {
         ArgumentNullException.ThrowIfNull(result);
         var items = FormatterSort.ByEcosystemNameVersion(result.Licenses)
-            .Select(l => new Dictionary<string, string?>
+            .Select(l =>
             {
-                ["ecosystem"] = l.Dependency.Ecosystem,
-                ["name"] = l.Dependency.Name,
-                ["version"] = l.Dependency.Version,
-                ["spdx"] = l.SpdxId,
-                ["licenseText"] = l.LicenseText,
-                ["sourceUrl"] = l.SourceUrl,
-                ["status"] = l.Status,
-                ["reason"] = l.Reason,
-                ["direct"] = l.Dependency.Direct ? "true" : "false",
+                // Issue #70 enrichment keys trail AFTER direct and are
+                // omitted-when-null (no golden churn on unenriched).
+                var entry = new Dictionary<string, object?>
+                {
+                    ["ecosystem"] = l.Dependency.Ecosystem,
+                    ["name"] = l.Dependency.Name,
+                    ["version"] = l.Dependency.Version,
+                    ["spdx"] = l.SpdxId,
+                    ["licenseText"] = l.LicenseText,
+                    ["sourceUrl"] = l.SourceUrl,
+                    ["status"] = l.Status,
+                    ["reason"] = l.Reason,
+                    ["direct"] = l.Dependency.Direct ? "true" : "false",
+                };
+                if (l.Enrichment?.Purl is not null)
+                {
+                    entry["purl"] = l.Enrichment.Purl;
+                }
+
+                if (l.Enrichment?.Supplier is not null)
+                {
+                    entry["supplier"] = l.Enrichment.Supplier;
+                }
+
+                if (l.Enrichment?.DownloadUrl is not null)
+                {
+                    entry["downloadUrl"] = l.Enrichment.DownloadUrl;
+                }
+
+                if (l.Enrichment?.Hashes is { Length: > 0 })
+                {
+                    entry["hashes"] = l.Enrichment.Hashes;
+                }
+
+                return entry;
             }).ToList();
         var doc = new Dictionary<string, object?>
         {

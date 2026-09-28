@@ -46,7 +46,11 @@ public sealed class BundlerLicenseResolver : ILicenseResolver
 
             var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://rubygems.org/gems/{dependency.Name}";
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // PARTIAL enrichment from the same already-fetched rubygems JSON
+            // (NO-NEW-HTTP): authors -> Supplier, gem_uri -> DownloadUrl.
+            // Versioned sha lives on an unfetched endpoint -> Hashes null.
+            var enrichment = ParseBundlerEnrichment(body, dependency);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -67,6 +71,53 @@ public sealed class BundlerLicenseResolver : ILicenseResolver
         catch (Exception ex)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+        }
+    }
+
+    internal static Enrichment? ParseBundlerEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            string? supplier = null;
+            if (root.TryGetProperty("authors", out var authors))
+            {
+                if (authors.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(authors.GetString()))
+                {
+                    supplier = authors.GetString()!.Trim();
+                }
+                else if (authors.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in authors.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String
+                            && !string.IsNullOrWhiteSpace(item.GetString()))
+                        {
+                            supplier = item.GetString()!.Trim();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            EnrichmentHelpers.TryGetString(root, "gem_uri", out var gemUri);
+
+            return EnrichmentHelpers.Create(
+                dependency,
+                hashes: null,
+                supplier,
+                gemUri);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 

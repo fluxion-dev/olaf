@@ -11,6 +11,9 @@ public sealed class HtmlFormatter : ILicenseFormatter
     public string FormatResult(ScanResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
+        // Issue #70: enrichment (purl/hashes/supplier/download) is consciously
+        // omitted here — fixed-column human table; SBOM/structured formats
+        // carry enrichment.
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Olaf License Report</title></head><body>");
         sb.Append("<p>Total: ").Append(result.TotalCount)

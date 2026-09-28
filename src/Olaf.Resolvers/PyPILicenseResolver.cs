@@ -59,7 +59,11 @@ public sealed class PyPILicenseResolver : ILicenseResolver
 
             var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://pypi.org/project/{dependency.Name}/{dependency.Version}/";
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // Enrichment reads the same already-fetched JSON API body
+            // (NO-NEW-HTTP): info.digests via urls[] -> Hashes, info.author ->
+            // Supplier, urls[] file URL -> DownloadUrl. Never copies SourceUrl.
+            var enrichment = ParsePyPIEnrichment(body, dependency);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -80,6 +84,77 @@ public sealed class PyPILicenseResolver : ILicenseResolver
         catch (Exception ex)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+        }
+    }
+
+    internal static Enrichment? ParsePyPIEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            string? supplier = null;
+            if (root.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object)
+            {
+                if (EnrichmentHelpers.TryGetString(info, "author", out var author))
+                {
+                    supplier = author;
+                }
+            }
+
+            string[]? hashes = null;
+            string? downloadUrl = null;
+            if (root.TryGetProperty("urls", out var urls) && urls.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entry in urls.EnumerateArray())
+                {
+                    if (entry.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+
+                    if (hashes is null
+                        && entry.TryGetProperty("digests", out var digests)
+                        && digests.ValueKind == JsonValueKind.Object)
+                    {
+                        var parts = new List<string>();
+                        foreach (var digest in digests.EnumerateObject())
+                        {
+                            if (digest.Value.ValueKind == JsonValueKind.String
+                                && !string.IsNullOrWhiteSpace(digest.Value.GetString()))
+                            {
+                                parts.Add(digest.Name.Trim().ToLowerInvariant() + ":" + digest.Value.GetString()!.Trim());
+                            }
+                        }
+
+                        if (parts.Count > 0)
+                        {
+                            hashes = parts.ToArray();
+                        }
+                    }
+
+                    if (downloadUrl is null && EnrichmentHelpers.TryGetString(entry, "url", out var fileUrl))
+                    {
+                        downloadUrl = fileUrl;
+                    }
+
+                    if (hashes is not null && downloadUrl is not null)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return EnrichmentHelpers.Create(dependency, hashes, supplier, downloadUrl);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 

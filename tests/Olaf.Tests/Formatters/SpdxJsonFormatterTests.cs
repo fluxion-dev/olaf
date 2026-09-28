@@ -10,8 +10,10 @@ namespace Olaf.Tests.Formatters;
 /// ScanResult constructed directly, no network (DirectFieldFormatterTests
 /// pattern). Bindings: positional SPDXIDs + DOCUMENT pinned (B1); Concluded
 /// passes single-token ids/expressions else NOASSERTION, Declared mirrors
-/// Concluded (B2); copyrightText/supplier/downloadLocation are literal
-/// NOASSERTION (B3/B4, SourceUrl never copied); DESCRIBES+CONTAINS per
+/// Concluded (B2); copyrightText stays literal NOASSERTION (pre-#72) while
+/// supplier/downloadLocation are enrichment-or-NOASSERTION (issue #70:
+/// `Person: {name}` + harvested download URL, else NOASSERTION; SourceUrl
+/// never copied; checksums[] only when enrichment hashes parse); DESCRIBES+CONTAINS per
 /// package with referential closure, self-DESCRIBES when empty (B5); counts
 /// in `comment` (B6); envelope pins + UUID namespace + ISO-8601 created +
 /// unconditional purls (B7/B8); `spdx-json` registration only (B9).
@@ -28,6 +30,16 @@ public sealed class SpdxJsonFormatterTests
         "SPDXID", "name", "versionInfo", "supplier", "downloadLocation",
         "filesAnalyzed", "licenseConcluded", "licenseDeclared",
         "copyrightText", "externalRefs",
+    };
+
+    // Issue #70: checksums is allowlisted ONLY (appended after externalRefs
+    // when enrichment hashes are present and parseable); unenriched packages
+    // must still omit it (asserted absent below).
+    private static readonly string[] AllowedKeys =
+    {
+        "SPDXID", "name", "versionInfo", "supplier", "downloadLocation",
+        "filesAnalyzed", "licenseConcluded", "licenseDeclared",
+        "copyrightText", "externalRefs", "checksums",
     };
 
     private static JsonElement ParseRoot(string output)
@@ -218,9 +230,11 @@ public sealed class SpdxJsonFormatterTests
     }
 
     [Fact]
-    public void Should_EmitNoassertionSupplierAndDownload_When_SourceUrlPresent()
+    public void Should_EmitNoassertionSupplierAndDownload_When_UnenrichedSourceUrlPresent()
     {
         // Registry page != download URI: SourceUrl is never copied.
+        // Unenriched packages stay literal NOASSERTION (enriched real-or-
+        // NOASSERTION is pinned by the enrichment formatter tests).
         var output = FormatterTestHelpers.ResolveFormatter("spdx-json").FormatResult(MixedSpdxScanResult());
 
         var packages = PackageList(ParseRoot(output));
@@ -228,6 +242,7 @@ public sealed class SpdxJsonFormatterTests
         {
             Assert.Equal("NOASSERTION", package.GetProperty("supplier").GetString());
             Assert.Equal("NOASSERTION", package.GetProperty("downloadLocation").GetString());
+            Assert.False(package.TryGetProperty("checksums", out _));
         }
 
         Assert.DoesNotContain("example.com/express/LICENSE", output, StringComparison.Ordinal);
@@ -298,8 +313,15 @@ public sealed class SpdxJsonFormatterTests
         Assert.Equal(3, packages.Count);
         foreach (var package in packages)
         {
-            // Per-package child order pinned.
+            // Per-package child order pinned; every key allowlisted (checksums
+            // allowlisted for enriched packages, still absent when unenriched).
             Assert.Equal(ExpectedChildOrder, package.EnumerateObject().Select(p => p.Name).ToArray());
+            foreach (var key in package.EnumerateObject().Select(p => p.Name))
+            {
+                Assert.Contains(key, AllowedKeys);
+            }
+
+            Assert.False(package.TryGetProperty("checksums", out _));
             Assert.False(package.GetProperty("filesAnalyzed").GetBoolean());
 
             // Purl unconditional: every package (even Unknown) carries one.

@@ -24,14 +24,22 @@ public sealed class SpdxJsonFormatter : ILicenseFormatter
             var dep = license.Dependency;
             var id = $"SPDXRef-Package-{i + 1}";
             var concluded = ToConcludedLicense(LicenseDisplay.EffectiveSpdx(license));
+            // Issue #70: supplier/downloadLocation are enrichment-or-NOASSERTION.
+            // Registry page != download URI, so SourceUrl is never copied —
+            // only the resolver-harvested DownloadUrl flows here.
+            var supplier = license.Enrichment?.Supplier is { } s && !string.IsNullOrWhiteSpace(s)
+                ? $"Person: {s.Trim()}"
+                : "NOASSERTION";
+            var download = !string.IsNullOrWhiteSpace(license.Enrichment?.DownloadUrl)
+                ? license.Enrichment!.DownloadUrl!
+                : "NOASSERTION";
             var package = new Dictionary<string, object?>
             {
                 ["SPDXID"] = id,
                 ["name"] = dep.Name,
                 ["versionInfo"] = dep.Version,
-                // Registry page != download URI, so SourceUrl is never copied.
-                ["supplier"] = "NOASSERTION",
-                ["downloadLocation"] = "NOASSERTION",
+                ["supplier"] = supplier,
+                ["downloadLocation"] = download,
                 ["filesAnalyzed"] = false,
                 ["licenseConcluded"] = concluded,
                 // licenseDeclared mirrors licenseConcluded: the resolver raw string
@@ -50,6 +58,30 @@ public sealed class SpdxJsonFormatter : ILicenseFormatter
                     },
                 },
             };
+            // Issue #70: checksums[] = {algorithm, checksumValue} when Hashes
+            // present (split "algo:value" on first colon; unparseable entries
+            // dropped), else omitted entirely (unenriched output is stable).
+            if (license.Enrichment?.Hashes is { Length: > 0 })
+            {
+                var checksums = new List<Dictionary<string, string?>>();
+                foreach (var entry in license.Enrichment.Hashes)
+                {
+                    if (CycloneDxComponentMapper.TrySplitHash(entry, out var algo, out var content))
+                    {
+                        checksums.Add(new Dictionary<string, string?>
+                        {
+                            ["algorithm"] = CycloneDxComponentMapper.ToSpdxAlg(algo),
+                            ["checksumValue"] = content,
+                        });
+                    }
+                }
+
+                if (checksums.Count > 0)
+                {
+                    package["checksums"] = checksums;
+                }
+            }
+
             packages.Add(package);
             describes.Add(id);
             // Flat-list honesty: no tree is inferred, so every package gets

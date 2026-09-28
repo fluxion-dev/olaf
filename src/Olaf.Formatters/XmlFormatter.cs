@@ -10,6 +10,10 @@ public sealed class XmlFormatter : ILicenseFormatter
     public string FormatResult(ScanResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
+        // Issue #70: enrichment (purl/hashes/supplier/download) is consciously
+        // omitted here — this is a fixed-shape human report, not a structured
+        // format; SBOM (cyclonedx/spdx) and structured (json/yaml) formats
+        // carry enrichment.
         var sorted = FormatterSort.ByEcosystemNameVersion(result.Licenses);
         var root = new XElement("report",
             new XElement("summary",

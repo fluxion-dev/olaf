@@ -35,7 +35,6 @@ public sealed class NpmLicenseResolver : ILicenseResolver
 
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var (rawLicense, licenseUrl) = ParseNpmJson(body);
-
             var spdx = SpdxMapper.Normalize(rawLicense)
                 ?? SpdxMapper.FromLicenseUrl(licenseUrl);
 
@@ -48,7 +47,11 @@ public sealed class NpmLicenseResolver : ILicenseResolver
                 ?? SpdxLicenseTexts.GetText(spdx);
 
             var source = $"https://www.npmjs.com/package/{dependency.Name}/v/{dependency.Version}";
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // Enrichment reads the same already-fetched versioned registry JSON
+            // (NO-NEW-HTTP): dist.integrity -> Hashes, author/maintainers ->
+            // Supplier, dist.tarball -> DownloadUrl. Never copies SourceUrl.
+            var enrichment = ParseNpmEnrichment(body, dependency);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -70,6 +73,99 @@ public sealed class NpmLicenseResolver : ILicenseResolver
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
+    }
+
+    internal static Enrichment? ParseNpmEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            string? integrity = null;
+            string? tarball = null;
+            if (root.TryGetProperty("dist", out var dist) && dist.ValueKind == JsonValueKind.Object)
+            {
+                if (EnrichmentHelpers.TryGetString(dist, "integrity", out var integ))
+                {
+                    integrity = integ;
+                }
+
+                if (EnrichmentHelpers.TryGetString(dist, "tarball", out var tb))
+                {
+                    tarball = tb;
+                }
+            }
+
+            string? supplier = null;
+            if (root.TryGetProperty("author", out var author))
+            {
+                supplier = ReadPersonName(author);
+            }
+
+            if (supplier is null
+                && root.TryGetProperty("maintainers", out var maintainers)
+                && maintainers.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var m in maintainers.EnumerateArray())
+                {
+                    supplier = ReadPersonName(m);
+                    if (supplier is not null)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            // integrity is "algo-base64digest" (e.g. "sha512-..."); Hashes are "algo:value".
+            string? hash = null;
+            if (!string.IsNullOrWhiteSpace(integrity))
+            {
+                var dash = integrity!.IndexOf('-');
+                if (dash > 0 && dash < integrity.Length - 1)
+                {
+                    hash = integrity.Substring(0, dash).Trim().ToLowerInvariant()
+                        + ":" + integrity.Substring(dash + 1).Trim();
+                }
+            }
+
+            return EnrichmentHelpers.Create(
+                dependency,
+                EnrichmentHelpers.HashList(hash),
+                supplier,
+                tarball);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? ReadPersonName(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            return string.IsNullOrWhiteSpace(element.GetString()) ? null : element.GetString()!.Trim();
+        }
+
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (EnrichmentHelpers.TryGetString(element, "name", out var name))
+            {
+                return name!.Trim();
+            }
+
+            if (EnrichmentHelpers.TryGetString(element, "email", out var email))
+            {
+                return email!.Trim();
+            }
+        }
+
+        return null;
     }
 
     private static (string? License, string? LicenseUrl) ParseNpmJson(string body)
