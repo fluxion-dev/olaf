@@ -13,7 +13,8 @@ public sealed class HtmlFormatter : ILicenseFormatter
         ArgumentNullException.ThrowIfNull(result);
         // Issue #70: enrichment (purl/hashes/supplier/download) is consciously
         // omitted here — fixed-column human table; SBOM/structured formats
-        // carry enrichment.
+        // carry enrichment. Issue #72 exception: holders-only Copyright line
+        // per package after the table (omit-when-empty).
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Olaf License Report</title></head><body>");
         sb.Append("<p>Total: ").Append(result.TotalCount)
@@ -43,7 +44,22 @@ public sealed class HtmlFormatter : ILicenseFormatter
                 .Append("</td></tr>");
         }
 
-        sb.Append("</tbody></table></body></html>");
+        sb.Append("</tbody></table>");
+        foreach (var l in FormatterSort.ByEcosystemNameVersion(result.Licenses))
+        {
+            if (l.Enrichment?.CopyrightHolders is { Length: > 0 } holders)
+            {
+                sb.Append("<p>Copyright: ")
+                    .Append(WebUtility.HtmlEncode(l.Dependency.Name))
+                    .Append("@")
+                    .Append(WebUtility.HtmlEncode(l.Dependency.Version))
+                    .Append(": ")
+                    .Append(WebUtility.HtmlEncode(string.Join("; ", holders)))
+                    .Append("</p>");
+            }
+        }
+
+        sb.Append("</body></html>");
         return sb.ToString();
     }
 }

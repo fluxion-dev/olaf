@@ -17,7 +17,7 @@
 #   tests (no E2E trait); behavioral proof = filtered LicenseTextWireTests run.
 # R1 matrix regression: canonical r1_matrix_regression (json/yaml/xml/html).
 # Rules: repo-relative, idempotent (mktemp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.1"
+VERSION="0.1.2"
 set -euo pipefail
 
 # ---- Canonical root resolution (factory depth: ../../.. per parser-coverage-probe.sh) ----
@@ -343,17 +343,28 @@ t_ok "l1-fetch" "L1 behavior: LicenseTextFetcherTests (in-memory tgz/zip/nupkg, 
 
 # ---- L2: fallback chain (embedded > licenseUrl > DB > null+reason) ----
 echo "-- L2 fallback chain --"
+set +e
 python3 - "$FETCHER" <<'PY' 2>/dev/null
 import sys
 src = open(sys.argv[1]).read()
-body = src.split("TryFetchLicenseTextAsync", 1)[1]
+# #72 moved the chain into TryFetchLicenseTextWithProvenanceAsync wrapper
+# (TryFetchLicenseTextAsync now just delegates); prefer the wrapper name,
+# fall back to the old name for pre-#72 trees.
+anchor = "TryFetchLicenseTextWithProvenanceAsync" if "TryFetchLicenseTextWithProvenanceAsync" in src else "TryFetchLicenseTextAsync"
+try:
+    body = src.split(anchor, 1)[1]
+except (IndexError, ValueError):
+    print(f"anchor split failed: {anchor}", file=sys.stderr)
+    sys.exit(1)
 i_tar, i_url, i_db = body.index("TryFetchFromTarballAsync"), body.index("TryFetchFromLicenseUrlAsync"), body.index("TryGetText")
 assert i_tar < i_url < i_db, (i_tar, i_url, i_db)
 assert "firstFailure ??=" in body
-assert "return (null, firstFailure)" in body
+assert "return (null, firstFailure" in body
 print("chain order ok")
 PY
-if [[ "$?" -eq 0 ]]; then pass "L2 src: tarball > licenseUrl > DB order + first-failure-wins"; else fail_msg "L2 src: chain order/pinning wrong"; fi
+L2RC=$?
+set -e
+if [[ "$L2RC" -eq 0 ]]; then pass "L2 src: tarball > licenseUrl > DB order + first-failure-wins"; else fail_msg "L2 src: chain order/pinning wrong"; fi
 if grep -q 'return (null, null)' "$FETCHER"; then
   fail_msg "L2 src: silent null present"
 else

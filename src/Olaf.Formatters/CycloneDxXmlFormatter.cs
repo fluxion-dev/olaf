@@ -103,6 +103,17 @@ public sealed class CycloneDxXmlFormatter : ILicenseFormatter
                             new XElement(ns + "url", Sanitize(item.DownloadUrl)))));
                 }
 
+                // Issue #72: evidence/copyright/text per holder; omit-when-
+                // empty (unenriched output is byte-stable). Pinned AFTER
+                // externalReferences, BEFORE properties. Every value goes
+                // through Sanitize (double-escape ban).
+                if (item.CopyrightHolders is { Length: > 0 })
+                {
+                    element.Add(new XElement(ns + "evidence",
+                        new XElement(ns + "copyright",
+                            item.CopyrightHolders.Select(h => new XElement(ns + "text", Sanitize(h))))));
+                }
+
                 if (item.Properties.Count > 0)
                 {
                     element.Add(new XElement(ns + "properties",

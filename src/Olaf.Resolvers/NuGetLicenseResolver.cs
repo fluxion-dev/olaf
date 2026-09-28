@@ -89,8 +89,11 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
                 ?? (catalogBody is null ? null : ParseNuGetEnrichment(body, dependency));
             // License text fills LicenseText ONLY (no id re-resolution):
             // tarball (packageContent via Enrichment) > licenseUrl > DB > null.
-            var (text, textReason) = await LicenseTextFetcher.TryFetchLicenseTextAsync(
+            var (text, textReason, isPerPackage) = await LicenseTextFetcher.TryFetchLicenseTextWithProvenanceAsync(
                 _http, enrichment?.DownloadUrl, licenseUrl, spdx, cancellationToken).ConfigureAwait(false);
+            // Issue #72: holders from per-package texts only — never DB
+            // subset text; metadata-author fallback when zero.
+            enrichment = CopyrightScraper.AttachHolders(dependency, enrichment, isPerPackage ? text : null, enrichment?.Supplier);
             return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

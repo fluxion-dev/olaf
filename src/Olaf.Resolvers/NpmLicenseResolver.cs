@@ -51,8 +51,12 @@ public sealed class NpmLicenseResolver : ILicenseResolver
             var enrichment = ParseNpmEnrichment(body, dependency);
             // License text fills LicenseText ONLY (no id re-resolution):
             // tarball (dist.tarball via Enrichment) > licenseUrl > DB > null.
-            var (text, textReason) = await LicenseTextFetcher.TryFetchLicenseTextAsync(
+            var (text, textReason, isPerPackage) = await LicenseTextFetcher.TryFetchLicenseTextWithProvenanceAsync(
                 _http, enrichment?.DownloadUrl, licenseUrl, spdx, cancellationToken).ConfigureAwait(false);
+            // Issue #72: holders from per-package texts only (tarball/
+            // licenseUrl provenance — never DB subset text); metadata-author
+            // fallback when zero; bare emails never promoted.
+            enrichment = CopyrightScraper.AttachHolders(dependency, enrichment, isPerPackage ? text : null, enrichment?.Supplier);
             return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

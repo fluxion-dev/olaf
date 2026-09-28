@@ -1,6 +1,4 @@
-using System.IO.Compression;
 using System.Net;
-using System.Text;
 using Olaf.Resolvers;
 
 namespace Olaf.Tests.Resolvers;
@@ -20,68 +18,7 @@ public sealed class LicenseTextChainTests
     private const string TarballUrl = "https://example.com/acme-1.0.0.tgz";
     private const string LicenseFileUrl = "https://example.com/acme-license.txt";
 
-    private static byte[] BuildTgz(string entryName, string content) =>
-        Gzip(BuildTar(entryName, content));
-
-    private static byte[] Gzip(byte[] tar)
-    {
-        using var gzBuffer = new MemoryStream();
-        using (var gzip = new GZipStream(gzBuffer, CompressionLevel.Fastest, leaveOpen: true))
-        {
-            gzip.Write(tar, 0, tar.Length);
-        }
-
-        return gzBuffer.ToArray();
-    }
-
-    // Minimal ustar writer (regular file, single entry): deterministic
-    // in-memory tarball — no TarWriter DataStream uncertainty.
-    private static byte[] BuildTar(string name, string content)
-    {
-        var payload = Encoding.UTF8.GetBytes(content);
-        using var buffer = new MemoryStream();
-        var header = new byte[512];
-        WriteField(header, 0, 100, name);
-        WriteField(header, 100, 8, "0000777\0");
-        WriteField(header, 108, 8, "0000000\0");
-        WriteField(header, 116, 8, "0000000\0");
-        WriteOctal(header, 124, 12, payload.Length);
-        WriteOctal(header, 136, 12, 0);
-        for (var i = 148; i < 156; i++)
-        {
-            header[i] = 0x20;
-        }
-
-        header[156] = (byte)'0';
-        WriteField(header, 257, 6, "ustar\0");
-        WriteField(header, 263, 2, "00");
-        var checksum = 0;
-        foreach (var b in header)
-        {
-            checksum += b;
-        }
-
-        WriteField(header, 148, 8, Convert.ToString(checksum, 8).PadLeft(6, '0') + "\0 ");
-        buffer.Write(header, 0, header.Length);
-        buffer.Write(payload, 0, payload.Length);
-        var pad = (512 - (payload.Length % 512)) % 512;
-        for (var i = 0; i < pad; i++)
-        {
-            buffer.WriteByte(0);
-        }
-
-        buffer.Write(new byte[1024], 0, 1024);
-        return buffer.ToArray();
-    }
-
-    private static void WriteField(byte[] header, int offset, int length, string value)
-    {
-        var bytes = Encoding.ASCII.GetBytes(value);
-        Array.Copy(bytes, 0, header, offset, Math.Min(bytes.Length, length));
-    }
-
-    private static void WriteOctal(byte[] header, int offset, int length, int value) =>
-        WriteField(header, offset, length, Convert.ToString(value, 8).PadLeft(length - 1, '0') + "\0");
+    // Tarball bytes via TarFixtureBuilder (shared hand-rolled ustar helper).
 
     [Fact]
     public async Task Should_PreferTarball_When_BothTarballAndLicenseUrlHit()
@@ -94,7 +31,7 @@ public sealed class LicenseTextChainTests
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new ByteArrayContent(BuildTgz("package/LICENSE", "TARBALL-WINS")),
+                    Content = new ByteArrayContent(TarFixtureBuilder.BuildTgz("package/LICENSE", "TARBALL-WINS")),
                 };
             }
 

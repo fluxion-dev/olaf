@@ -23,9 +23,11 @@ public sealed record CycloneDxComponent(
     IReadOnlyList<CycloneDxProperty> Properties,
     string? Group,
     // Issue #70 enrichment slots (trailing, defaulted): omit-null downstream.
+    // Issue #72 adds CopyrightHolders (5th trailing slot, same rule).
     string? Supplier = null,
     string[]? Hashes = null,
-    string? DownloadUrl = null);
+    string? DownloadUrl = null,
+    string[]? CopyrightHolders = null);
 
 /// <summary>
 /// Neutral DTO mapper shared by the CycloneDX JSON and XML formatters.
@@ -116,7 +118,8 @@ public static class CycloneDxComponentMapper
                 group,
                 license.Enrichment?.Supplier,
                 license.Enrichment?.Hashes,
-                license.Enrichment?.DownloadUrl));
+                license.Enrichment?.DownloadUrl,
+                license.Enrichment?.CopyrightHolders));
         }
 
         return components;

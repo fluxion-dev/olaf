@@ -12,7 +12,8 @@ public sealed class MarkdownFormatter : ILicenseFormatter
         ArgumentNullException.ThrowIfNull(result);
         // Issue #70: enrichment (purl/hashes/supplier/download) is consciously
         // omitted here — fixed-column human table; SBOM/structured formats
-        // carry enrichment.
+        // carry enrichment. Issue #72 exception: holders-only Copyright bullet
+        // per detail section (omit-when-empty; the table columns are fixed).
         var sb = new StringBuilder();
         sb.AppendLine("# Third-Party Attribution");
         sb.AppendLine();
@@ -49,6 +50,11 @@ public sealed class MarkdownFormatter : ILicenseFormatter
             sb.AppendLine($"- Name: {Cell(l.Dependency.Name)}");
             sb.AppendLine($"- Version: {Cell(l.Dependency.Version)}");
             sb.AppendLine($"- SPDX: {Cell(LicenseDisplay.EffectiveSpdx(l))}");
+            if (l.Enrichment?.CopyrightHolders is { Length: > 0 } holders)
+            {
+                sb.AppendLine($"- Copyright: {Cell(string.Join("; ", holders))}");
+            }
+
             sb.AppendLine($"- License: {Cell(l.LicenseText)}");
             sb.AppendLine($"- Source: {Cell(l.SourceUrl)}");
             sb.AppendLine($"- Status: {Cell(l.Status)}");
