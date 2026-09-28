@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 753 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 771 passing (`dotnet test`).
 
 ## Usage
 
@@ -43,11 +43,13 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --form
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt --group-by-license
 # allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
+# policy file (version-controlled gate; flags override per key — see `### Policy file`)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --rules examples/sbom-rules.example.yaml
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
-`--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
+`--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate. `--rules <file>` loads a YAML policy file declaring the same gate in version control (see `### Policy file`); per key, a present `--allow`/`--deny` flag REPLACES the file list, and a present `--strict` forces `failOnUnknown: true`.
 Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set. `--group-by-license` composes with `--direct-only` (filter first, then group; see `### Grouping by license`).
 
 `--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
@@ -57,6 +59,9 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 --ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm (pypi alias for pip)
 --max-image-mb <max-image-mb>  Cap container-image scan at N megabytes uncompressed handled (default: 1024; must be > 0)
 --strict                 Fail on unresolved or unknown licenses
+--allow <allow>                Comma-separated SPDX allow-list; strict-gate fails licenses not in the list
+--deny <deny>                  Comma-separated SPDX deny-list; strict-gate fails licenses in the list
+--rules <rules>                Policy rules file (.sbom-rules.yaml)
 --direct-only            Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)
 --include-transitive     Explicitly include transitive dependencies (same as default: report all)
 --group-by-license       Group txt/md/html output by license (ignored for SBOM formats)
@@ -381,13 +386,79 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --for
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format html --group-by-license
 ```
 
+### Policy file (`--rules`)
+
+`--rules <file>` loads a YAML policy file that declares the license gate in version control instead of (or under) flags. Flag behavior without a file is unchanged.
+
+- Flag: `--rules <file>` (default null; CLI form is `--input`/`--format`, no subcommand).
+- Resolution order (no cwd search, no walk-up):
+  1. `--rules <file>` explicit (missing file → exit `2`: `Rules file not found: '<path>'.`).
+  2. Input-adjacent: file input uses its directory, dir input uses itself. Probes `.sbom-rules.yaml` THEN `.olaf-rules.yaml` in that dir. Both present → `.sbom-rules.yaml` wins + a `--verbose` note (`Using '.sbom-rules.yaml'; ignoring '.olaf-rules.yaml'.`), not an error.
+  3. None → flag behavior (a missing adjacent file is silent: no warning, no break).
+- Schema reference (all keys optional; unknown top-level keys and wrong types are schema errors — exit `2`, never `1`):
+
+| Key | Type | Default | Meaning |
+|-----|------|---------|---------|
+| `allow` | list of strings | `[]` | SPDX allow-list (fail licenses not in the list) |
+| `deny` | list of strings | `[]` | SPDX deny-list (fail licenses in the list) |
+| `excludeEcosystems` | list of strings | `[]` | Ecosystems filtered out pre-gate AND pre-report (`pypi` normalizes to `pip`) |
+| `failOnUnknown` | bool (`true`/`false`) | `false` | Fail on ANY `Status == Unknown` row |
+| `failOnUnresolved` | bool (`true`/`false`) | `false` | Fail only on the unresolved Unknown subset (see below) |
+| `exceptions` | list of mappings | `[]` | Per-package suppressions (see below) |
+
+Exception rows: `purl` and/or `name` (at least one required) + `license` (required) + `reason` (required, non-empty — empty is a schema error) + `expires` (optional ISO date-only `YYYY-MM-DD`; a datetime or any other shape is a schema error).
+
+- `failOnUnresolved` vs `failOnUnknown`: `unresolved` is the `Unknown` subset whose `Reason` carries one of the exact prefixes `transport`, `timeout`, `not-found`, `resolver-error` (case-insensitive prefix match). `failOnUnknown` gates ANY `Unknown` row regardless of reason; `failOnUnresolved` gates only that subset.
+- Precedence (flags > file > defaults, PER KEY):
+
+| Key | Absent flag | Present flag | Neither |
+|-----|-------------|--------------|---------|
+| `allow` / `deny` lists | file value | flag REPLACES the file list for that key (override, never union; "present" = the flag got a value token, even `--allow ""` which replaces with empty) | default empty set |
+| `failOnUnknown` / `failOnUnresolved` | file value | present `--strict` forces `failOnUnknown: true` (see below) | default `false` |
+| `excludeEcosystems` | file value | no flag exists → file only | default empty |
+| `exceptions` | file value | no flag exists → file only | default empty |
+
+- Explicit allow rescues: the allow-list is checked FIRST (existing gate order preserved) — a license on `allow` is never an offender even if it also appears on `deny`. A license missing from a non-empty `allow` is an offender regardless of `deny`.
+- `excludeEcosystems` vs `--ecosystem`: INTERSECT. File excludes apply within `--ecosystem` scope (`--ecosystem npm` + `excludeEcosystems: [npm]` → empty set → exit `0` with a 0-dep report). Excludes filter the resolved list post-scan/pre-format/pre-gate — the same point as `--direct-only` — so `summary` counts recompute and gates see the filtered set.
+- `--strict` vs file: token-present `--strict` forces `failOnUnknown: true`, winning over file `failOnUnknown: false`. File `failOnUnknown: true` alone does NOT imply full strict — it enables the unknown-gate only, while allow/deny enforcement keeps the existing `hasAllow`/`hasDeny` semantics. The `--allow/--deny without --strict; applying policy gate.` warning fires only when flag tokens drive the gate without `--strict`; file-driven gates declare intent in version control, so no warning text.
+- Exceptions (suppression scope + expiry): a row matches when (`purl` exact OR `name` exact, case-insensitive) AND `license` exact (effective SPDX, case-insensitive) — suppression is scoped to that license only, so the same package with a different license still offends. `expires` is an ISO date-only day compared at UTC midnight: `date >= today` is valid, missing `expires` is perpetual (valid forever). An expired exception lets the violation resume: exit `1` with the original reason plus the literal marker, e.g. `npm:express@^4.18.2 -> Unknown (exception expired: Triage pending.)`.
+- Error shapes: schema errors (unknown key, wrong type, bad exception row, bad `expires`) and YAML syntax errors exit `2` BEFORE any report write (no partial report, no `--out` file created). Validator errors carry best-effort line info `{file}:{line}:{col}` (`1:1` fallback when the node line is unavailable); a malformed-YAML failure uses the same `{file}:{line}:{col}: {message}` shape. Policy violations (exit `1`) keep report-write-first: the report is already written, then the gate fails.
+
+Example (`examples/sbom-rules.example.yaml`, committed; resolution-order comments live in the file header):
+
+```yaml
+allow:
+  - MIT
+  - Apache-2.0
+deny:
+  - GPL-3.0-only
+excludeEcosystems:
+  - apk
+failOnUnknown: false
+failOnUnresolved: false
+exceptions:
+  - name: example-vendored-dep
+    license: GPL-3.0-only
+    reason: "Vendored with written permission; re-evaluate on upgrade."
+    expires: 2099-01-01
+```
+
+```bash
+# explicit file (verified offline: report on stdout + exit 1 — the npm
+# fixture deps resolve Unknown here, tripping the file allow-list gate;
+# reason strings vary with network, so never golden-match them)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --rules examples/sbom-rules.example.yaml --format json
+# input-adjacent discovery: copy package.json + the example renamed to
+# .sbom-rules.yaml into one dir, then scan with no --rules flag
+```
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
-| `1` | `--strict` found unresolved/`Unknown` licenses, or `--allow`/`--deny` policy-gate offenders |
-| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive`, missing `--template` file, template syntax error (`template error line <N>` on stderr), template render-cap exceeded |
+| `1` | `--strict` found unresolved/`Unknown` licenses, `--allow`/`--deny` policy-gate offenders, or `--rules` policy-file offenders (allow/deny/`failOnUnknown`/`failOnUnresolved` gates, expired exceptions; excludes-filtered list) |
+| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive`, missing `--template` file, template syntax error (`template error line <N>` on stderr), template render-cap exceeded, missing `--rules` file (`Rules file not found: '<path>'.`), rules YAML syntax error or schema error (`{file}:{line}:{col}` on stderr, before any report write) |
 
 ## Output contract
 

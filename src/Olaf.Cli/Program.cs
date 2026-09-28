@@ -1,8 +1,10 @@
 ﻿using System.CommandLine;
+using Olaf.Cli;
 using Olaf.Core;
 using Olaf.Formatters;
 using Olaf.Parsers;
 using Olaf.Resolvers;
+using YamlDotNet.Core;
 
 const string SupportedFormats = "json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json";
 const string SupportedEcosystems = "npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm";
@@ -56,6 +58,10 @@ var denyOption = new Option<string?>("--deny")
 {
     Description = "Comma-separated SPDX deny-list; strict-gate fails licenses in the list",
 };
+var rulesOption = new Option<string?>("--rules")
+{
+    Description = "Policy rules file (.sbom-rules.yaml)",
+};
 var directOnlyOption = new Option<bool>("--direct-only")
 {
     Description = "Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)",
@@ -98,6 +104,7 @@ var rootCommand = new RootCommand($"""
     strictOption,
     allowOption,
     denyOption,
+    rulesOption,
     directOnlyOption,
     includeTransitiveOption,
     groupByLicenseOption,
@@ -114,7 +121,6 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var templatePath = parseResult.GetValue(templateOption);
     var outPath = parseResult.GetValue(outOption);
     var force = parseResult.GetValue(forceOption);
-    var strict = parseResult.GetValue(strictOption);
     var ecosystem = parseResult.GetValue(ecosystemOption);
     var maxImageMbRaw = parseResult.GetValue(maxImageMbOption);
     var verbose = parseResult.GetValue(verboseOption);
@@ -124,6 +130,13 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var directOnly = parseResult.GetValue(directOnlyOption);
     var includeTransitive = parseResult.GetValue(includeTransitiveOption);
     var groupByLicense = parseResult.GetValue(groupByLicenseOption);
+    var rulesPath = parseResult.GetValue(rulesOption);
+    // Issue #75: flag "presence" is token-presence (even an empty --allow ""
+    // replaces the file list for that key). String options consume value
+    // tokens; bool --strict takes none, so presence uses IsImplicit.
+    var allowFlagPresent = parseResult.GetResult(allowOption)?.Tokens.Count > 0;
+    var denyFlagPresent = parseResult.GetResult(denyOption)?.Tokens.Count > 0;
+    var strictFlagPresent = parseResult.GetResult(strictOption)?.IdentifierToken is not null;
 
     static HashSet<string> ParseSpdxSet(string? csv)
     {
@@ -167,10 +180,22 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
                 || ecosystem.Equals("rpm", StringComparison.OrdinalIgnoreCase));
     }
 
-    var allowed = ParseSpdxSet(allowRaw);
-    var denied = ParseSpdxSet(denyRaw);
-    var hasAllow = allowed.Count > 0;
-    var hasDeny = denied.Count > 0;
+    // Issue #75: pypi is an alias for pip on both sides of the exclude
+    // compare (decision recorded in Factory-Notes).
+    static bool IsExcludedEcosystem(string ecosystem, HashSet<string> excludes)
+    {
+        var normalized = ecosystem.Equals("pypi", StringComparison.OrdinalIgnoreCase) ? "pip" : ecosystem;
+        foreach (var exclude in excludes)
+        {
+            var want = exclude.Equals("pypi", StringComparison.OrdinalIgnoreCase) ? "pip" : exclude;
+            if (normalized.Equals(want, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     void LogVerbose(string message)
     {
@@ -227,6 +252,75 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     else
     {
         ContainerImageParser.MaxImageBytes = ContainerImageParser.DefaultMaxImageBytes;
+    }
+
+    // Issue #75: policy rules resolution — explicit --rules > input-adjacent
+    // (.sbom-rules.yaml then .olaf-rules.yaml) > none. Schema/YAML errors
+    // exit 2 BEFORE any report write (no partial report, no --out file).
+    string? rulesFile = null;
+    var fileRules = new RulesFile();
+    if (rulesPath is not null)
+    {
+        if (!File.Exists(rulesPath))
+        {
+            Console.Error.WriteLine($"Rules file not found: '{rulesPath}'.");
+            return 2;
+        }
+
+        rulesFile = rulesPath;
+    }
+    else
+    {
+        rulesFile = RulesLoader.FindAdjacentRulesFile(input, out var shadowed);
+        if (shadowed)
+        {
+            LogVerbose("Using '.sbom-rules.yaml'; ignoring '.olaf-rules.yaml'.");
+        }
+    }
+
+    if (rulesFile is not null)
+    {
+        string rulesText;
+        try
+        {
+            rulesText = await File.ReadAllTextAsync(rulesFile, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            Console.Error.WriteLine($"Failed to read rules file '{rulesFile}': {ex.Message}");
+            return 2;
+        }
+
+        RulesFile? parsedRules;
+        IReadOnlyList<string> ruleErrors;
+        try
+        {
+            (parsedRules, ruleErrors) = RulesLoader.TryParse(rulesText, rulesFile);
+        }
+        catch (YamlException ex)
+        {
+            var line = ex.Start.Line <= 0 ? 1 : ex.Start.Line;
+            var col = ex.Start.Column <= 0 ? 1 : ex.Start.Column;
+            Console.Error.WriteLine($"{rulesFile}:{line}:{col}: {ex.Message}");
+            return 2;
+        }
+
+        foreach (var error in ruleErrors)
+        {
+            Console.Error.WriteLine(error);
+        }
+
+        if (parsedRules is null)
+        {
+            return 2;
+        }
+
+        fileRules = parsedRules;
     }
 
     string? templateText = null;
@@ -371,6 +465,15 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         LogVerbose($"Transitive filter (--direct-only): reporting {resolved.Count} of {results.Length} resolved licenses.");
     }
 
+    // Issue #75: file excludeEcosystems filters the resolved list pre-gate
+    // AND pre-report (same point as --direct-only); intersects --ecosystem.
+    if (fileRules.ExcludeEcosystems.Count > 0)
+    {
+        var beforeExcludes = resolved.Count;
+        resolved = resolved.Where(r => !IsExcludedEcosystem(r.Dependency.Ecosystem, fileRules.ExcludeEcosystems)).ToList();
+        LogVerbose($"Ecosystem excludes ({string.Join(", ", fileRules.ExcludeEcosystems)}): reporting {resolved.Count} of {beforeExcludes} resolved licenses.");
+    }
+
     foreach (var license in results)
     {
         LogVerbose($"Resolved {FormatDependency(license.Dependency)} -> {license.Status}");
@@ -447,9 +550,39 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         Console.Out.Write(output);
     }
 
-    static bool IsStrictViolation(bool strict, List<ResolvedLicense> licenses)
+    // Issue #75: merged policy gate (flags > file > defaults, PER KEY).
+    // Present flag REPLACES the file list for that key; absent flag keeps
+    // the file value. --strict (token-present) forces failOnUnknown:true.
+    var allowed = allowFlagPresent ? ParseSpdxSet(allowRaw) : new HashSet<string>(fileRules.Allow, StringComparer.OrdinalIgnoreCase);
+    var denied = denyFlagPresent ? ParseSpdxSet(denyRaw) : new HashSet<string>(fileRules.Deny, StringComparer.OrdinalIgnoreCase);
+    var hasAllow = allowed.Count > 0;
+    var hasDeny = denied.Count > 0;
+    var enforceUnknown = strictFlagPresent || fileRules.FailOnUnknown;
+    var enforceUnresolved = fileRules.FailOnUnresolved;
+    var policyEnforced = enforceUnknown || hasAllow || hasDeny;
+    var today = RulesLoader.UtcToday();
+
+    var offenderLines = new List<string>();
+    foreach (var license in resolved)
     {
-        return strict && licenses.Any(r => r.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase));
+        var exception = RulesLoader.MatchException(license, fileRules.Exceptions);
+        if (exception is not null)
+        {
+            if (RulesLoader.IsExceptionActive(exception, today))
+            {
+                Console.Error.WriteLine($"Suppressed {FormatOffender(license)} (exception: {exception.Reason}).");
+                continue;
+            }
+
+            offenderLines.Add($"{FormatOffender(license)} (exception expired: {exception.Reason})");
+            continue;
+        }
+
+        if (IsPolicyOffender(license, policyEnforced, allowed, denied)
+            || (enforceUnresolved && RulesLoader.IsUnresolved(license)))
+        {
+            offenderLines.Add(FormatOffender(license));
+        }
     }
 
     static string FormatDependency(Dependency dependency)
@@ -462,23 +595,31 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         return $"{FormatDependency(license.Dependency)} -> {LicenseDisplay.EffectiveSpdx(license)}";
     }
 
-    static bool IsPolicyOffender(ResolvedLicense license, bool enforceUnknown, HashSet<string> allowed, HashSet<string> denied)
+    static bool IsPolicyOffender(ResolvedLicense license, bool enforceUnknownGate, HashSet<string> allowedSet, HashSet<string> deniedSet)
     {
         var effective = LicenseDisplay.EffectiveSpdx(license);
         var isUnknown = license.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase);
-        var hasAllow = allowed.Count > 0;
-        var hasDeny = denied.Count > 0;
-        if (hasAllow && !allowed.Contains(effective))
+        var hasAllowGate = allowedSet.Count > 0;
+        var hasDenyGate = deniedSet.Count > 0;
+        // Issue #75: explicit allow rescues — a license on the allow list is
+        // never an offender even if it also appears on the deny list.
+        // Allow-first order preserved (allow-miss still offenders first).
+        if (hasAllowGate && allowedSet.Contains(effective))
+        {
+            return false;
+        }
+
+        if (hasAllowGate)
         {
             return true;
         }
 
-        if (hasDeny && denied.Contains(effective))
+        if (hasDenyGate && deniedSet.Contains(effective))
         {
             return true;
         }
 
-        if (enforceUnknown && isUnknown && !(hasAllow && allowed.Contains(effective)))
+        if (enforceUnknownGate && isUnknown)
         {
             return true;
         }
@@ -489,32 +630,44 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     // Default gate (no allow/deny): preserve exact strict message + exit 1.
     if (!hasAllow && !hasDeny)
     {
-        if (IsStrictViolation(strict, resolved))
+        if (offenderLines.Count == 0)
         {
-            Console.Error.WriteLine("Strict mode: unknown licenses found.");
-            return 1;
+            return 0;
         }
 
-        return 0;
+        Console.Error.WriteLine(strictFlagPresent
+            ? "Strict mode: unknown licenses found."
+            : "Policy gate: license violations found (--rules).");
+        if (!strictFlagPresent || offenderLines.Any(l => l.Contains("(exception expired:", StringComparison.Ordinal)))
+        {
+            foreach (var line in offenderLines)
+            {
+                Console.Error.WriteLine(line);
+            }
+
+            Console.Error.WriteLine($"{offenderLines.Count} offender(s) found.");
+        }
+
+        return 1;
     }
 
     // Allow/deny gate (report already written above — report-write-first order).
-    var policyEnforced = strict || hasAllow || hasDeny;
-    if (!strict)
+    // The --allow/--deny warning fires only when flag tokens drive the gate;
+    // file-driven gates declare intent in version control (no warning text).
+    if (!strictFlagPresent && (allowFlagPresent || denyFlagPresent))
     {
         Console.Error.WriteLine("Warning: --allow/--deny without --strict; applying policy gate.");
     }
 
-    var offenders = resolved.Where(r => IsPolicyOffender(r, policyEnforced, allowed, denied)).ToList();
-    if (offenders.Count > 0)
+    if (offenderLines.Count > 0)
     {
         Console.Error.WriteLine("Strict mode: policy gate violations found.");
-        foreach (var offender in offenders)
+        foreach (var offender in offenderLines)
         {
-            Console.Error.WriteLine(FormatOffender(offender));
+            Console.Error.WriteLine(offender);
         }
 
-        Console.Error.WriteLine($"{offenders.Count} offender(s) found.");
+        Console.Error.WriteLine($"{offenderLines.Count} offender(s) found.");
         return 1;
     }
 
