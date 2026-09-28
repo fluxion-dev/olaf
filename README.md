@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 739 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 753 passing (`dotnet test`).
 
 ## Usage
 
@@ -39,14 +39,16 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --tem
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/groups.scriban
 # direct-only filter (report direct dependencies only; counts recompute on the filtered set)
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json --direct-only
+# grouped attribution (group txt/md/html output by license; see `### Grouping by license`)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt --group-by-license
 # allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
-Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set.
+Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set. `--group-by-license` composes with `--direct-only` (filter first, then group; see `### Grouping by license`).
 
 `--help` excerpt (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
 
@@ -57,6 +59,7 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 --strict                 Fail on unresolved or unknown licenses
 --direct-only            Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)
 --include-transitive     Explicitly include transitive dependencies (same as default: report all)
+--group-by-license       Group txt/md/html output by license (ignored for SBOM formats)
 --template <template>    Custom attribution template file (overrides --format)
 ```
 
@@ -337,6 +340,46 @@ Error matrix:
 | Unclosed/mismatched block or bad tag (e.g. unclosed `{{#each licenses}}`) | `2` | `template error line <N>: …` with the 1-based line number |
 | Render caps exceeded (256 KiB input / 1 MiB output / 10_000 loop iterations) | `2` | `template error…` / read-failure message |
 | Unknown field/path in template | `0` (renders empty string — never throws, never the `null` literal) | — |
+
+### Grouping by license (`--group-by-license`)
+
+`--group-by-license` groups the human-readable attribution formats (`txt`/`md`/`html`) by license instead of listing one flat block per package. Default output (flag absent) is byte-identical to before.
+
+- Flag: `--group-by-license` (bool, default false; CLI form is `--input`/`--format`, no subcommand). Composes with `--direct-only` (filter first, then group).
+- Group key: `LicenseDisplay.EffectiveSpdx` (trimmed SPDX id, or `"Unknown"` when unresolved) — not `Status`, so a `Resolved` row with an empty SPDX id still lands in the `Unknown` group and a stale `reason` on a resolved row never leaks into a license group.
+- Sort chain: groups ordered by SPDX id `Ordinal` ascending with `Unknown` LAST always (explicit rule — `Unknown` sorts last even though `U` < `Z` alphabetically). A count-descending secondary is vacuous by construction (group keys are distinct, so two groups never tie on a key to break by count). In-group bullets keep the existing `ecosystem → name → version` order.
+- Group header + text: `## {SPDX} ({n} packages)` per group (`<h2>` in `html`), with the full license text emitted ONCE per group — the first-sorted package's `LicenseText` wins (first in `ecosystem → name → version` order within the group; no longest-text, no concatenation).
+- Bullets: `- name@version (ecosystem)` plus holders (`; holder1; holder2` via `CopyrightHoldersFormat.Join`) with a package-identity fallback — when holders are absent the bullet still renders (omit-when-empty applies to the holders suffix, never the bullet). `md` cells escape `|`; `html` bullets render as `<li>` (HTML-encoded).
+- Unknown group: one `Unknown` bucket; every bullet keeps its own per-package reason (`- name@version (ecosystem): reason…` plus holders suffix when present). Unknown packages with different reasons stay as separate bullets.
+- Header counts: `X packages under Y licenses` (`Y` includes `Unknown` as one bucket) plus the usual `Total`/`Resolved`/`Unknown` line. Counts are computed post-`--direct-only`-filter on the list actually rendered. The `--strict`/`--allow`/`--deny` gates see the FLAT filtered list — grouping is display-only and never reorders or hides gate evaluation.
+- SBOM scope: `--group-by-license` is IGNORED for SBOM formats (`cyclonedx-json`/`cyclonedx`/`cyclonedx-xml`/`spdx-json`) with a `--verbose` note (`--group-by-license ignored for SBOM format '<f>'.` on stderr), not exit `2`. `json`/`yaml`/`xml` are likewise ungrouped.
+- Template scope: `--template` is out-of-scope — a custom template renders through the template engine only (`TemplateModel.Groups` already exists for `{{#each groups}}`), and `--group-by-license` has no effect on template output.
+
+Example (synthetic `ScanResult` illustration — shape only, not a live scan; holder names illustrative):
+
+```text
+Third-Party Attribution
+3 packages under 2 licenses
+Total: 3, Resolved: 2, Unknown: 1
+
+## MIT (2 packages)
+License: (The MIT License — full text emitted once per group; `…` below abbreviates it here)
+…
+
+- debug@4.3.4 (npm); Josh Junon (illustrative holder)
+- express@4.18.2 (npm); TJ Holowaychuk (illustrative holder)
+
+## Unknown (1 packages)
+- synthetic-unresolved@0.0.0 (npm): not-found: synthetic unresolved row (reason text illustrative).
+```
+
+Note: template `{{#each groups}}` (`TemplateModel.Groups`) sorts pure-`Ordinal` (no Unknown-last); only the `--group-by-license` display path (`LicenseGrouper`) pins `Unknown` last.
+
+```bash
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format txt --group-by-license
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format md --group-by-license
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format html --group-by-license
+```
 
 ## Exit codes
 

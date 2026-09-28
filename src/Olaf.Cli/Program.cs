@@ -60,6 +60,10 @@ var directOnlyOption = new Option<bool>("--direct-only")
 {
     Description = "Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)",
 };
+var groupByLicenseOption = new Option<bool>("--group-by-license")
+{
+    Description = "Group txt/md/html output by license (ignored for SBOM formats)",
+};
 var includeTransitiveOption = new Option<bool>("--include-transitive")
 {
     Description = "Explicitly include transitive dependencies (same as default: report all)",
@@ -96,6 +100,7 @@ var rootCommand = new RootCommand($"""
     denyOption,
     directOnlyOption,
     includeTransitiveOption,
+    groupByLicenseOption,
     ecosystemOption,
     maxImageMbOption,
     verboseOption,
@@ -118,6 +123,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     var denyRaw = parseResult.GetValue(denyOption);
     var directOnly = parseResult.GetValue(directOnlyOption);
     var includeTransitive = parseResult.GetValue(includeTransitiveOption);
+    var groupByLicense = parseResult.GetValue(groupByLicenseOption);
 
     static HashSet<string> ParseSpdxSet(string? csv)
     {
@@ -371,6 +377,33 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     }
 
     var scanResult = new ScanResult(resolved);
+    // Issue #74: grouping is display-only (post-scan/pre-format, post-filter
+    // so counts are post --direct-only). Gates below see the flat filtered
+    // list; formatter swap only. SBOM formats ignore with a verbose note.
+    if (groupByLicense && templateText is null)
+    {
+        var formatKey = format.ToLowerInvariant();
+        if (formatKey.Equals("txt", StringComparison.Ordinal))
+        {
+            formatter = new TxtFormatter(groupByLicense: true);
+        }
+        else if (formatKey.Equals("md", StringComparison.Ordinal) || formatKey.Equals("markdown", StringComparison.Ordinal))
+        {
+            formatter = new MarkdownFormatter(groupByLicense: true);
+        }
+        else if (formatKey.Equals("html", StringComparison.Ordinal))
+        {
+            formatter = new HtmlFormatter(groupByLicense: true);
+        }
+        else if (formatKey.Equals("cyclonedx-json", StringComparison.Ordinal)
+            || formatKey.Equals("cyclonedx", StringComparison.Ordinal)
+            || formatKey.Equals("cyclonedx-xml", StringComparison.Ordinal)
+            || formatKey.Equals("spdx-json", StringComparison.Ordinal))
+        {
+            LogVerbose($"--group-by-license ignored for SBOM format '{format}'.");
+        }
+    }
+
     string output;
     try
     {
