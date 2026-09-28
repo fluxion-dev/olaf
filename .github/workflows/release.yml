@@ -1,0 +1,73 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rid: [linux-x64, osx-arm64, win-x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet publish src/Olaf.Cli/Olaf.Cli.csproj -c Release -p:PublishRID=${{ matrix.rid }}
+      - name: Assert bundle exists
+        run: |
+          shopt -s nullglob
+          files=(src/Olaf.Cli/bin/Release/net10.0/${{ matrix.rid }}/publish/Olaf.Cli*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No published apphost found for ${{ matrix.rid }}" >&2
+            exit 1
+          fi
+          ls -la "src/Olaf.Cli/bin/Release/net10.0/${{ matrix.rid }}/publish"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: olaf-${{ matrix.rid }}
+          path: src/Olaf.Cli/bin/Release/net10.0/${{ matrix.rid }}/publish/
+
+  smoke-linux:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: olaf-linux-x64
+          path: ./artifacts/linux-x64
+      - run: chmod +x ./artifacts/linux-x64/Olaf.Cli
+      - run: ./artifacts/linux-x64/Olaf.Cli --help
+      - run: ./artifacts/linux-x64/Olaf.Cli --version
+      - uses: actions/download-artifact@v4
+        with:
+          name: olaf-osx-arm64
+          path: ./artifacts/osx-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: olaf-win-x64
+          path: ./artifacts/win-x64
+      - name: Assert win/osx bundles exist with size
+        run: ls -la ./artifacts/osx-arm64 ./artifacts/win-x64 && du -sh ./artifacts/*
+
+  release:
+    needs: [publish, smoke-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./bundles
+      - run: gh release create "${{ github.ref_name }}" ./bundles/olaf-*/*
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

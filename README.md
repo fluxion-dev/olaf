@@ -6,6 +6,35 @@ Supported ecosystems (13): `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler
 
 ## Tool install
 
+No .NET install required: each `v*` tag builds self-contained single-file
+binaries (`.github/workflows/release.yml`, matrix `linux-x64|osx-arm64|win-x64`)
+and attaches the three bundles to that tag's GitHub Release:
+
+| RID | Binary | Size (publish from source) |
+|-----|--------|----------------------------|
+| `linux-x64` | `Olaf.Cli` | 75,006,505 bytes (~71.5 MiB) |
+| `osx-arm64` | `Olaf.Cli` | 81,467,641 bytes (~77.7 MiB) |
+| `win-x64` | `Olaf.Cli.exe` | 74,966,246 bytes (~71.5 MiB) |
+
+```bash
+chmod +x ./Olaf.Cli
+./Olaf.Cli --version
+```
+
+No tagged release yet (or your platform is missing)? Publish from source
+(requires the .NET 10 SDK; `<rid>` is one of the three RIDs above):
+
+```bash
+dotnet publish src/Olaf.Cli -c Release -p:PublishRID=<rid>
+src/Olaf.Cli/bin/Release/net10.0/<rid>/publish/Olaf.Cli --version
+```
+
+(`Olaf.Cli.exe` on `win-x64`. The `linux-x64` apphost runs with no `dotnet`
+on `PATH`; `win-x64`/`osx-arm64` bundles are existence+size verified here,
+runtime covered by CI.)
+
+Alternative — .NET tool (needs a .NET runtime to run):
+
 ```bash
 dotnet pack src/Olaf.Cli -c Release
 dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.1
