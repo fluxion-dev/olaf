@@ -22,3 +22,4 @@ Rules:
 - Extraction is delete-the-wrapper: after a call site moves to the shared helper, the leftover forwarder goes too — never leave a same-shape wrapper behind.
 - Via-comment placement rule: consumer-list comments are code — update the list when migrating/deleting a copy.
 - IsUnknown single-canonical rule: grouping-path Unknown must route via LicenseGrouper.IsUnknown, never re-spell literal.
+- Facade-double-lookup rule (#77 harvest, 2+ occurrences): DB/facade ordering lives in exactly one place (fetcher OR facade, never both). Flag `X.TryGet*` called both directly AND inside the callee-facade in the same chain (e.g. fetcher→SpdxLicenseDb + fetcher→SpdxLicenseTexts→SpdxLicenseDb).
