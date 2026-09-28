@@ -87,7 +87,7 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
             // empty (unenriched output is byte-stable). Pinned AFTER
             // externalReferences (B10 child order: ..., externalReferences?,
             // evidence?, properties?).
-            if (item.CopyrightHolders is { Length: > 0 })
+            if (CopyrightHoldersFormat.HasHolders(item.CopyrightHolders))
             {
                 component["evidence"] = new Dictionary<string, object?>
                 {

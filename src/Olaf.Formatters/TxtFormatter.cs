@@ -22,9 +22,9 @@ public sealed class TxtFormatter : ILicenseFormatter
             sb.AppendLine();
             sb.AppendLine($"{l.Dependency.Name}@{l.Dependency.Version} ({l.Dependency.Ecosystem}) direct={(l.Dependency.Direct ? "true" : "false")}");
             sb.AppendLine($"  SPDX: {LicenseDisplay.EffectiveSpdx(l)}");
-            if (l.Enrichment?.CopyrightHolders is { Length: > 0 } holders)
+            if (CopyrightHoldersFormat.Join(l.Enrichment?.CopyrightHolders) is { } copyright)
             {
-                sb.AppendLine($"  Copyright: {string.Join("; ", holders)}");
+                sb.AppendLine($"  Copyright: {copyright}");
             }
 
             if (!string.IsNullOrWhiteSpace(l.SourceUrl))

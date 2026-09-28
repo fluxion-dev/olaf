@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.4"
+VERSION="0.2.5"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -176,6 +176,39 @@ KEEP_TEMP=0
 # #   if air_gap_grep "$DB"; then pass "air-gap safe (pure in-memory, zero HTTP)"; else fail_msg "HTTP surface found (air-gap broken)"; fi
 # # widened call site (documents deliberate widening):
 # #   if air_gap_grep "$DB" 'MyCustomSender'; then pass "..."; else fail_msg "..."; fi
+
+# ---- Canonical py_anchor_assert (copy-paste skeleton; then adapt) ----
+# Python anchor assert with dual-anchor + set +e guard + try/except split.
+# Pattern: a src method moved into a wrapper (e.g. TryFetchLicenseTextAsync
+#   -> TryFetchLicenseTextWithProvenanceAsync) so the assert prefers the new
+#   anchor with fallback to the old name; the `set +e ... RC=$? ... set -e`
+#   wrapper keeps `set -euo pipefail` from silently aborting on a python
+#   nonzero (missing anchor / failed assert), and the try/except around
+#   str.split turns a missing anchor into sys.exit(1) -> FAIL line via the
+#   RC check instead of a traceback abort.
+# Canonical source promoted to template 0.2.5 after 2nd family use
+#   (license-text-probe.sh L2 chain assert — #72 REJECT-FIX: split on the
+#   old anchor silently aborted after #72 moved the chain into the
+#   WithProvenanceAsync wrapper; `return (null, firstFailure` prefix-match
+#   accepts both 2-tuple and 3-tuple provenance returns).
+#   Back-ported: license-text-probe.sh L2 now carries the canonical header
+#   comment live (behavior identical, comment-only diff).
+# set +e
+# python3 - "$FILE" <<'PY' 2>/dev/null
+# import sys
+# src = open(sys.argv[1]).read()
+# anchor = "NewAnchorName" if "NewAnchorName" in src else "OldAnchorName"
+# try:
+#     body = src.split(anchor, 1)[1]
+# except (IndexError, ValueError):
+#     print(f"anchor split failed: {anchor}", file=sys.stderr)
+#     sys.exit(1)
+# # ... asserts on body follow (index order, vocab pins) ...
+# print("anchor order ok")
+# PY
+# ANCHOR_RC=$?
+# set -e
+# if [[ "$ANCHOR_RC" -eq 0 ]]; then pass "<label>: anchor order ok"; else fail_msg "<label>: anchor/pinning wrong"; fi
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"

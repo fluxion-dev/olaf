@@ -107,7 +107,7 @@ public sealed class CycloneDxXmlFormatter : ILicenseFormatter
                 // empty (unenriched output is byte-stable). Pinned AFTER
                 // externalReferences, BEFORE properties. Every value goes
                 // through Sanitize (double-escape ban).
-                if (item.CopyrightHolders is { Length: > 0 })
+                if (CopyrightHoldersFormat.HasHolders(item.CopyrightHolders))
                 {
                     element.Add(new XElement(ns + "evidence",
                         new XElement(ns + "copyright",

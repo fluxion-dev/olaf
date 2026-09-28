@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 722 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 723 passing (`dotnet test`).
 
 ## Usage
 
@@ -219,7 +219,7 @@ SBOM consumption (omit-null everywhere — unenriched SBOM output is stable):
 
 Legacy structured formats: JSON/YAML emit optional `purl` / `supplier` / `downloadUrl` / `hashes` keys AFTER `direct`, omitted-when-null (unenriched rows keep the 9-field shape).
 
-Fixed-shape human formats consciously omit enrichment (`xml` fixed-shape report; `html`/`md` fixed-column tables; `txt` fixed-line attribution) except the holders-only `Copyright` line per package (see `### Copyright holders`) — SBOM (`cyclonedx-json`/`cyclonedx-xml`/`spdx-json`) and structured (`json`/`yaml`) formats carry enrichment.
+Fixed-shape human formats consciously omit enrichment except that `txt`, `md`, and `html` carry a holders-only `Copyright` line per package (see `### Copyright holders`); `xml` is fixed-shape with no holders line — SBOM (`cyclonedx-json`/`cyclonedx-xml`/`spdx-json`) and structured (`json`/`yaml`) formats carry enrichment.
 
 Null-tolerance + provenance rules: blank suppliers/URLs normalize to `null`; non-`http(s)` download URLs are rejected to `null`; blank hash entries are dropped. `SourceUrl` (a registry page) is NEVER copied into `DownloadUrl` (a download URI) — when no harvestable download URL exists, `DownloadUrl` stays `null` even though `SourceUrl` is set.
 

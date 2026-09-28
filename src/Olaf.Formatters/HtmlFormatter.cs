@@ -47,14 +47,14 @@ public sealed class HtmlFormatter : ILicenseFormatter
         sb.Append("</tbody></table>");
         foreach (var l in FormatterSort.ByEcosystemNameVersion(result.Licenses))
         {
-            if (l.Enrichment?.CopyrightHolders is { Length: > 0 } holders)
+            if (CopyrightHoldersFormat.Join(l.Enrichment?.CopyrightHolders) is { } copyright)
             {
                 sb.Append("<p>Copyright: ")
                     .Append(WebUtility.HtmlEncode(l.Dependency.Name))
                     .Append("@")
                     .Append(WebUtility.HtmlEncode(l.Dependency.Version))
                     .Append(": ")
-                    .Append(WebUtility.HtmlEncode(string.Join("; ", holders)))
+                    .Append(WebUtility.HtmlEncode(copyright))
                     .Append("</p>");
             }
         }

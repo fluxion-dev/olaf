@@ -20,3 +20,4 @@ Rules:
 - Extraction-leftover guard: a shared helper must not reference its consumer-file type — extracted helpers (e.g. Purl) live in their own file. FQN habit: 3+ shared FQN prefixes → using + short name.
 - No second copies: new absolute-http URL gates delegate to EnrichmentHelpers.NormalizeHttpUrl (no 2nd Uri.TryCreate+scheme copy); new Maven splits call MavenCoordinates.TrySplit direct (no per-consumer wrapper).
 - Extraction is delete-the-wrapper: after a call site moves to the shared helper, the leftover forwarder goes too — never leave a same-shape wrapper behind.
+- Via-comment placement rule: consumer-list comments are code — update the list when migrating/deleting a copy.

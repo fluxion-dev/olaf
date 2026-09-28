@@ -48,9 +48,8 @@ public sealed class SpdxJsonFormatter : ILicenseFormatter
                 // Issue #72: copyrightText = "; "-joined holders, or
                 // NOASSERTION when empty (omit-null has no meaning in SPDX —
                 // the field is mandatory, so empty stays the literal).
-                ["copyrightText"] = license.Enrichment?.CopyrightHolders is { Length: > 0 } holders
-                    ? string.Join("; ", holders)
-                    : "NOASSERTION",
+                ["copyrightText"] = CopyrightHoldersFormat.Join(license.Enrichment?.CopyrightHolders)
+                    ?? "NOASSERTION",
                 // PURL is unconditional (always emitted).
                 ["externalRefs"] = new[]
                 {

@@ -5,9 +5,9 @@ namespace Olaf.Tests.Resolvers;
 
 /// <summary>
 /// Shared hand-rolled ustar builder (issues #71/#72) — single home for the
-/// inline tgz writers previously triplicated across
-/// <c>LicenseTextChainTests</c>, <c>LicenseTextFetcherTests</c>, and
-/// <c>CopyrightIntegrationTests</c>. Deterministic in-memory tarballs with
+/// inline tgz writers previously quadruplicated across
+/// <c>LicenseTextChainTests</c>, <c>LicenseTextFetcherTests</c>,
+/// <c>CopyrightIntegrationTests</c>, and <c>LicenseTextWireTests</c>. Deterministic in-memory tarballs with
 /// exact control over entry names and types: hand-rolled 512-byte headers,
 /// never <c>TarWriter</c> (null-DataStream trap), so symlink / absolute /
 /// <c>..</c>-escaping adversarial entries stay expressible. Regular files

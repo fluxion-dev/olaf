@@ -17,7 +17,7 @@
 #   tests (no E2E trait); behavioral proof = filtered LicenseTextWireTests run.
 # R1 matrix regression: canonical r1_matrix_regression (json/yaml/xml/html).
 # Rules: repo-relative, idempotent (mktemp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.2"
+VERSION="0.1.3"
 set -euo pipefail
 
 # ---- Canonical root resolution (factory depth: ../../.. per parser-coverage-probe.sh) ----
@@ -342,6 +342,8 @@ run_t "l1-fetch" "FullyQualifiedName~LicenseTextFetcherTests"
 t_ok "l1-fetch" "L1 behavior: LicenseTextFetcherTests (in-memory tgz/zip/nupkg, stub-only)"
 
 # ---- L2: fallback chain (embedded > licenseUrl > DB > null+reason) ----
+# Canonical py_anchor_assert (from _template.sh 0.2.5; behavior identical) —
+# dual-anchor + set +e + try/except + set -e restore; comment-only back-port.
 echo "-- L2 fallback chain --"
 set +e
 python3 - "$FETCHER" <<'PY' 2>/dev/null

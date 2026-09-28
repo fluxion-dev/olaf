@@ -2,15 +2,17 @@
 # test-count-probe: README Tests:N docs gate (docs mandatory request — README Tests:N stale 2+ issues).
 # Compares the documented `Tests: N passing` count in README.md against a live
 # `dotnet test tests/Olaf.Tests/Olaf.Tests.csproj --verbosity minimal` run.
-# FAIL (exit 1) on mismatch — the message shows actual vs documented.
-# No --update flag by design: wording belongs to the docs agent; this probe
-# never edits docs. Exit 2 on usage/IO/build error.
+# Dry-run default: FAIL (exit 1) on mismatch — the message shows actual vs
+# documented and never edits docs. `--update`: on mismatch, rewrite ONLY the
+# single `Tests: N passing` line to the live total and exit 0 (mandatory per
+# 8-issue Tests:N repeat — the manual docs-agent round-trip was the cost
+# center). Exit 2 on usage/IO/build error.
 # --fqn <Area> reporter (QA proposal): emits the (FQN-count, text-census,
 # README N) triple in one call. FQN-count via `dotnet test --list-tests
 # --filter FullyQualifiedName~<Area>` is authoritative; text census
 # (`[Fact]`/`[Theory]` grep with bin/obj excluded) is informational only —
 # Theory expansion means FQN >= census; README N is informational only.
-VERSION="0.2.0"
+VERSION="0.3.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -35,16 +37,24 @@ pass() { echo "PASS: $*"; }
 fail_msg() { echo "FAIL: $*"; fail=1; }
 
 FQN_AREA=""
+UPDATE=0
 
 if [[ "${1:-}" == "--help" ]]; then
-  echo "Usage: $(basename "$0") [--help] [--version] [--fqn <Area>]"
+  echo "Usage: $(basename "$0") [--help] [--version] [--fqn <Area>] [--update]"
   echo "README Tests:N docs gate: greps the documented \`Tests: N passing\`"
   echo "count from README.md and compares it against a live"
   echo "\`dotnet test tests/Olaf.Tests/Olaf.Tests.csproj --verbosity minimal\`"
   echo "run (full run, ~15s, acceptable for a docs gate)."
-  echo "Exit 0 = documented count matches live; 1 = mismatch (actual vs"
-  echo "documented in message; probe never edits docs); 2 = usage/IO/build error."
+  echo "Exit 0 = documented count matches live (or --update rewrote it);"
+  echo "1 = mismatch dry-run (actual vs documented in message; no edit);"
+  echo "2 = usage/IO/build error."
   echo "Example: ./.opencode/tools/factory/test-count-probe.sh"
+  echo ""
+  echo "--update (additive; default gate unchanged): on mismatch, rewrite ONLY"
+  echo "the single \`Tests: N passing\` line in README.md to the live total"
+  echo "(first match only, via sed 0,/re/ address) and exit 0. Dry-run (no"
+  echo "flag) still FAILs without editing. Cannot be combined with --fqn."
+  echo "Example: ./.opencode/tools/factory/test-count-probe.sh --update"
   echo ""
   echo "--fqn <Area> reporter (additive; default gate unchanged): emits the"
   echo "(FQN-count, text-census, README N) triple in one call, e.g.:"
@@ -64,18 +74,22 @@ if [[ "${1:-}" == "--version" ]]; then
   echo "$(basename "$0") $VERSION"
   exit 0
 fi
-if [[ "${1:-}" == "--fqn" ]]; then
-  [[ -n "${2:-}" ]] || { echo "Missing value for --fqn <Area> (try --help)" >&2; exit 2; }
-  FQN_AREA="$2"
-  shift 2
-fi
-if [[ "${1:-}" == --fqn=* ]]; then
-  FQN_AREA="${1#*=}"
-  [[ -n "$FQN_AREA" ]] || { echo "Missing value for --fqn=<Area> (try --help)" >&2; exit 2; }
-  shift
-fi
-if [[ -n "${1:-}" ]]; then
-  echo "Unknown option: $1 (try --help)" >&2
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --fqn)
+      [[ -n "${2:-}" ]] || { echo "Missing value for --fqn <Area> (try --help)" >&2; exit 2; }
+      FQN_AREA="$2"
+      shift 2 ;;
+    --fqn=*)
+      FQN_AREA="${1#*=}"
+      [[ -n "$FQN_AREA" ]] || { echo "Missing value for --fqn=<Area> (try --help)" >&2; exit 2; }
+      shift ;;
+    --update) UPDATE=1; shift ;;
+    *) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
+  esac
+done
+if (( UPDATE )) && [[ -n "$FQN_AREA" ]]; then
+  echo "--update cannot be combined with --fqn (reporter never edits)" >&2
   exit 2
 fi
 
@@ -158,7 +172,20 @@ if grep -q 'Passed!' <<<"$LAST"; then
     echo "TEST-COUNT-PROBE OK"
     exit 0
   else
-    fail_msg "README says Tests: $DOC_N passing but live dotnet test reports $ACT_N passed (docs fix belongs to docs agent — probe does not edit)"
+    if (( UPDATE )); then
+      sed -i "0,/Tests: [0-9][0-9]* passing/s//Tests: $ACT_N passing/" "$README"
+      NEW_N="$(grep -oE 'Tests: [0-9]+' "$README" | grep -oE '[0-9]+' | head -1 || true)"
+      if [[ "$NEW_N" == "$ACT_N" ]]; then
+        pass "README Tests:N updated $DOC_N -> $ACT_N (--update, single-line rewrite)"
+        echo "TEST-COUNT-PROBE OK (--update)"
+        exit 0
+      else
+        fail_msg "--update rewrite failed (README still $NEW_N, want $ACT_N)"
+        echo "TEST-COUNT-PROBE FAIL"
+        exit 1
+      fi
+    fi
+    fail_msg "README says Tests: $DOC_N passing but live dotnet test reports $ACT_N passed (re-run with --update to rewrite, or leave the docs fix to the docs agent — dry-run never edits)"
     echo "TEST-COUNT-PROBE FAIL"
     exit 1
   fi

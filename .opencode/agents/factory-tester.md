@@ -26,3 +26,4 @@ Rules:
 - Spdx-allowlist guard (Wave 5b #70 harvest): new enriched key updates AllowedKeys + absent-when-unenriched assert together.
 - Rename-stale-test guard (Wave 5b #70 harvest): rename lying test names on touch (e.g. EightFields asserting 9-floor).
 - TarWriter-trap guard (Wave 5b RECTIFY threshold HIT, 2nd sighting): adversarial archive fixtures (symlink, absolute, `..`, empty, dual-tier ordering) MUST use hand-rolled ustar bytes or the shared helper — never TarWriter (null-DataStream trap; TarEntryFormat enum). TarWriter allowed only for happy-path regular-file layers. Triplication trigger: 3rd copy of an archive builder → file TOOL-REQUEST, never a 4th copy.
+- Census-noglob guard (Wave 5b RECTIFY): canonical census is `noglob grep -r --exclude-dir=bin --exclude-dir=obj --include='*.cs'` — bare `--include=*.cs` fails under zsh NOMATCH.

@@ -50,9 +50,9 @@ public sealed class MarkdownFormatter : ILicenseFormatter
             sb.AppendLine($"- Name: {Cell(l.Dependency.Name)}");
             sb.AppendLine($"- Version: {Cell(l.Dependency.Version)}");
             sb.AppendLine($"- SPDX: {Cell(LicenseDisplay.EffectiveSpdx(l))}");
-            if (l.Enrichment?.CopyrightHolders is { Length: > 0 } holders)
+            if (CopyrightHoldersFormat.Join(l.Enrichment?.CopyrightHolders) is { } copyright)
             {
-                sb.AppendLine($"- Copyright: {Cell(string.Join("; ", holders))}");
+                sb.AppendLine($"- Copyright: {Cell(copyright)}");
             }
 
             sb.AppendLine($"- License: {Cell(l.LicenseText)}");
