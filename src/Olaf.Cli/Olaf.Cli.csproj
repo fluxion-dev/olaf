@@ -21,7 +21,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>olaf</ToolCommandName>
     <PackageId>olaf</PackageId>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.1.0-preview.2</Version>
     <Description>License scanner: scans npm, nuget, and pip projects, resolves licenses, and writes a report.</Description>
     <Authors>olaf contributors</Authors>
     <!-- No LICENSE file in repo; using MIT expression. Add LICENSE and keep in sync if license changes. -->

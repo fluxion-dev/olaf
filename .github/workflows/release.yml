@@ -77,7 +77,7 @@ jobs:
       - name: Assert release asset count and unique names
         run: |
           shopt -s nullglob
-          files=(./bundles/olaf-*/*)
+          files=(./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64 ./bundles/olaf-win-x64/olaf-win-x64.exe)
           if [ ${#files[@]} -ne 3 ]; then
             echo "Expected 3 release assets, found ${#files[@]}: ${files[*]}" >&2
             exit 1
@@ -90,7 +90,7 @@ jobs:
             echo "Windows asset olaf-win-x64.exe missing" >&2
             exit 1
           fi
-          ls -la ./bundles/olaf-*/*
-      - run: gh release create "${{ github.ref_name }}" --prerelease ./bundles/olaf-*/*
+          ls -la ./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64 ./bundles/olaf-win-x64/olaf-win-x64.exe
+      - run: gh release create "${{ github.ref_name }}" --prerelease ./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64 ./bundles/olaf-win-x64/olaf-win-x64.exe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
