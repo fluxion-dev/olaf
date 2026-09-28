@@ -1,4 +1,6 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -39,14 +41,67 @@ public sealed class CocoaPodsLicenseResolver : ILicenseResolver
 
             var spdx = SpdxMapper.Normalize(rawLicense);
 
-            if (spdx is null)
+            if (spdx is not null)
             {
-                return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
+                var text = SpdxLicenseTexts.GetText(spdx);
+                var source = $"https://cocoapods.org/pods/{dependency.Name.Trim()}";
+                return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
             }
 
-            var text = SpdxLicenseTexts.GetText(spdx);
-            var source = $"https://cocoapods.org/pods/{dependency.Name.Trim()}";
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // Trunk 200 but no usable license: CDN podspec fallback (issue #84).
+            // Version rule: requested Version verbatim, unless null/empty/* ->
+            // latest = versions[].name last element from the already-fetched trunk body.
+            var podName = dependency.Name.Trim();
+            var requested = dependency.Version?.Trim();
+            var version = string.IsNullOrWhiteSpace(requested) || requested == "*"
+                ? ParseLatestVersion(body)
+                : requested;
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                return LicenseUnknown(dependency);
+            }
+
+            var cdnUrl = BuildCdnUrl(podName, version!);
+            try
+            {
+                using var cdnResponse = await ResolverHttpRetry.GetAsync(_http, cdnUrl, cancellationToken).ConfigureAwait(false);
+                if (!cdnResponse.IsSuccessStatusCode)
+                {
+                    return LicenseUnknown(dependency);
+                }
+
+                var cdnBody = await cdnResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var cdnSpdx = SpdxMapper.Normalize(ParseTrunkJson(cdnBody));
+                if (cdnSpdx is null)
+                {
+                    return LicenseUnknown(dependency);
+                }
+
+                var cdnText = SpdxLicenseTexts.GetText(cdnSpdx);
+                var cdnSource = $"https://cocoapods.org/pods/{podName}";
+                return new ResolvedLicense(dependency, cdnSpdx, cdnText, cdnSource, "Resolved", null);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (HttpRequestException)
+            {
+                return LicenseUnknown(dependency);
+            }
+            catch (IOException)
+            {
+                // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+                return LicenseUnknown(dependency);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return LicenseUnknown(dependency);
+            }
+            catch (Exception)
+            {
+                return LicenseUnknown(dependency);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -60,6 +115,15 @@ public sealed class CocoaPodsLicenseResolver : ILicenseResolver
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"transport-error: {ex.Message}");
         }
+        catch (IOException ex)
+        {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+        }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
@@ -67,6 +131,57 @@ public sealed class CocoaPodsLicenseResolver : ILicenseResolver
         catch (Exception ex)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+        }
+    }
+
+    private static ResolvedLicense LicenseUnknown(Dependency dependency) =>
+        new(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
+
+    internal static string BuildCdnUrl(string podName, string version)
+    {
+        var hash = MD5.HashData(Encoding.UTF8.GetBytes(podName));
+        var hex = Convert.ToHexString(hash).ToLowerInvariant();
+        return string.Join('/', "https://cdn.cocoapods.org/Specs", hex.Substring(0, 1), hex.Substring(1, 1), hex.Substring(2, 1),
+            Uri.EscapeDataString(podName), Uri.EscapeDataString(version),
+            Uri.EscapeDataString(podName) + ".podspec.json");
+    }
+
+    internal static string? ParseLatestVersion(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            // Trunk versions shape: {"versions": [{"name": "5.8.1"}, ...]};
+            // last element = newest (no extra GET).
+            if (root.TryGetProperty("versions", out var versions)
+                && versions.ValueKind == JsonValueKind.Array)
+            {
+                string? latest = null;
+                foreach (var item in versions.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Object
+                        && item.TryGetProperty("name", out var name)
+                        && name.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(name.GetString()))
+                    {
+                        latest = name.GetString()!.Trim();
+                    }
+                }
+
+                return latest;
+            }
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 
