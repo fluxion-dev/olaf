@@ -17,8 +17,15 @@ and attaches the three bundles to that tag's GitHub Release
 | `osx-arm64` | `olaf-osx-arm64` | 81,467,641 bytes (~77.7 MiB) |
 | `win-x64` | `olaf-win-x64.exe` | 74,966,246 bytes (~71.5 MiB) |
 
-Download with `gh` (the repo is private, so anonymous `curl` of the asset
-URLs below returns `404`; `gh` authenticates and downloads byte-exact):
+Download with `curl` (the repo is public, so the asset URLs below fetch
+anonymously) or with `gh`:
+
+```bash
+curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
+chmod +x /tmp/olaf-dl/olaf-linux-x64
+/tmp/olaf-dl/olaf-linux-x64 --version
+# 0.1.0-preview.3+...
+```
 
 ```bash
 gh release download v0.1.0-preview.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
