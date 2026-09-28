@@ -13,7 +13,7 @@
 #   B7 unknown-format (toml) exit 2 + --help lists cyclonedx-json
 #   R1 format-matrix regression untouched (json/yaml/xml/html markers MATRIX OK)
 # Rules: repo-relative, idempotent (mktemp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.1"
+VERSION="0.1.2"
 set -euo pipefail
 
 # ---- Canonical root resolution (factory depth: ../../.. per parser-coverage-probe.sh) ----
@@ -378,30 +378,36 @@ else
   fail_msg "B7 --help missing cyclonedx-json (exit $helprc)"
 fi
 
+# ---- Canonical R1 format-matrix regression (from _template.sh 0.2.3; behavior identical) ----
+r1_matrix_regression() {
+  # r1_matrix_regression [formats...]; default: json yaml xml html.
+  local formats=("$@")
+  (( ${#formats[@]} )) || formats=(json yaml xml html)
+  local R1FAIL=0 f pat
+  echo "-- R1 format-matrix regression --"
+  for f in "${formats[@]}"; do
+    run_scan "r1-$f" "$FIXTURE" "$f"
+    if [[ "$RC" -ne 0 ]]; then
+      fail_msg "R1/$f scan exited $RC"; R1FAIL=1; continue
+    fi
+    case "$f" in
+      json) pat='"direct"' ;;
+      yaml) pat='direct:' ;;
+      xml) pat='<direct>' ;;
+      html) pat='<th>Direct</th>' ;;
+      *) fail_msg "R1/$f: no marker for format"; R1FAIL=1; continue ;;
+    esac
+    if grep -qF -- "$pat" "$WORKDIR/r1-$f.stdout"; then
+      pass "R1/$f carries $pat"
+    else
+      fail_msg "R1/$f missing $pat"; R1FAIL=1
+    fi
+  done
+  if (( ! R1FAIL )); then pass "R1 MATRIX OK: ${formats[*]} untouched"; fi
+}
+
 # ---- R1 format-matrix regression untouched ----
-echo "-- R1 format-matrix regression --"
-R1FAIL=0
-for f in json yaml xml html; do
-  set +e
-  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" --no-launch-profile -- --input "$FIXTURE" --format "$f" >"$WORKDIR/r1.$f" 2>"$WORKDIR/r1.$f.err"
-  frc=$?
-  set -e
-  if [[ "$frc" -ne 0 ]]; then
-    fail_msg "R1/$f scan exited $frc"; R1FAIL=1; continue
-  fi
-  case "$f" in
-    json) pat='"direct"' ;;
-    yaml) pat='direct:' ;;
-    xml) pat='<direct>' ;;
-    html) pat='<th>Direct</th>' ;;
-  esac
-  if grep -qF -- "$pat" "$WORKDIR/r1.$f"; then
-    pass "R1/$f carries $pat"
-  else
-    fail_msg "R1/$f missing $pat"; R1FAIL=1
-  fi
-done
-if [[ "$R1FAIL" -eq 0 ]]; then pass "R1 MATRIX OK: json/yaml/xml/html untouched"; fi
+r1_matrix_regression
 
 echo "== summary =="
 if [[ "$fail" -eq 0 ]]; then

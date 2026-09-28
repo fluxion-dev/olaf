@@ -4,20 +4,6 @@ namespace Olaf.Formatters;
 
 internal static class CycloneDxPurl
 {
-    internal static bool TrySplitMavenCoordinates(string name, out string group, out string coordinates)
-    {
-        if (MavenCoordinates.TrySplit(name, out var groupPart, out var artifactPart))
-        {
-            group = groupPart!;
-            coordinates = groupPart + "/" + artifactPart;
-            return true;
-        }
-
-        group = string.Empty;
-        coordinates = name;
-        return false;
-    }
-
     internal static string Build(Dependency dep)
     {
         ArgumentNullException.ThrowIfNull(dep);

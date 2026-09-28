@@ -98,7 +98,7 @@ public static class CycloneDxComponentMapper
             var ecosystem = (dep.Ecosystem ?? string.Empty).ToLowerInvariant();
             if (ecosystem is "maven" or "gradle")
             {
-                if (CycloneDxPurl.TrySplitMavenCoordinates(dep.Name, out var groupPart, out _))
+                if (MavenCoordinates.TrySplit(dep.Name, out var groupPart, out _))
                 {
                     group = groupPart;
                 }

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -23,7 +24,7 @@ public sealed class CocoaPodsLicenseResolver : ILicenseResolver
         {
             var url = $"https://trunk.cocoapods.org/api/v1/pods/{Uri.EscapeDataString(dependency.Name.Trim())}";
             using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: cocoapods pod '{dependency.Name} {dependency.Version}' not found.");
             }

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -24,7 +25,7 @@ public sealed class PyPILicenseResolver : ILicenseResolver
         {
             var url = $"https://pypi.org/pypi/{Uri.EscapeDataString(dependency.Name)}/{Uri.EscapeDataString(dependency.Version)}/json";
             using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: PyPI package '{dependency.Name} {dependency.Version}' not found.");
             }

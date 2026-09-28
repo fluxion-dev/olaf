@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -47,7 +48,7 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
         try
         {
             using var response = await ResolverHttpRetry.GetAsync(_http, definitionUrl, ct).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: no license for '{dependency.Name} {dependency.Version}' in registry or ClearlyDefined.");
             }

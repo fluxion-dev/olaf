@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -24,7 +25,7 @@ public sealed class BundlerLicenseResolver : ILicenseResolver
         {
             var url = $"https://rubygems.org/api/v1/gems/{Uri.EscapeDataString(dependency.Name)}.json";
             using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: bundler gem '{dependency.Name} {dependency.Version}' not found.");
             }

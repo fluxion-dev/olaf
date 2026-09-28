@@ -1,3 +1,4 @@
+using System.Net;
 using System.Xml;
 using System.Xml.Linq;
 using Olaf.Core;
@@ -270,7 +271,7 @@ public sealed class MavenLicenseResolver : ILicenseResolver
     private async Task<FetchOutcome> FetchPomAsync(string url, CancellationToken cancellationToken)
     {
         using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return new FetchOutcome(FetchStatus.NotFound, null, (int)response.StatusCode);
         }

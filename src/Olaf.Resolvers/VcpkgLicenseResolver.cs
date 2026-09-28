@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -25,7 +26,7 @@ public sealed class VcpkgLicenseResolver : ILicenseResolver
             // top-level "license" (string or array of strings).
             var url = $"https://raw.githubusercontent.com/microsoft/vcpkg/master/ports/{Uri.EscapeDataString(dependency.Name.Trim())}/vcpkg.json";
             using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: vcpkg port '{dependency.Name} {dependency.Version}' not found.");
             }

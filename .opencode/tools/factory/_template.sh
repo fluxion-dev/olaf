@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.2"
+VERSION="0.2.3"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -108,6 +108,46 @@ KEEP_TEMP=0
 # }
 # dep_ver() { dep_field "$1" "$2" "version"; }
 # dep_direct() { dep_field "$1" "$2" "direct"; }
+
+# ---- Canonical R1 format-matrix regression (copy-paste; then call) ----
+# Requires (define live alongside): run_scan <tag> <inputdir> <format>
+#   [extra...] writing $WORKDIR/$tag.stdout and setting RC; FIXTURE input dir;
+#   WORKDIR; pass()/fail_msg(). Marker map mirrors format-matrix-dump.sh
+#   9th-field `direct` asserts (json/yaml/xml/html subset; txt/md/cdx arms
+#   live in the matrix tool, not in probes).
+# Canonical source promoted to template 0.2.3 after 4th family use
+#   (cyclonedx-probe.sh + cyclonedx-xml-probe.sh + spdx-probe.sh 4-format
+#   loops, enrichment-probe.sh narrowed 2-format loop — restored to 4-format
+#   on back-port since `direct` spans all 9 matrix formats).
+#   Back-ported: all four probes now call this exact function live.
+# r1_matrix_regression() {
+#   # r1_matrix_regression [formats...]; default: json yaml xml html.
+#   local formats=("$@")
+#   (( ${#formats[@]} )) || formats=(json yaml xml html)
+#   local R1FAIL=0 f pat
+#   echo "-- R1 format-matrix regression --"
+#   for f in "${formats[@]}"; do
+#     run_scan "r1-$f" "$FIXTURE" "$f"
+#     if [[ "$RC" -ne 0 ]]; then
+#       fail_msg "R1/$f scan exited $RC"; R1FAIL=1; continue
+#     fi
+#     case "$f" in
+#       json) pat='"direct"' ;;
+#       yaml) pat='direct:' ;;
+#       xml) pat='<direct>' ;;
+#       html) pat='<th>Direct</th>' ;;
+#       *) fail_msg "R1/$f: no marker for format"; R1FAIL=1; continue ;;
+#     esac
+#     if grep -qF -- "$pat" "$WORKDIR/r1-$f.stdout"; then
+#       pass "R1/$f carries $pat"
+#     else
+#       fail_msg "R1/$f missing $pat"; R1FAIL=1
+#     fi
+#   done
+#   if (( ! R1FAIL )); then pass "R1 MATRIX OK: ${formats[*]} untouched"; fi
+# }
+# # call site (replaces the inline for-f loop):  r1_matrix_regression
+# # narrowed call site (documents deliberate narrowing):  r1_matrix_regression json yaml
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"

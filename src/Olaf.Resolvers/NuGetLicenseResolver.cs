@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using System.Text.Json;
 using System.Xml.Linq;
 using Olaf.Core;
@@ -28,7 +29,7 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
             var url = $"https://api.nuget.org/v3/registration5-gz-semver2/{Uri.EscapeDataString(lowerName)}/{Uri.EscapeDataString(lowerVersion)}.json";
 
             using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: NuGet package '{dependency.Name} {dependency.Version}' not found.");
             }

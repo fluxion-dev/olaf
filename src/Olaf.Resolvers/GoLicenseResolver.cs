@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net;
 using System.Text.Json;
 using Olaf.Core;
 
@@ -24,7 +25,7 @@ public sealed class GoLicenseResolver : ILicenseResolver
         {
             var url = $"https://proxy.golang.org/{dependency.Name.Trim('/')}/@v/{Uri.EscapeDataString(dependency.Version)}.info";
             using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: go module '{dependency.Name} {dependency.Version}' not found.");
             }
@@ -143,7 +144,7 @@ public sealed class GoLicenseResolver : ILicenseResolver
         try
         {
             using var response = await _http.GetAsync(zipUrl, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: go module '{dependency.Name} {dependency.Version}' not found.");
             }

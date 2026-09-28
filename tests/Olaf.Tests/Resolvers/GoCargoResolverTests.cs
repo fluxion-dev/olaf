@@ -1,3 +1,4 @@
+using System.Net;
 using Olaf.Core;
 using Olaf.Resolvers;
 
@@ -156,7 +157,7 @@ public sealed class GoResolverTests
 
             if (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             {
-                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new ByteArrayContent(zipBytes),
                 };
@@ -193,7 +194,7 @@ public sealed class GoResolverTests
 
             if (url.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             {
-                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new ByteArrayContent(zipBytes),
                 };

@@ -22,3 +22,6 @@ Rules:
 - Probe-only fixture guard (Wave 5b #69 harvest): `grep -rn <fixture> tests/ src/` must return doc-comment-only, zero code refs.
 - SPDX relation guard (Wave 5b #69 harvest): relations as per-id kinds + closure, never literal counts.
 - Assert-then-slice guard (Wave 5b #69 harvest): Substring only after StartsWith / IndexOf>=0 assert.
+- Yaml-e2e-floor guard (Wave 5b #70 harvest): live-enriched E2E counts are floors (`Assert.True(count >= floor)`), never exact.
+- Spdx-allowlist guard (Wave 5b #70 harvest): new enriched key updates AllowedKeys + absent-when-unenriched assert together.
+- Rename-stale-test guard (Wave 5b #70 harvest): rename lying test names on touch (e.g. EightFields asserting 9-floor).

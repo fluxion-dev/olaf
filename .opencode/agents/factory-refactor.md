@@ -18,3 +18,5 @@ Rules:
 - Copy-paste rule (Wave 5b): CS0160 sentence is exactly `// Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.`; OS-parser resolver tail is exactly `— no resolver changes here.` — copy verbatim, never reword.
 - Lint: flag System./Olaf. FQN where sibling files carry the using (≤2-hit files allowlisted); exact-Throws rule: Assert.Throws<T> on real API, no try/catch+Assert.Fail, no ThrowsAny<Exception>.
 - Extraction-leftover guard: a shared helper must not reference its consumer-file type — extracted helpers (e.g. Purl) live in their own file. FQN habit: 3+ shared FQN prefixes → using + short name.
+- No second copies: new absolute-http URL gates delegate to EnrichmentHelpers.NormalizeHttpUrl (no 2nd Uri.TryCreate+scheme copy); new Maven splits call MavenCoordinates.TrySplit direct (no per-consumer wrapper).
+- Extraction is delete-the-wrapper: after a call site moves to the shared helper, the leftover forwarder goes too — never leave a same-shape wrapper behind.
