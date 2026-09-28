@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # pages-verify-probe.sh — Pages home-page verification probe for issue #131.
-# P1 (6): docs/index.html exists; HERO_MARKER greppable; no <script element;
-#   no local src/href; invented-surface gate (16 removed flags + `olaf scan` +
+# P1 (6): page exists (auto-detect: site/dist/index.html when site/ exists,
+#   else docs/index.html); HERO_MARKER greppable; no <script element;
+#   no local src/href EXCEPT hashed Vite CSS ((src|href)="(/olaf/|./|/)?
+#   assets/[^"]*\.css" allowlisted — CSS-only because the #135 homepage is a
+#   CSS-entry Vite build; any *.js ref stays banned since a script asset
+#   would violate the no-script guarantee enforced by the P1-3 <script arm);
+#   invented-surface gate (16 removed flags + `olaf scan` +
 #   txt/html code-span formats + --reason); every concrete `olaf ...` command
 #   line pasted in the page re-executed DLL-direct via run_gate (exit + token).
 # P2 (4): all badge img-src URLs curl -fSL 200 (license badge 404 allowed ONLY
@@ -14,7 +19,7 @@
 # happens post-enable (plan Step 6). Shell MUST be bash. No pipestatus reads
 # (fqn-lint pipefail arm). $TIMEOUT_BIN captured before any PATH use.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 shopt -s nullglob
 
@@ -32,6 +37,13 @@ Usage: $(basename "$0") [options]
 
 Pages home-page verification: P1 page gates + P2 badge 200s + P3 live 200 and
 hero marker + P4 pages.yml workflow poll.
+
+Page auto-detect: site/dist/index.html when site/ exists under --repo-root
+(Vite build, issue #135), else docs/index.html. No --page flag by design.
+P1 local-ref arm is deny-all EXCEPT hashed Vite CSS link(s) matching
+(src|href)="(/olaf/|./|/)?assets/[^"]*\.css"; every other local src/href —
+especially any *.js — FAILs (js stays banned: a script asset would break
+the no-script guarantee the P1/P3 <script arms enforce).
 
 Options:
   --url <live-url>      Pages URL (default: $LIVE_URL)
@@ -147,7 +159,13 @@ run_gate() {
 }
 
 HERO_MARKER="License scanner:"
-PAGE="$REPO_ROOT/docs/index.html"
+# Page auto-detect (issue #135, additive — no --page flag): Vite-built page
+# at site/dist/index.html when site/ exists, else legacy docs/index.html.
+if [[ -d "$REPO_ROOT/site" ]]; then
+  PAGE="$REPO_ROOT/site/dist/index.html"
+else
+  PAGE="$REPO_ROOT/docs/index.html"
+fi
 WORKFLOW="$REPO_ROOT/.github/workflows/pages.yml"
 # 16 removed flags (cli-ux-probe.sh DELETED_FLAGS, issue #123 collapse).
 REMOVED_FLAGS="--input --template --cache-dir --no-cache --refresh-cache --cache-ttl-days --ecosystem --max-image-mb --verbose --quiet --allow --deny --rules --direct-only --include-transitive --group-by-license"
@@ -157,14 +175,15 @@ ALLOWED_FLAGS="--format --out --force --strict --offline --help --version"
 
 echo "== pages-verify-probe v$VERSION =="
 echo "repo-root: $REPO_ROOT"
+echo "page: $PAGE"
 echo "live-url: $LIVE_URL"
 
 # ---- P1 (6): page gates + command re-exec ----
 echo "-- P1: page gates --"
 if [[ -f "$PAGE" ]]; then
-  pass "P1: docs/index.html exists"
+  pass "P1: page exists ($PAGE)"
 else
-  fail_msg "P1: docs/index.html missing (pre-Step-1: page not created)"
+  fail_msg "P1: page missing ($PAGE) (pre-Step-1: page not created)"
 fi
 
 if [[ -f "$PAGE" ]]; then
@@ -178,11 +197,15 @@ if [[ -f "$PAGE" ]]; then
   else
     pass "P1: no <script element"
   fi
-  LOCALREFS="$(grep -oE -- '(src|href)="[^"]*"' "$PAGE" | grep -vE -- '(src|href)="(https?://|#|mailto:)' || true)"
+  # Deny-all with CSS-only allowlist (issue #135): hashed Vite stylesheet
+  # link(s) (src|href)="(/olaf/|./|/)?assets/[^"]*\.css" are legal/skipped;
+  # every other local ref — especially any *.js, which would break the
+  # no-script guarantee — still FAILs.
+  LOCALREFS="$(grep -oE -- '(src|href)="[^"]*"' "$PAGE" | grep -vE -- '(src|href)="(https?://|#|mailto:)' | grep -vE -- '(src|href)="(/olaf/|./|/)?assets/[^"]*\.css"' || true)"
   if [[ -n "$LOCALREFS" ]]; then
     fail_msg "P1: local src/href refs: $(printf '%s' "$LOCALREFS" | head -3 | tr '\n' ' ')"
   else
-    pass "P1: no local src/href refs"
+    pass "P1: no local src/href refs (outside hashed-CSS allowlist)"
   fi
   # Invented-surface gate: 16 removed flags + `olaf scan` + txt/html code-span
   # formats + --reason must be absent (bare `html` matches markup, so the
