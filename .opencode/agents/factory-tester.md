@@ -37,6 +37,7 @@ Rules:
 - Multi-tail-Fact label (Wave 5b #75 harvest): single-Fact loop/tail holders must comment the tail count so reconcile survives expansion review.
 - Census-reconcile wording (Wave 5b RECTIFY): report attribute census + InlineData/MemberData arm expansion separately; live `dotnet test` total is authoritative and FQN-filter counts beat bare-grep arithmetic — bare grep never reconciles a total on its own.
 - Flag-parity table (Wave 5b RECTIFY): subcommand issues carry a per-flag parity table — every flag gets a root arm + a generate arm or a recorded why-inapplicable; exit(generate X) == exit(root X) per arm.
+- Direct-polarity pin (Wave 5b #51 harvest, 3rd sighting): any formatter E2E asserting `direct=` carries the one-line `// Dependency.cs:9` pin comment + exact-count `CountOccurrences` assert — planner keeps re-deriving the negation wrong.
 - JSON-casing gate (Wave 5b #78 harvest): new JSON store/cache tests assert serialize→parse round-trip first (write casing vs read casing + compat aliases) — unpinned casing caused a tester re-queue.
 - Reason-prefix gate (Wave 5b #78 harvest): never-cache/transport assertions grep all `*-error:` reason emitters vs the predicate before pinning — `transport-error:` escaped a 3-prefix predicate.
 - Test-vehicle exception default (Wave 5b #78 harvest): target `resolver-error:` with `NotSupportedException` (primaries own `InvalidOperationException→parse-error` per D2); `InvalidOperationException` vehicle is a parse-error arm, not a resolver-error arm.
