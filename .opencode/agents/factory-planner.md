@@ -33,3 +33,6 @@ Wave 5b hardening (binding, threshold-HIT):
 - Rename reconciliation (#77 harvest): rename allowed only with same-count note in PR body (e.g. 6+3=3+6); exact-filename drift without note blocks freeze.
 - Factory-Notes mandate (#77 harvest): PR body must carry `Factory-Notes` with expected-vs-shipped test triple + plan-accuracy; merge step must verify `git branch -r` remote deleted.
 - Files subdir convention (#77 harvest): plan `Files:` must cite target subdir per tester style (`Cli/` subprocess-e2e vs `Resolvers/` throwing-handler) or flag rename at freeze.
+- Store-shape serialization pin (#78 harvest): JSON/file-cache bindings must pin on-disk casing policy (`JsonPropertyName`/naming-policy + case-insensitive-read + compat aliases) — unpinned casing caused a full tester re-queue.
+- Step file-tags explicit (#78 harvest): no back-reference tags (`same set as Steps N`); every Step row enumerates its own `reg:` anchors or states `Files: none`.
+- Probe PASS-vs-WARN pin (#78 harvest): plan states whether advisory WARNs count in probe PASS totals (45 PASS + 7 WARN vs 52 PASS).

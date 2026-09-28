@@ -4,13 +4,14 @@
 # direct-promote justification as catch-guard-probe).
 # Check 1 FAIL (exit 1): any single file with >2 non-using, non-comment code
 #   lines carrying `System.<X>` tokens (a `using` pays for itself at 3+ uses).
-# Check 2 FAIL (exit 1): any single FQN (full `System(\.Seg)+` token)
+# Check 2 FAIL (exit 1): any single FQN (full `System(\.Seg)+` token,
+#   `(?<![A-Za-z_])` lookbehind so `OperatingSystem.*` never counts)
 #   appearing in code lines across >=3 distinct files (shared vocabulary
 #   belongs in usings).
 # Allowlist by construction: `using System...;` directives (incl.
 #   global/static/alias forms), `//` comments (a token only counts when it
 #   precedes any `//` on the line), and files with <=2 hit lines never FAIL.
-VERSION="0.1.0"
+VERSION="0.1.1"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -67,7 +68,7 @@ command -v python3 >/dev/null 2>&1 || { echo "python3 required" >&2; exit 2; }
 SCAN="$(SRC="$SRC" python3 <<'PY'
 import os, re
 src = os.environ["SRC"]
-tok = re.compile(r"System(?:\.[A-Za-z_][A-Za-z0-9_]*)+")
+tok = re.compile(r"(?<![A-Za-z_])System(?:\.[A-Za-z_][A-Za-z0-9_]*)+")
 using_re = re.compile(r"^\s*using\s+(global\s+)?(static\s+)?System[_.A-Za-z0-9]*\s*;\s*$")
 alias_re = re.compile(r"^\s*using\s+[A-Za-z_][A-Za-z0-9_]*\s*=")
 comment_re = re.compile(r"(?<!:)//")
