@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 674 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 698 passing (`dotnet test`).
 
 ## Usage
 
@@ -293,3 +293,20 @@ dotnet run --project src/Olaf.Cli -- --input image.tar --format json --max-image
 - Report goes to stdout when `--out` is omitted (machine-parseable; e.g. stdout is pure JSON with `--format json`).
 - When `--out <file>` is given the report goes to the file and stdout stays empty.
 - Errors, the `--strict` notice, and `--verbose` logs go to stderr; `--version` prints to stdout.
+
+## License text
+
+`LicenseText` is filled text-only: the already-resolved SPDX id stands (no re-resolution — the fetcher returns `(Text, FailureReason)`, never an SPDX id).
+
+- Shared fetcher: one `LicenseTextFetcher` helper (`LicenseTextLimits` caps) dedupes the old npm/NuGet `TryFetchLicenseTextAsync` dup. Tarball URLs come from the already-fetched registry bodies via #70 `Enrichment.DownloadUrl` — no new discovery endpoints, no parser changes. Wired tarball paths: `npm` (tgz via `dist.tarball`), `nuget` (nupkg/zip via `packageContent`), `pip` (sdist/wheel tgz/zip via `urls[]` file URL), `cargo` (`.crate` tgz via `dl_path` absolutized against `https://crates.io`). `npm`/`nuget` also pass their registry `licenseUrl` as fallback (`cargo`/`pip` bodies carry no licenseUrl field, so they pass null); `go` keeps its existing module-zip path with caps added only (content still maps via `SpdxMapper`); all other resolvers stay DB-only (`SpdxLicenseTexts.GetText`).
+- Caps are consts, NOT CLI flags (`LicenseTextLimits`): per-package timeout `5`s via linked CTS; max download `1_048_576` bytes (`1 MiB`) via Content-Length gate + streaming truncation; archive max-entries `512`; max-entry-bytes `1 MiB`. Never `ExtractToFile` (file-name-only match, stream-read of the matched entry); symlinks, absolute paths, and `..`-escaping names are skipped. Single retry only — the fetcher calls `ResolverHttpRetry.GetAsync`, never a second retry layer.
+- Tarball shapes: tgz / zip / nupkg / wheel / crate. Content is magic-sniffed first (gzip `1F 8B` → tar, zip `PK 03 04` → zip) with a URL-extension-hint fallback (`.zip`/`.nupkg`/`.whl` → zip; `.tgz`/`.gz`/`.crate` → gzip+tar). Filename preference `LICENSE*` > `COPYING*` > `NOTICE*`, first-match-wins within a tier (`LICENSE*` returns immediately; the first `COPYING*`/`NOTICE*` hit is kept).
+- Encoding chain (never throws): UTF-8 BOM → UTF-16 BE/LE BOM → UTF-8 strict → Windows-1252 fallback, NULs stripped; whitespace-only decodes keep hunting.
+- Fallback chain (pinned): tarball-file text > `licenseUrl` fetch > embedded DB text > null. Non-`http(s)` license URLs are skipped with zero HTTP. Reason vocabulary (existing `prefix: detail` style): `tarball-miss:<detail>` (`not-found`, `status-<n>`, `transport`, `archive-error`, `no-license-file`) · `tarball-timeout` · `tarball-too-large:<bytes>` · `licenseurl-fetch-failed:<status|timeout|transport|empty>` · `spdxdb-miss:<id>`. First-failure wins: the first stage that fails pins `Reason`; later stages are still attempted for text but never overwrite it — every null-text `Resolved` carries a reason (no silent null). Caller cancellation (`OperationCanceledException` on the caller's token) is always rethrown, never swallowed.
+- Curated DB subset (35 ids, pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`, ~225KB of the ~500KB max): `MIT`, `Apache-2.0`, `Apache-1.1`, `ISC`, `BSD-2-Clause`, `BSD-3-Clause`, `BSD-4-Clause`, `GPL-1.0-only`, `GPL-2.0-only`, `GPL-3.0-only`, `GPL-2.0-or-later`, `GPL-3.0-or-later`, `LGPL-2.0-only`, `LGPL-2.1-only`, `LGPL-3.0-only`, `LGPL-2.1-or-later`, `LGPL-3.0-or-later`, `AGPL-1.0-only`, `AGPL-3.0-only`, `AGPL-3.0-or-later`, `MPL-1.0`, `MPL-1.1`, `MPL-2.0`, `CDDL-1.0`, `EPL-1.0`, `EPL-2.0`, `Unlicense`, `CC0-1.0`, `Artistic-2.0`, `AAL`, `MIT-0`, `BSL-1.0`, `Zlib`, `OFL-1.1`, `0BSD` (subset list mirrored in the `SpdxLicenseTexts.cs` comment; historical stubs kept byte-identical). The FULL offline DB + download script is owned by issue #77 — no runtime download-at-scan here. The DB path is air-gap safe: pure in-memory switch/dictionary via `SpdxLicenseTexts.TryGetText`, zero HTTP (no `HttpClient` in that file).
+- Cache: in-memory only — the whole record including text rides the existing `CachingLicenseResolver`; `Unknown` (including text-stage failures) stays uncached. Disk cache is owned by issue #78: no disk code here by design.
+- No new flags, no new exit codes: text-stage failures surface as `Unknown` + reason, never throw, so `--help` is unchanged:
+
+```bash
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
+```

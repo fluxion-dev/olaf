@@ -5,7 +5,10 @@ namespace Olaf.Tests.Resolvers;
 
 /// <summary>
 /// Issue #70 B2: enrichment ONLY from already-fetched payloads (NO-NEW-HTTP —
-/// every stub test asserts a single GET). YES group (npm/nuget/pypi/cargo/
+/// enrichment itself adds zero GETs). Issue #71 adds ONE license-text GET
+/// (tarball via DownloadUrl, then licenseUrl) for npm/nuget/pypi/cargo, so
+/// those four single-GET pins became two GETs (registry + tarball); the
+/// rest still assert a single GET. YES group (npm/nuget/pypi/cargo/
 /// composer/maven) harvests hashes+supplier+download; PARTIAL (bundler/go)
 /// harvests what its endpoint carries (hashes null); NULL group
 /// (swift/cocoapods/vcpkg/conan) returns null; ClearlyDefined is YES-trivial.
@@ -36,7 +39,7 @@ public sealed class EnrichmentResolverTests
         var result = await resolver.ResolveAsync(dep);
 
         Assert.Equal("MIT", result.SpdxId);
-        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(2, handler.CallCount); // #71: registry + tarball license-text GET
         Assert.NotNull(result.Enrichment);
         Assert.Equal("pkg:npm/express@4.18.2", result.Enrichment.Purl);
         Assert.Equal(new[] { "sha512:abc123==" }, result.Enrichment.Hashes);
@@ -63,7 +66,7 @@ public sealed class EnrichmentResolverTests
         var result = await resolver.ResolveAsync(dep);
 
         Assert.Equal("MIT", result.SpdxId);
-        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(2, handler.CallCount); // #71: registry + tarball license-text GET
         Assert.NotNull(result.Enrichment);
         Assert.Equal("pkg:nuget/Newtonsoft.Json@13.0.1", result.Enrichment.Purl);
         // Algorithm passes through lowercased (hyphen preserved here;
@@ -98,7 +101,7 @@ public sealed class EnrichmentResolverTests
         var result = await resolver.ResolveAsync(dep);
 
         Assert.Equal("MIT", result.SpdxId);
-        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(2, handler.CallCount); // #71: registry + tarball license-text GET
         Assert.NotNull(result.Enrichment);
         Assert.Equal("pkg:pypi/requests@2.31.0", result.Enrichment.Purl);
         Assert.Equal(new[] { "sha256:deadbeef", "md5:cafef00d" }, result.Enrichment.Hashes);
@@ -126,7 +129,7 @@ public sealed class EnrichmentResolverTests
         var result = await resolver.ResolveAsync(dep);
 
         Assert.Equal("MIT", result.SpdxId);
-        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(2, handler.CallCount); // #71: registry + tarball license-text GET
         Assert.NotNull(result.Enrichment);
         Assert.Equal("pkg:cargo/serde@1.0.0", result.Enrichment.Purl);
         Assert.Equal(new[] { "sha256:deadbeef1234" }, result.Enrichment.Hashes);

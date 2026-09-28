@@ -41,6 +41,9 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             }
 
             var result = await inner.ResolveAsync(dependency, cancellationToken).ConfigureAwait(false);
+            // In-memory only (whole record incl. LicenseText). Unknown —
+            // including text-stage failures — stays uncached. #78 owns disk
+            // cache: no disk code here by design.
             if (result.Status.Equals("Resolved", StringComparison.OrdinalIgnoreCase))
             {
                 Cache[key] = result;
