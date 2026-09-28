@@ -36,19 +36,6 @@ public sealed class MarkdownReportE2ETests
         return (scan, formatter.FormatResult(scan));
     }
 
-    private static int CountOccurrences(string haystack, string needle)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += needle.Length;
-        }
-
-        return count;
-    }
-
     private static string GetTableRow(string output, string name)
     {
         var cell = $"| {name} |";
@@ -90,7 +77,7 @@ public sealed class MarkdownReportE2ETests
         Assert.Contains("| --- | --- | --- | --- | --- | --- | --- | --- | --- |", output, StringComparison.Ordinal);
         var pipeLines = output.Split('\n').Count(line => line.TrimStart().StartsWith("| ", StringComparison.Ordinal));
         Assert.Equal(5, pipeLines);
-        Assert.Equal(3, CountOccurrences(output, "## "));
+        Assert.Equal(3, FormatterTestHelpers.CountOccurrences(output, "## "));
     }
 
     [Fact]
@@ -103,7 +90,7 @@ public sealed class MarkdownReportE2ETests
         foreach (var name in new[] { "express", "lodash", PhantomName })
         {
             var row = GetTableRow(output, name);
-            Assert.Equal(10, CountOccurrences(row, "|"));
+            Assert.Equal(10, FormatterTestHelpers.CountOccurrences(row, "|"));
         }
 
         // Per-package sections with - bullets carrying all 9 fields.

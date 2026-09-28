@@ -363,6 +363,24 @@ internal static class FormatterTestHelpers
     }
 
     /// <summary>
+    /// Ordinal substring count shared by every occurrence-counting suite
+    /// (GroupByLicense/DirectField/MarkdownReportE2E/HtmlReportE2E).
+    /// Non-overlapping matches.
+    /// </summary>
+    internal static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
+
+    /// <summary>
     /// ISO-8601 timestamp shape + parseability (regex-never-golden: prefix
     /// shape pinned, exact instant never matched). Shared by Spdx created +
     /// CycloneDX JSON/XML metadata timestamps.

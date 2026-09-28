@@ -38,19 +38,6 @@ public sealed class HtmlReportE2ETests
         return (scan, formatter.FormatResult(scan));
     }
 
-    private static int CountOccurrences(string haystack, string needle)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += needle.Length;
-        }
-
-        return count;
-    }
-
     private static string GetRow(string output, string name)
     {
         var cell = $"<td>{WebUtility.HtmlEncode(name)}</td>";
@@ -102,8 +89,8 @@ public sealed class HtmlReportE2ETests
         Assert.True(tbodyStart >= 0, "HTML output missing '<tbody>'.");
         Assert.True(tbodyEnd > tbodyStart, "HTML output missing '</tbody>'.");
         var tbody = output.Substring(tbodyStart, tbodyEnd - tbodyStart);
-        Assert.Equal(3, CountOccurrences(tbody, "<tr>"));
-        Assert.Equal(27, CountOccurrences(tbody, "<td>"));
+        Assert.Equal(3, FormatterTestHelpers.CountOccurrences(tbody, "<tr>"));
+        Assert.Equal(27, FormatterTestHelpers.CountOccurrences(tbody, "<td>"));
     }
 
     [Fact]

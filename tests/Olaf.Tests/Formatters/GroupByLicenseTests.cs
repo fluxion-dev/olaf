@@ -9,9 +9,9 @@ namespace Olaf.Tests.Formatters;
 /// built programmatically, no fixture files, no network).
 /// Implementer pins: header "{X} packages under {Y} licenses"; group header
 /// "## {SPDX} ({n} packages)" (txt/md; h2 html); txt "License: {text}"; md
-/// Cell() paragraph; html pre; bullets "- name@version (eco)[; holders]";
+/// Cell() paragraph; html pre; bullets "- name@version (ecosystem)[; holders]";
 /// Unknown bullets add ": {reason}". Key = EffectiveSpdx; groups Ordinal asc
-/// with Unknown LAST; in-group eco/name/version; first-sorted text wins.
+/// with Unknown LAST; in-group ecosystem/name/version; first-sorted text wins.
 /// </summary>
 public sealed class GroupByLicenseTests
 {
@@ -23,19 +23,6 @@ public sealed class GroupByLicenseTests
         "Resolved",
         null)).ToList());
 
-    private static int CountOccurrences(string haystack, string needle)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += needle.Length;
-        }
-
-        return count;
-    }
-
     [Fact]
     public void Should_GroupFiftyMitIntoSingleBlock_When_TxtGrouped()
     {
@@ -46,8 +33,8 @@ public sealed class GroupByLicenseTests
         Assert.Contains("License: MIT License text", output, StringComparison.Ordinal);
         Assert.Contains("- pkg-00@1.0.0 (npm)", output, StringComparison.Ordinal);
         Assert.Contains("- pkg-49@1.0.0 (npm)", output, StringComparison.Ordinal);
-        Assert.Equal(50, CountOccurrences(output, "- pkg-"));
-        Assert.Equal(1, CountOccurrences(output, "## MIT (50 packages)"));
+        Assert.Equal(50, FormatterTestHelpers.CountOccurrences(output, "- pkg-"));
+        Assert.Equal(1, FormatterTestHelpers.CountOccurrences(output, "## MIT (50 packages)"));
     }
 
     [Fact]
@@ -61,8 +48,8 @@ public sealed class GroupByLicenseTests
         Assert.Contains("MIT License text", output, StringComparison.Ordinal);
         Assert.Contains("- pkg-00@1.0.0 (npm)", output, StringComparison.Ordinal);
         Assert.Contains("- pkg-49@1.0.0 (npm)", output, StringComparison.Ordinal);
-        Assert.Equal(50, CountOccurrences(output, "- pkg-"));
-        Assert.Equal(1, CountOccurrences(output, "## MIT (50 packages)"));
+        Assert.Equal(50, FormatterTestHelpers.CountOccurrences(output, "- pkg-"));
+        Assert.Equal(1, FormatterTestHelpers.CountOccurrences(output, "## MIT (50 packages)"));
         Assert.DoesNotContain("| npm |", output, StringComparison.Ordinal);
     }
 
@@ -76,7 +63,7 @@ public sealed class GroupByLicenseTests
         Assert.Contains("<pre>MIT License text</pre>", output, StringComparison.Ordinal);
         Assert.Contains("<li>pkg-00@1.0.0 (npm)</li>", output, StringComparison.Ordinal);
         Assert.Contains("<li>pkg-49@1.0.0 (npm)</li>", output, StringComparison.Ordinal);
-        Assert.Equal(50, CountOccurrences(output, "<li>"));
+        Assert.Equal(50, FormatterTestHelpers.CountOccurrences(output, "<li>"));
         Assert.DoesNotContain("<table", output, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -85,9 +72,9 @@ public sealed class GroupByLicenseTests
     {
         var result = FiftyMitScanResult();
 
-        Assert.Equal(1, CountOccurrences(new TxtFormatter(groupByLicense: true).FormatResult(result), "MIT License text"));
-        Assert.Equal(1, CountOccurrences(new MarkdownFormatter(groupByLicense: true).FormatResult(result), "MIT License text"));
-        Assert.Equal(1, CountOccurrences(new HtmlFormatter(groupByLicense: true).FormatResult(result), "MIT License text"));
+        Assert.Equal(1, FormatterTestHelpers.CountOccurrences(new TxtFormatter(groupByLicense: true).FormatResult(result), "MIT License text"));
+        Assert.Equal(1, FormatterTestHelpers.CountOccurrences(new MarkdownFormatter(groupByLicense: true).FormatResult(result), "MIT License text"));
+        Assert.Equal(1, FormatterTestHelpers.CountOccurrences(new HtmlFormatter(groupByLicense: true).FormatResult(result), "MIT License text"));
     }
 
     [Fact]
@@ -233,7 +220,7 @@ public sealed class GroupByLicenseTests
         Assert.True(appleNpm >= 0, "missing npm/apple bullet.");
         Assert.True(zebraNpm >= 0, "missing npm/zebra bullet.");
         Assert.True(zebraNuget >= 0, "missing nuget/zebra bullet.");
-        Assert.True(appleNpm < zebraNpm && zebraNpm < zebraNuget, "expected in-group eco/name/version order.");
+        Assert.True(appleNpm < zebraNpm && zebraNpm < zebraNuget, "expected in-group ecosystem/name/version order.");
     }
 
     [Fact]

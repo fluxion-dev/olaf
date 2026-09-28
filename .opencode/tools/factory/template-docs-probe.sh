@@ -16,8 +16,12 @@
 #      TemplateModelBuilder.ToolVersionValue vs Olaf.Cli.csproj Version.
 #   D4 FAIL: any committed *.scriban fixture (exactly 2) carries a non-4-tag construct
 #      ({{else}}, `|` filters, unknown #// block, bad var path) or unclosed/mismatched block.
+#   D5 FAIL: attribution example block carries real-looking package/holder rows
+#      without a nearby synthetic|illustrative|shape-only marker; or a `…`
+#      abbreviation without an abbreviates-note; or a TemplateModel.Groups vs
+#      LicenseGrouper sort mention without the Unknown-last contrast note.
 # Rules: repo-relative, idempotent (read-only), no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (factory depth: ../../.. per parser-coverage-probe.sh) ----
@@ -47,7 +51,9 @@ Template-docs drift probe: README model-table keys == TemplateEngine ToScope
 keys (D1, exact + Ordinal), README caps == engine consts (D2: 256 KiB / 1 MiB
 / 10_000), README toolVersion literal == Olaf.Cli.csproj Version (D3, 3-way),
 both committed *.scriban fixtures parse under the 4-tag grammar (D4: no
-{{else}}/filters). Offline-safe: pure grep + python3, no dotnet, no network.
+{{else}}/filters), attribution example synthetic-labels pinned (D5:
+synthetic|illustrative|shape-only + abbreviates-note + Unknown-last
+contrast). Offline-safe: pure grep + python3, no dotnet, no network.
 
 Exit codes: 0 all PASS, 1 assertion failure, 2 usage/environment error.
 
@@ -312,9 +318,106 @@ else
   fail_msg "D4 fixture grammar violation (see MISMATCH lines above)"
 fi
 
+echo "-- D5: attribution example synthetic-labels pinned --"
+set +e
+D5OUT="$(python3 - "$README" <<'PY'
+import re, sys
+readme_path = sys.argv[1]
+readme = open(readme_path, encoding='utf-8').read()
+lines = readme.splitlines()
+bad = []
+
+# Collect fenced blocks with line numbers.
+fences = []  # (start_idx, end_idx, content)
+i = 0
+while i < len(lines):
+    if lines[i].strip().startswith('```'):
+        s = i
+        j = i + 1
+        while j < len(lines) and not lines[j].strip().startswith('```'):
+            j += 1
+        if j >= len(lines):
+            break
+        fences.append((s, j, '\n'.join(lines[s + 1:j])))
+        i = j + 1
+    else:
+        i += 1
+
+PKG = re.compile(r'[A-Za-z0-9_.\-]+@\d+\.\d+')
+MARK = re.compile(r'synthetic|illustrative|shape-only', re.I)
+ELL = '\u2026'
+ABBR = re.compile(r'abbreviat', re.I)
+
+# D5a+D5b: only attribution example blocks (contain a rendered name@version row).
+attr = [(s, e, c) for (s, e, c) in fences if PKG.search(c)]
+if not attr:
+    print("MISMATCH: no attribution example block with name@version found")
+    bad.append('no-example')
+else:
+    print(f"attribution example blocks: {len(attr)}")
+for (s, e, c) in attr:
+    pre = '\n'.join(lines[max(0, s - 10):s])
+    # D5a-1: intro marker nearby (10 lines before fence).
+    if MARK.search(pre):
+        print(f"PASS: D5a intro marker nearby fence L{s + 1}")
+    else:
+        print(f"MISMATCH: attribution example fence L{s + 1} with real-looking package rows lacks nearby synthetic|illustrative|shape-only marker (10 lines before)")
+        bad.append(f'intro-{s + 1}')
+    # D5a-2: every rendered package bullet row carries its own marker.
+    for n, ln in enumerate(c.splitlines(), 1):
+        if PKG.search(ln):
+            if MARK.search(ln):
+                print(f"PASS: D5a bullet marker L{s + 1 + n}: {ln.strip()[:80]}")
+            else:
+                print(f"MISMATCH: attribution bullet without synthetic|illustrative marker (fence L{s + 1}, row: {ln.strip()[:100]})")
+                bad.append(f'bullet-{s + 1}-{n}')
+    # D5b: `…` abbreviation requires an abbreviates-note nearby (same fence or intro).
+    if ELL in c:
+        if ABBR.search(c) or ABBR.search(pre):
+            print(f"PASS: D5b `…` abbreviates-note present (fence L{s + 1})")
+        else:
+            print(f"MISMATCH: `…` abbreviation without abbreviates-note (fence L{s + 1})")
+            bad.append(f'ellipsis-{s + 1}')
+    else:
+        print(f"PASS: D5b no `…` in fence L{s + 1} (nothing to label)")
+
+# D5c: every TemplateModel.Groups + LicenseGrouper sort window needs Unknown-last contrast.
+has_both = 'TemplateModel.Groups' in readme and 'LicenseGrouper' in readme
+if not has_both:
+    print("PASS: D5c no Groups-vs-Grouper sort mention (nothing to contrast)")
+else:
+    windows = []
+    for k in range(len(lines)):
+        w = '\n'.join(lines[k:k + 10])
+        if 'TemplateModel.Groups' in w and 'LicenseGrouper' in w:
+            windows.append(k)
+    if not windows:
+        print("MISMATCH: TemplateModel.Groups + LicenseGrouper mentioned but never together in a 10-line window (contrast note placement drift)")
+        bad.append('contrast-placement')
+    else:
+        for k in windows:
+            w = '\n'.join(lines[k:k + 10])
+            if 'Unknown' in w and re.search(r'last', w, re.I):
+                print(f"PASS: D5c Unknown-last contrast present (window L{k + 1}-L{k + 10})")
+            else:
+                print(f"MISMATCH: Groups-vs-Grouper sort mention without Unknown-last contrast (window L{k + 1}-L{k + 10})")
+                bad.append(f'contrast-{k + 1}')
+
+sys.exit(1 if bad else 0)
+PY
+)"
+D5RC=$?
+set -e
+echo "$D5OUT"
+if [[ "$D5RC" -eq 0 ]]; then
+  pass "D5 attribution synthetic-labels pinned"
+else
+  fail_msg "D5 synthetic-label drift (see MISMATCH lines above)"
+fi
+
 echo "== summary =="
 if [[ "$fail" -eq 0 ]]; then
-  echo "TEMPLATE-DOCS-PROBE OK: D1-D4 all pass."
+  echo "TEMPLATE-DOCS-PROBE OK: D1-D5 all pass."
   exit 0
 else
   echo "TEMPLATE-DOCS-PROBE FAILED: see FAIL lines above." >&2

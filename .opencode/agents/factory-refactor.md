@@ -21,3 +21,4 @@ Rules:
 - No second copies: new absolute-http URL gates delegate to EnrichmentHelpers.NormalizeHttpUrl (no 2nd Uri.TryCreate+scheme copy); new Maven splits call MavenCoordinates.TrySplit direct (no per-consumer wrapper).
 - Extraction is delete-the-wrapper: after a call site moves to the shared helper, the leftover forwarder goes too — never leave a same-shape wrapper behind.
 - Via-comment placement rule: consumer-list comments are code — update the list when migrating/deleting a copy.
+- IsUnknown single-canonical rule: grouping-path Unknown must route via LicenseGrouper.IsUnknown, never re-spell literal.

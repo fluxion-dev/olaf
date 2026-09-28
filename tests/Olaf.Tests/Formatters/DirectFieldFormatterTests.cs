@@ -31,19 +31,6 @@ public sealed class DirectFieldFormatterTests
             "not-found: no license for 'shadow-dep 1.0.0'."),
     });
 
-    private static int CountOccurrences(string haystack, string needle)
-    {
-        var count = 0;
-        var index = 0;
-        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += needle.Length;
-        }
-
-        return count;
-    }
-
     [Fact]
     public void Should_SurfaceDirectBoolLast_When_FormatJson()
     {
@@ -117,7 +104,7 @@ public sealed class DirectFieldFormatterTests
         Assert.True(reasonTh >= 0 && directTh > reasonTh, "Expected '<th>Direct</th>' after '<th>Reason</th>'.");
         // 2 body rows x 9 columns = 18 td cells; per-row values pinned.
         var tbody = output.Substring(output.IndexOf("<tbody>", StringComparison.Ordinal));
-        Assert.Equal(18, CountOccurrences(tbody, "<td>"));
+        Assert.Equal(18, FormatterTestHelpers.CountOccurrences(tbody, "<td>"));
         var expressAt = tbody.IndexOf("express", StringComparison.Ordinal);
         var expressRow = tbody.Substring(expressAt, Math.Min(600, tbody.Length - expressAt));
         Assert.Contains("<td>true</td>", expressRow, StringComparison.Ordinal);
@@ -160,8 +147,8 @@ public sealed class DirectFieldFormatterTests
         // 2 data rows x 10 pipes each; per-package sections carry - Direct:.
         var pipeLines = output.Split('\n').Where(line => line.TrimStart().StartsWith("| ", StringComparison.Ordinal)).ToList();
         Assert.Equal(4, pipeLines.Count); // header + separator + 2 rows
-        Assert.Equal(10, CountOccurrences(pipeLines[2], "|"));
-        Assert.Equal(10, CountOccurrences(pipeLines[3], "|"));
+        Assert.Equal(10, FormatterTestHelpers.CountOccurrences(pipeLines[2], "|"));
+        Assert.Equal(10, FormatterTestHelpers.CountOccurrences(pipeLines[3], "|"));
         Assert.Contains("| true |", output, StringComparison.Ordinal);
         Assert.Contains("| false |", output, StringComparison.Ordinal);
         var expressSection = output.Substring(output.IndexOf("## express@", StringComparison.Ordinal));
