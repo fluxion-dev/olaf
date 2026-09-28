@@ -12,7 +12,7 @@
 # --filter FullyQualifiedName~<Area>` is authoritative; text census
 # (`[Fact]`/`[Theory]` grep with bin/obj excluded) is informational only —
 # Theory expansion means FQN >= census; README N is informational only.
-VERSION="0.3.1"
+VERSION="0.3.2"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -81,10 +81,12 @@ while [[ $# -gt 0 ]]; do
     --fqn)
       [[ -n "${2:-}" ]] || { echo "Missing value for --fqn <Area> (try --help)" >&2; exit 2; }
       FQN_AREA="$2"
+      FQN_AREA="${FQN_AREA#FullyQualifiedName~}"
       shift 2 ;;
     --fqn=*)
       FQN_AREA="${1#*=}"
       [[ -n "$FQN_AREA" ]] || { echo "Missing value for --fqn=<Area> (try --help)" >&2; exit 2; }
+      FQN_AREA="${FQN_AREA#FullyQualifiedName~}"
       shift ;;
     --update) UPDATE=1; shift ;;
     *) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;

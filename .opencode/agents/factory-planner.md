@@ -33,6 +33,10 @@ Wave 5b hardening (binding, threshold-HIT):
 - Rename reconciliation (#77 harvest): rename allowed only with same-count note in PR body (e.g. 6+3=3+6); exact-filename drift without note blocks freeze.
 - Factory-Notes mandate (#77 harvest): PR body must carry `Factory-Notes` with expected-vs-shipped test triple + plan-accuracy; merge step must verify `git branch -r` remote deleted.
 - Files subdir convention (#77 harvest): plan `Files:` must cite target subdir per tester style (`Cli/` subprocess-e2e vs `Resolvers/` throwing-handler) or flag rename at freeze.
+- Retro citations path-qualified (#50 harvest): cite `.opencode/plans/retro-<n>.md` (never bare `retro-<n>.md` — root has no retros).
+- One implement step per new file (#50 harvest): sub-arms a/b/c/d for Facts under one `Step N: create <file> [total]` with method-name anchors (`Should_*`), never line-slice anchors (`:~60/~120` drift on first edit); per-Fact top-level Steps against one file are forbidden.
+- Literal plan-accuracy token (#50 harvest): PR Factory-Notes must carry the literal string `plan-accuracy: EXACT` (or explicit DRIFT) so Wave 5a greps need not infer.
+- Precedent-mirror escape (#50 harvest): e2e-live-shape allows `precedent-mirror with anchor` (sibling pins cited) alongside `why-inapplicable with anchor`.
 - Store-shape serialization pin (#78 harvest): JSON/file-cache bindings must pin on-disk casing policy (`JsonPropertyName`/naming-policy + case-insensitive-read + compat aliases) — unpinned casing caused a full tester re-queue.
 - Asymmetric-split rule (#48 harvest): never force symmetric `N+N` test rows across ecosystems with different concepts; require per-arm eco-concept anchor (e.g. no-owner only meaningful for owner/repo ecosystems) when sum-check rows span ecosystems.
 - E2E live-shape rule (#48 harvest): live-network stories must cite a Wave-1 live payload-keys snapshot (endpoint keys recorded, SPDX-clean pins, date) with rerun-once-on-429/5xx discipline.

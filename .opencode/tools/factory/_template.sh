@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.9"
+VERSION="0.2.10"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -309,8 +309,11 @@ KEEP_TEMP=0
 #   E2E files — Trait doc-comment overcount hit in #48/#49 QA slots).
 #   Back-port: vcpkg-conan-e2e-probe.sh E2 gate already carries the anchored
 #   form live (fixed pre-promote from naive grep -c).
-# # E2E_TRAIT_RE='^[[:space:]]*\[Trait\("Category", *"E2E"\)\]'
+# # E2E_TRAIT_RE='^[[:space:]]*\[Trait("Category", *"E2E")\]'
 # # e2e_trait_count="$(grep -rc --include='*.cs' -e "$E2E_TRAIT_RE" tests/Olaf.Tests/Resolvers/ || [ $? -eq 1 ])"
+# # NOTE: BRE literal parens are BARE ( \( \) are grouping operators and can
+# #   never match literal parens — fixed 0.2.10 after xml-report probe copier
+# #   caught the escaped form matching zero lines).
 # # call site (replaces bare grep -c Trait census):
 # #   n="$(grep -c -e "$E2E_TRAIT_RE" "$f" || [ $? -eq 1 ]); echo \"trait-attrs=$n facts=$(grep -c '\[Fact\]' "$f" || [ $? -eq 1 ])\""
 
