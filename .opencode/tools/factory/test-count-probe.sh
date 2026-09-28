@@ -12,7 +12,7 @@
 # --filter FullyQualifiedName~<Area>` is authoritative; text census
 # (`[Fact]`/`[Theory]` grep with bin/obj excluded) is informational only —
 # Theory expansion means FQN >= census; README N is informational only.
-VERSION="0.3.0"
+VERSION="0.3.1"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -60,7 +60,9 @@ if [[ "${1:-}" == "--help" ]]; then
   echo "(FQN-count, text-census, README N) triple in one call, e.g.:"
   echo "  FQN=227 CENSUS=219 README=674 AREA=Parsers"
   echo "FQN-count (authoritative) = \`dotnet test --list-tests"
-  echo "--filter FullyQualifiedName~<Area>\` lines; text-census (informational)"
+  echo "--filter FullyQualifiedName~<Area>\` lines; use FullyQualifiedName~<ClassName>"
+  echo "per-file (bare ~<Area> substring is informational only — TemplateHolders"
+  echo "collision exemplar); text-census (informational)"
   echo "= \`grep -r [Fact]/[Theory]\` under tests/Olaf.Tests/<Area>/ (or the"
   echo "whole tree when <Area> is not a test dir); README N (informational) ="
   echo "documented \`Tests: N passing\`. Theory/InlineData expansion explains"
