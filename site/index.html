@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>olaf — license scanner</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body class="bg-white text-slate-800 antialiased" style="color:#1c2333">
+
+<header class="bg-gradient-to-br from-[#1c2333] via-[#2a2350] to-[#512bd4] px-5 pb-10 pt-14 text-center text-white">
+  <h1 class="m-0 text-5xl font-extrabold tracking-wide">olaf<span class="text-[#b7a6f5]">.</span></h1>
+  <p class="mx-auto mt-2 max-w-3xl text-lg text-[#d7d0f2]">License scanner: <code class="whitespace-nowrap rounded bg-white/10 px-2 py-0.5 font-mono text-[0.9em] text-white">olaf generate &lt;DIR&gt;</code> scans a project directory, resolves licenses, writes a report to stdout or a file.</p>
+  <p class="mx-auto mt-2 max-w-3xl text-lg text-[#d7d0f2]">One command. Thirteen ecosystems. Zero setup. Fun at parties, serious in CI.</p>
+  <div class="mt-5">
+    <a class="mx-1 no-underline" href="https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml"><img class="inline h-5 align-middle" src="https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a class="mx-1 no-underline" href="https://github.com/fluxion-dev/olaf/releases"><img class="inline h-5 align-middle" src="https://img.shields.io/github/v/release/fluxion-dev/olaf?include_prereleases" alt="Release"></a>
+    <a class="mx-1 no-underline" href="https://github.com/fluxion-dev/olaf"><img class="inline h-5 align-middle" src="https://img.shields.io/github/license/fluxion-dev/olaf" alt="License"></a>
+    <a class="mx-1 no-underline" href="https://github.com/fluxion-dev/olaf"><img class="inline h-5 align-middle" src="https://img.shields.io/badge/.NET-10-512BD4" alt=".NET 10"></a>
+  </div>
+</header>
+
+<nav class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-5 py-2.5 text-center text-[0.95rem]">
+  <a class="mx-3 text-[#512bd4] no-underline hover:underline" href="#problems">Problems</a>
+  <a class="mx-3 text-[#512bd4] no-underline hover:underline" href="#install">Install</a>
+  <a class="mx-3 text-[#512bd4] no-underline hover:underline" href="#usage">Usage</a>
+  <a class="mx-3 text-[#512bd4] no-underline hover:underline" href="#formats">Formats</a>
+  <a class="mx-3 text-[#512bd4] no-underline hover:underline" href="#exits">Exit codes</a>
+  <a class="mx-3 text-[#512bd4] no-underline hover:underline" href="#links">Links</a>
+</nav>
+
+<main class="mx-auto max-w-4xl px-5 pb-12 pt-8">
+
+<section id="problems" class="mb-10">
+  <h2 class="mb-3 text-2xl font-bold"><span class="mr-1.5">🧭</span>Problems olaf solves</h2>
+  <p class="text-lg text-[#5a6376]">Dependency sprawl is a license-sprawl problem. olaf answers “what licenses ship with my build?” with a single sweep.</p>
+  <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+    <div class="rounded-xl border border-[#e2ddf3] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <h3 class="mb-1.5 text-lg font-semibold">🗺️ 13-ecosystem sprawl</h3>
+      <p class="m-0 text-[0.95rem] text-[#5a6376]">One sweep covers <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan</code> (<code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">pypi</code> alias for <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">pip</code>). Polyglot repo? Still one command.</p>
+    </div>
+    <div class="rounded-xl border border-[#e2ddf3] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <h3 class="mb-1.5 text-lg font-semibold">📋 Audit &amp; SBOM pressure</h3>
+      <p class="m-0 text-[0.95rem] text-[#5a6376]">Emit CycloneDX 1.5 (<code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">cyclonedx-json</code>, <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">cyclonedx-xml</code>) or SPDX 2.3 (<code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">spdx-json</code>) straight from the same run auditors already trust.</p>
+    </div>
+    <div class="rounded-xl border border-[#e2ddf3] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <h3 class="mb-1.5 text-lg font-semibold">✈️ Air-gap friendly</h3>
+      <p class="m-0 text-[0.95rem] text-[#5a6376]"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--offline</code> resolves licenses from the embedded SPDX DB only — zero HTTP. Perfect for locked-down runners and planes.</p>
+    </div>
+    <div class="rounded-xl border border-[#e2ddf3] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <h3 class="mb-1.5 text-lg font-semibold">🚦 CI license gates</h3>
+      <p class="m-0 text-[0.95rem] text-[#5a6376]"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--strict</code> fails the build (exit 1) when any license comes back <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">Unknown</code>. Unknowns never slip into a release unnoticed.</p>
+    </div>
+    <div class="rounded-xl border border-[#e2ddf3] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <h3 class="mb-1.5 text-lg font-semibold">💌 Attribution without tears</h3>
+      <p class="m-0 text-[0.95rem] text-[#5a6376]">The <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">md</code> report is a human-readable attribution page: header counts plus a section per package. Paste it into your docs and done.</p>
+    </div>
+    <div class="rounded-xl border border-[#e2ddf3] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <h3 class="mb-1.5 text-lg font-semibold">⚡ Zero-config + always-on cache</h3>
+      <p class="m-0 text-[0.95rem] text-[#5a6376]"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">generate</code> is the only command and it just works — defaults point at the current directory and print <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">json</code> to stdout. The license cache is internal and always on, so repeat runs stay fast.</p>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="mb-10">
+  <h2 class="mb-3 text-2xl font-bold"><span class="mr-1.5">📦</span>Install</h2>
+  <p>No .NET install required: each <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">v*</code> tag ships self-contained single-file binaries. Grab one with <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">curl</code> (or <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">gh</code>), make it executable, check the version:</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
+chmod +x /tmp/olaf-dl/olaf-linux-x64
+/tmp/olaf-dl/olaf-linux-x64 --version
+<span class="text-[#9d94c7]"># 0.1.0-preview.3+...</span>
+</code></pre>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">gh release download v0.1.0-preview.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
+chmod +x /tmp/olaf-dl/olaf-linux-x64
+/tmp/olaf-dl/olaf-linux-x64 --version
+<span class="text-[#9d94c7]"># 0.1.0-preview.3+...</span>
+</code></pre>
+  <table class="w-full border-collapse text-[0.95rem]">
+    <tr><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">RID</th><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Binary</th><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Size (attached asset)</th></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">linux-x64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">olaf-linux-x64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">75,007,663 bytes (~71.5 MiB)</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">osx-arm64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">olaf-osx-arm64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">81,467,641 bytes (~77.7 MiB)</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">win-x64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">olaf-win-x64.exe</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">74,966,246 bytes (~71.5 MiB)</td></tr>
+  </table>
+  <p>Prefer the .NET toolchain? Install the pinned prerelease as a global tool (the pin is required — unpinned installs fail for prereleases):</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">dotnet pack src/Olaf.Cli -c Release
+dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.3
+olaf --help
+</code></pre>
+</section>
+
+<section id="usage" class="mb-10">
+  <h2 class="mb-3 text-2xl font-bold"><span class="mr-1.5">🚀</span>Usage</h2>
+  <p>Full command shape — <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">generate [PATH]</code> is the only command (<code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">PATH</code> defaults to <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">.</code>, the report goes to stdout unless <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--out</code> is given):</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">olaf generate &lt;DIR&gt; [--format &lt;fmt&gt;] [--out &lt;file&gt;] [--force] [--strict] [--offline]
+</code></pre>
+  <p>Exactly five flags, nothing else:</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">--format &lt;format&gt;  Output format: json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json (default: json)
+--out &lt;out&gt;        Output file path (default: stdout; parent directories are created)
+--force            Overwrite output file if it exists
+--strict           Fail (exit 1) on unknown licenses
+--offline          Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)
+</code></pre>
+  <p>Quickstart (exits <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">0</code>, summary <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">total 3, resolved 2, unknown 1</code> on the bundled fixture):</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">olaf generate tests/Olaf.Tests/Fixtures/npm --format json --offline
+<span class="text-[#9d94c7]"># {"summary":{"total":3,"resolved":2,"unknown":1},...} (exit 0)</span>
+</code></pre>
+  <p>Gate it in CI — the same run exits <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">1</code> because one license is <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">Unknown</code> (the report is still written first):</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">olaf generate tests/Olaf.Tests/Fixtures/npm --format json --offline --strict
+<span class="text-[#9d94c7]"># report written, then exit 1 on the Unknown row</span>
+</code></pre>
+  <p>Help and version both exit <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">0</code>:</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">olaf generate --help
+olaf --version
+<span class="text-[#9d94c7]"># 0.1.0-preview.3+...</span>
+</code></pre>
+</section>
+
+<section id="formats" class="mb-10">
+  <h2 class="mb-3 text-2xl font-bold"><span class="mr-1.5">🎨</span>Formats</h2>
+  <p>Seven formats, zero aliases. One sweep, whichever shape your pipeline wants:</p>
+  <table class="w-full border-collapse text-[0.95rem]">
+    <tr><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Format</th><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Output</th></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">json</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Summary counts plus per-package rows, sorted <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">ecosystem → name → version</code></td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">yaml</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Same shape as <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">json</code>, YAML-encoded</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">xml</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Same fields as <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">json</code>, XML-encoded</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">md</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Human-readable attribution report (header counts + per-package sections)</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">cyclonedx-json</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">CycloneDX 1.5 SBOM</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">cyclonedx-xml</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Same CycloneDX 1.5 data as JSON, XML-encoded</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">spdx-json</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">SPDX 2.3 SBOM</td></tr>
+  </table>
+</section>
+
+<section id="exits" class="mb-10">
+  <h2 class="mb-3 text-2xl font-bold"><span class="mr-1.5">🔢</span>Exit codes</h2>
+  <table class="w-full border-collapse text-[0.95rem]">
+    <tr><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Code</th><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Meaning</th></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left font-bold text-[#1a7f37]"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">0</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Success — including runs with <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">Unknown</code> licenses (without <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--strict</code>), empty-directory empty reports, <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--help</code>/<code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--version</code></td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left font-bold text-[#9a6700]"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">1</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--strict</code> found <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">Unknown</code> licenses (report is still written first)</td></tr>
+    <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left font-bold text-[#cf222e]"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">2</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">Usage/IO error: path not found, single-file input, unsupported <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--format</code>, unknown option, <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--out</code> exists without <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--force</code>, write failure</td></tr>
+  </table>
+</section>
+
+<section id="links" class="mb-10">
+  <h2 class="mb-3 text-2xl font-bold"><span class="mr-1.5">🔗</span>Links</h2>
+  <ul class="list-disc pl-6">
+    <li class="mb-1.5">Repository: <a class="text-[#512bd4] hover:underline" href="https://github.com/fluxion-dev/olaf">https://github.com/fluxion-dev/olaf</a></li>
+    <li class="mb-1.5">Releases: <a class="text-[#512bd4] hover:underline" href="https://github.com/fluxion-dev/olaf/releases">https://github.com/fluxion-dev/olaf/releases</a></li>
+    <li class="mb-1.5">Current release: <a class="text-[#512bd4] hover:underline" href="https://github.com/fluxion-dev/olaf/releases/tag/v0.1.0-preview.3">v0.1.0-preview.3</a></li>
+  </ul>
+</section>
+
+</main>
+
+<footer class="border-t border-[#e2ddf3] bg-[#f4f2fb] px-5 pb-8 pt-6 text-center text-[0.92rem] text-[#5a6376]">
+  <p class="m-0"><a class="text-[#512bd4] hover:underline" href="https://github.com/fluxion-dev/olaf">olaf</a> — a license scanner that takes Docs Day seriously, and itself lightly. Reports issues upstream.</p>
+</footer>
+
+</body>
+</html>
