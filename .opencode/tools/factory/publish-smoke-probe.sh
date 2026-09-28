@@ -5,13 +5,15 @@
 # single-file shape (one apphost, no *.dll beside it), then smokes the published
 # apphost with dotnet stripped from PATH (--help/--version exit 0, npm-fixture
 # offline generate exit 0 + JSON parse, --strict exit 1, missing-path + bad-format
-# exit 2).
+# exit 2). v0.2.0 parity arm: published-apphost vs framework-DLL `generate` on
+# the npm fixture (json/offline) must be byte-identical outputs with equal
+# summary.total/resolved/unknown parsed from JSON (never prose).
 # Correctness notes (tester's verified run): apphost filename is `Olaf.Cli`
 # (NOT lowercase `olaf`; win-x64 `Olaf.Cli.exe`); shell MUST be bash (zsh lacks
 # shopt nullglob; release.yml run: default is bash); osx-arm64/win-x64 binaries
 # cannot execute on linux (existence+size+single-file only, runtime CI-only).
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 shopt -s nullglob
 
@@ -35,7 +37,8 @@ Usage: $(basename "$0") [options]
 
 Single-file publish + no-runtime smoke: publishes the RID matrix via
 -p:PublishRID=<rid>, gates single-file shape, smokes the linux-x64 apphost
-with dotnet stripped from PATH.
+with dotnet stripped from PATH, then gates published-apphost vs
+framework-DLL generate parity (npm fixture, json, offline).
 
 Options:
   --rid <rid>           linux-x64 | osx-arm64 | win-x64 | all (default: all)
@@ -279,6 +282,89 @@ smoke_linux() {
   fi
 }
 
+parity_apphost_vs_dll() {
+  local rid="linux-x64"
+  local pubdir="$REPO_ROOT/src/Olaf.Cli/bin/Release/net10.0/$rid/publish"
+  local apphost="$pubdir/Olaf.Cli"
+  local dll="$REPO_ROOT/src/Olaf.Cli/bin/Release/net10.0/Olaf.Cli.dll"
+  echo "-- parity published-apphost vs framework-dll (npm fixture, json, offline) --"
+  if [[ ! -f "$apphost" ]]; then
+    fail_msg "parity: apphost missing (publish first)"
+    return
+  fi
+  # Always rebuild the framework DLL fresh: the bin/Release copy may be stale
+  # (pre-#123 --input CLI) since publish writes only to the RID publish dir.
+  echo "NOTE: parity builds a fresh framework DLL (Release, no PublishRID)"
+  run_gate "$WORKDIR/parity-build.log" -- timeout "$TIMEOUT_SECS" dotnet build "$REPO_ROOT/src/Olaf.Cli/Olaf.Cli.csproj" -c Release --nologo -v minimal
+  if [[ "$RC" -ne 0 ]]; then
+    fail_msg "parity build exited $RC (log: $WORKDIR/parity-build.log)"
+    return
+  fi
+  if [[ ! -f "$dll" ]]; then
+    fail_msg "parity: framework DLL still missing after build: $dll"
+    return
+  fi
+  pass "parity framework DLL built fresh"
+  run_gate "$WORKDIR/parity-pub.log" -- env "PATH=$pubdir" "$TIMEOUT_BIN" "$SMOKE_TIMEOUT" "$apphost" generate "$NPMFIX" --format json --offline
+  if [[ "$RC" -ne 0 ]]; then
+    fail_msg "parity apphost generate exited $RC (want 0)"
+    return
+  fi
+  pass "parity apphost generate exit 0"
+  run_gate "$WORKDIR/parity-dll.log" -- timeout "$SMOKE_TIMEOUT" dotnet "$dll" generate "$NPMFIX" --format json --offline
+  if [[ "$RC" -ne 0 ]]; then
+    fail_msg "parity framework-dll generate exited $RC (want 0)"
+    return
+  fi
+  pass "parity framework-dll generate exit 0"
+  # Counts parsed from JSON summary (never prose); assert pub==dll equality,
+  # NOT hardcoded totals (fixture may evolve).
+  local pub_counts dll_counts
+  pub_counts="$(python3 - "$WORKDIR/parity-pub.log" <<'PY' 2>/dev/null
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    s = data["summary"]
+    print(f"{int(s['total'])} {int(s['resolved'])} {int(s['unknown'])}")
+except Exception:
+    sys.exit(1)
+PY
+)"
+  if [[ -z "$pub_counts" ]]; then
+    fail_msg "parity apphost output is not JSON with summary.total/resolved/unknown"
+    return
+  fi
+  pass "parity apphost summary parses as JSON ($pub_counts)"
+  dll_counts="$(python3 - "$WORKDIR/parity-dll.log" <<'PY' 2>/dev/null
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    s = data["summary"]
+    print(f"{int(s['total'])} {int(s['resolved'])} {int(s['unknown'])}")
+except Exception:
+    sys.exit(1)
+PY
+)"
+  if [[ -z "$dll_counts" ]]; then
+    fail_msg "parity framework-dll output is not JSON with summary.total/resolved/unknown"
+    return
+  fi
+  pass "parity framework-dll summary parses as JSON ($dll_counts)"
+  if [[ "$pub_counts" != "$dll_counts" ]]; then
+    fail_msg "parity summary mismatch: apphost=[$pub_counts] dll=[$dll_counts]"
+    return
+  fi
+  pass "parity summary equal ($pub_counts)"
+  if diff -u "$WORKDIR/parity-pub.log" "$WORKDIR/parity-dll.log" >"$WORKDIR/parity.diff" 2>&1; then
+    pass "parity outputs byte-identical"
+  else
+    fail_msg "parity outputs differ (diff: $WORKDIR/parity.diff)"
+    return
+  fi
+  local total="${pub_counts%% *}"
+  echo "PARITY-OK total=$total"
+}
+
 echo "== publish-smoke-probe v$VERSION =="
 echo "repo: $REPO_ROOT"
 echo "rid: $RID"
@@ -299,6 +385,7 @@ done
 
 if [[ "$RID" == "all" || "$RID" == "linux-x64" ]]; then
   smoke_linux
+  parity_apphost_vs_dll
 else
   echo "NOTE: runtime smoke skipped (--rid $RID is not linux-x64)"
 fi

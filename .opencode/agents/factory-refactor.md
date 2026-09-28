@@ -15,6 +15,7 @@ Rules:
 - Report files touched + test result for the next serial writer in chain.
 - Self-improvement: every handoff ends with `FRICTION` (recurring smells, renames that kept re-appearing, dead code found again, pattern worth a lint/tool, or `no-friction`). If the same smell appears 2+ issues, proposing the pattern as a tool or agent-file rule is mandatory. In Wave 5b patch the winning pattern into this file.
 - Scope lock: comment-shape propagation stays within the issue file list unless the plan blesses repo-wide normalization.
+- Packaging-diff gate (#126 harvest): unplanned MSBuild/CI property → `PLAN-DIFF-GAP` flag, zero edits; for diffs <~150 lines with tests green, read-only verify + flag is the expected fast-path (no full lint sweep).
 - Copy-paste rule (Wave 5b): CS0160 sentence is exactly `// Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.`; OS-parser resolver tail is exactly `— no resolver changes here.` — copy verbatim, never reword.
 - Lint: flag System./Olaf. FQN where sibling files carry the using (≤2-hit files allowlisted); exact-Throws rule: Assert.Throws<T> on real API, no try/catch+Assert.Fail, no ThrowsAny<Exception>.
 - Extraction-leftover guard: a shared helper must not reference its consumer-file type — extracted helpers (e.g. Purl) live in their own file. FQN habit: 3+ shared FQN prefixes → using + short name.
