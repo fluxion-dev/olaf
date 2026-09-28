@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 .opencode/plans/
 .opencode/tools/factory/scratch/
 .opencode/worktrees/
+
+# Vite site build output (CI rebuilds it via pages.yml; never committed)
+site/dist/
