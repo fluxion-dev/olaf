@@ -12,10 +12,14 @@
 #   template-missing (--template nofile)  -> 2 + Template-not-found stderr
 #   template-badsyntax (unclosed {{#each}})-> 2 + line-N stderr
 #   rules-missing (--rules nofile)        -> 2 + Rules-file-not-found stderr
+#   generate-default (empty dir)          -> 0 + empty SBOM (total 0)
+#   generate-fixture (fixture parity)     -> exit + total match legacy --input
+#   generate-bad-format (--format bogus)  -> 2
+#   generate-missing (nonexistent path)   -> 2 + Input-not-found stderr
 # Split: successful --out run must have empty stdout (report -> file only).
-# Help: --help output mentions --template, --rules (additive, --input check untouched).
+# Help: --help output mentions --template, --rules, generate + olaf-generate examples (additive, --input check untouched).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.4.0"
+VERSION="0.5.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -48,6 +52,9 @@ Checks:
   template-missing->2 (+ Template-not-found stderr)
   template-badsyntax->2 (+ line-N stderr)
   rules-missing->2 (+ Rules-file-not-found stderr)
+  generate-default->0 (+ empty SBOM total 0) | generate-fixture parity (exit + total)
+  generate-bad-format->2 | generate-missing->2 (+ Input-not-found stderr)
+  help mentions generate + olaf-generate examples
   split: --out run has empty stdout
 
 Exit codes: 0 all PASS, 1 assertion failure, 2 usage/environment error.
@@ -247,6 +254,68 @@ if grep -q "Rules file not found" "$WORKDIR/rules-missing.stderr" 2>/dev/null; t
   pass "rules-missing" "stderr mentions Rules file not found"
 else
   fail "rules-missing" "stderr missing Rules file not found (tail: $(tail -c 200 "$WORKDIR/rules-missing.stderr" | tr '\n' ' '))"
+fi
+
+echo "-- step 6: generate subcommand arms (issue #76, additive) --"
+# help surface: root --help (captured in step 1) mentions generate + an olaf-generate example
+if grep -q "generate" "$WORKDIR/help.stdout" 2>/dev/null || grep -q "generate" "$WORKDIR/help.stderr" 2>/dev/null; then
+  pass "generate-help" "root --help mentions generate"
+else
+  fail "generate-help" "root --help missing generate"
+fi
+if grep -q "olaf generate" "$WORKDIR/help.stdout" 2>/dev/null || grep -q "olaf generate" "$WORKDIR/help.stderr" 2>/dev/null; then
+  pass "generate-help" "root --help carries olaf-generate examples"
+else
+  fail "generate-help" "root --help missing olaf-generate examples"
+fi
+
+# generate-default: manifest-less empty dir -> 0 + valid empty SBOM (total 0, licenses [])
+mkdir -p "$WORKDIR/gen-empty"
+run_cli "generate-default" 0 generate "$WORKDIR/gen-empty" || true
+if grep -q '"total":0' "$WORKDIR/generate-default.stdout" 2>/dev/null; then
+  pass "generate-default" "empty SBOM total 0"
+else
+  fail "generate-default" "stdout missing total 0 (tail: $(tail -c 200 "$WORKDIR/generate-default.stdout" | tr '\n' ' '))"
+fi
+if grep -q '"licenses":\[\]' "$WORKDIR/generate-default.stdout" 2>/dev/null; then
+  pass "generate-default" "empty SBOM licenses []"
+else
+  fail "generate-default" "stdout missing empty licenses array"
+fi
+
+# generate-fixture: same fixture via generate vs legacy --input -> parity exit + total
+run_cli "generate-fixture" 0 generate "$FIXTURE" || true
+set +e
+timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$FIXTURE" >"$WORKDIR/generate-parity.stdout" 2>"$WORKDIR/generate-parity.stderr"
+PARITY_RC=$?
+set -e
+if [[ "$PARITY_RC" -eq 0 ]]; then
+  pass "generate-fixture" "legacy --input parity exit 0"
+else
+  fail "generate-fixture" "legacy --input parity exit $PARITY_RC (want 0)"
+fi
+GEN_TOTAL="$(grep -o '"total":[0-9]*' "$WORKDIR/generate-fixture.stdout" 2>/dev/null | head -1)"
+LEG_TOTAL="$(grep -o '"total":[0-9]*' "$WORKDIR/generate-parity.stdout" 2>/dev/null | head -1)"
+if [[ -n "$GEN_TOTAL" && "$GEN_TOTAL" == "$LEG_TOTAL" ]]; then
+  pass "generate-fixture" "parity total $GEN_TOTAL"
+else
+  fail "generate-fixture" "total mismatch generate=${GEN_TOTAL:-?} legacy=${LEG_TOTAL:-?}"
+fi
+
+# generate-bad-format: bogus format -> 2 + Unsupported-format stderr
+run_cli "generate-bad-format" 2 generate "$FIXTURE" --format bogus || true
+if grep -q "Unsupported format" "$WORKDIR/generate-bad-format.stderr" 2>/dev/null; then
+  pass "generate-bad-format" "stderr mentions Unsupported format"
+else
+  fail "generate-bad-format" "stderr missing Unsupported format (tail: $(tail -c 200 "$WORKDIR/generate-bad-format.stderr" | tr '\n' ' '))"
+fi
+
+# generate-missing-path: nonexistent path -> 2 + Input-not-found stderr
+run_cli "generate-missing-path" 2 generate "$WORKDIR/does-not-exist-olaf-xyz" || true
+if grep -q "Input not found" "$WORKDIR/generate-missing-path.stderr" 2>/dev/null; then
+  pass "generate-missing-path" "stderr mentions Input not found"
+else
+  fail "generate-missing-path" "stderr missing Input not found (tail: $(tail -c 200 "$WORKDIR/generate-missing-path.stderr" | tr '\n' ' '))"
 fi
 
 echo "== summary =="

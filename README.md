@@ -14,9 +14,20 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 771 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 794 passing (`dotnet test`).
 
 ## Usage
+
+Quickstart (zero-config; both verified offline — exit `0`):
+
+```bash
+# default PATH `.`, json report to stdout
+dotnet run --project src/Olaf.Cli -- generate .
+# same, pinned to the offline npm fixture (reason strings vary with network, so never golden-match them)
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json
+```
+
+Legacy `--input` form is preserved (same scanner, same flags):
 
 ```bash
 # stdout (default json)
@@ -48,6 +59,7 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/packa
 ```
 
 Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
+`generate [PATH]` inherits ALL of these flags (same spec, same behavior — see `### Generate subcommand`); `--input` is optional on `generate` (a present `--input` wins over the positional `PATH`).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate. `--rules <file>` loads a YAML policy file declaring the same gate in version control (see `### Policy file`); per key, a present `--allow`/`--deny` flag REPLACES the file list, and a present `--strict` forces `failOnUnknown: true`.
 Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set. `--group-by-license` composes with `--direct-only` (filter first, then group; see `### Grouping by license`).
@@ -66,6 +78,37 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 --include-transitive     Explicitly include transitive dependencies (same as default: report all)
 --group-by-license       Group txt/md/html output by license (ignored for SBOM formats)
 --template <template>    Custom attribution template file (overrides --format)
+```
+
+Root `--help` also lists the subcommand (via `dotnet run --project src/Olaf.Cli -- --help`, exit `0`):
+
+```text
+Commands:
+  generate <PATH>  Scan a project path and write a license report (zero-config).
+                   Defaults: PATH "."; json report to stdout unless --out is given
+                   (file output reuses the same atomic-write path as the root command).
+
+                   Examples:
+                     olaf generate .
+                     olaf generate ./svc --format cyclonedx-json
+                     olaf generate . --out sbom [default: .]
+```
+
+### Generate subcommand (`generate [PATH]`)
+
+`olaf generate [PATH]` is the zero-config entry point. CLI forms are `--input <file|dir>` (root) and `generate [PATH]` (subcommand) — there is no other subcommand, and a bare positional without `generate` is still an error.
+
+- Defaults: `PATH` is `.` (current directory); `--format` is `json`; the report goes to stdout unless `--out` is given. Verified offline: `dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json` → exit `0`, stdout byte-identical to `dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json`.
+- `--out <file>`: the report goes to the file and stdout stays empty (verified: `--out` run exits `0` with `0` stdout bytes); parent directories are auto-created; fails if the file exists unless `--force` is given. Same atomic-write path as root.
+- Empty directory: `generate <empty-dir>` emits a valid empty SBOM per format and exits `0` (verified: `dotnet run --project src/Olaf.Cli -- generate <empty-dir> --format json` → `{"summary":{"total":0,"resolved":0,"unknown":0},"licenses":[]}`, exit `0`; `--format spdx-json` → empty `packages` with a single self-`DESCRIBES` relationship, exit `0`). Legacy `--input <empty-dir>` still fails with exit `2` (`No manifests found …`).
+- Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
+- Bare `olaf .` is NOT supported: only `olaf generate .`. A bare positional without the subcommand stays a parse error (`Unrecognized command or argument '.'`, exit `1`).
+
+```bash
+dotnet run --project src/Olaf.Cli -- generate .
+dotnet run --project src/Olaf.Cli -- generate ./svc --format cyclonedx-json
+dotnet run --project src/Olaf.Cli -- generate . --out sbom
+dotnet run --project src/Olaf.Cli -- generate --help
 ```
 
 ## Reliability
@@ -280,7 +323,7 @@ dotnet run --project src/Olaf.Cli -- --input image.tar --format json --max-image
 
 `--template <file>` renders the scan through a user-supplied attribution template instead of a built-in `--format`.
 
-- Flag: `--template <file>` (default null; CLI form is `--input`/`--format`, no subcommand).
+- Flag: `--template <file>` (default null; CLI forms are `--input`/`--format` (root) and `generate [PATH]` (subcommand)).
 - Override contract: `--template` overrides `--format` — when both are given the template wins and `--verbose` prints `Template overrides --format '<f>'.` on stderr (quiet suppresses). There is no conflict exit.
 - Defaults stay hand-coded: the built-in `txt`/`md`/`html` formatters remain hand-coded C# (byte-stability for legal output); the template engine never renders them. Byte-parity snapshot tests pin `txt`/`md`/`html` output identical on empty + holders + special-chars scans.
 
@@ -350,7 +393,7 @@ Error matrix:
 
 `--group-by-license` groups the human-readable attribution formats (`txt`/`md`/`html`) by license instead of listing one flat block per package. Default output (flag absent) is byte-identical to before.
 
-- Flag: `--group-by-license` (bool, default false; CLI form is `--input`/`--format`, no subcommand). Composes with `--direct-only` (filter first, then group).
+- Flag: `--group-by-license` (bool, default false; CLI forms are `--input`/`--format` (root) and `generate [PATH]` (subcommand)). Composes with `--direct-only` (filter first, then group).
 - Group key: `LicenseDisplay.EffectiveSpdx` (trimmed SPDX id, or `"Unknown"` when unresolved) — not `Status`, so a `Resolved` row with an empty SPDX id still lands in the `Unknown` group and a stale `reason` on a resolved row never leaks into a license group.
 - Sort chain: groups ordered by SPDX id `Ordinal` ascending with `Unknown` LAST always (explicit rule — `Unknown` sorts last even though `U` < `Z` alphabetically). A count-descending secondary is vacuous by construction (group keys are distinct, so two groups never tie on a key to break by count). In-group bullets keep the existing `ecosystem → name → version` order.
 - Group header + text: `## {SPDX} ({n} packages)` per group (`<h2>` in `html`), with the full license text emitted ONCE per group — the first-sorted package's `LicenseText` wins (first in `ecosystem → name → version` order within the group; no longest-text, no concatenation).
@@ -390,7 +433,7 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --for
 
 `--rules <file>` loads a YAML policy file that declares the license gate in version control instead of (or under) flags. Flag behavior without a file is unchanged.
 
-- Flag: `--rules <file>` (default null; CLI form is `--input`/`--format`, no subcommand).
+- Flag: `--rules <file>` (default null; CLI forms are `--input`/`--format` (root) and `generate [PATH]` (subcommand)).
 - Resolution order (no cwd search, no walk-up):
   1. `--rules <file>` explicit (missing file → exit `2`: `Rules file not found: '<path>'.`).
   2. Input-adjacent: file input uses its directory, dir input uses itself. Probes `.sbom-rules.yaml` THEN `.olaf-rules.yaml` in that dir. Both present → `.sbom-rules.yaml` wins + a `--verbose` note (`Using '.sbom-rules.yaml'; ignoring '.olaf-rules.yaml'.`), not an error.

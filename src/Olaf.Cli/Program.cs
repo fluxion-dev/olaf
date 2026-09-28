@@ -76,6 +76,12 @@ var includeTransitiveOption = new Option<bool>("--include-transitive")
     Description = "Explicitly include transitive dependencies (same as default: report all)",
 };
 
+var pathArgument = new Argument<string>("PATH")
+{
+    Description = "Project path to scan (default: current directory)",
+    DefaultValueFactory = _ => ".",
+};
+
 var rootCommand = new RootCommand($"""
     olaf license scanner
     Scans {SupportedEcosystems} projects, resolves licenses, and writes a report to stdout or a file.
@@ -115,29 +121,36 @@ var rootCommand = new RootCommand($"""
     quietOption,
 };
 
-rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancellationToken) =>
+// Issue #76: shared scan+report core. BOTH the legacy root (--input) path
+// and the `generate [PATH]` subcommand call this; the ONLY behavioral fork
+// is AllowEmpty (generate-only valid-empty-SBOM on manifest-less input).
+async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationToken)
 {
-    var input = parseResult.GetValue(inputOption);
-    var format = parseResult.GetValue(formatOption) ?? "json";
-    var templatePath = parseResult.GetValue(templateOption);
-    var outPath = parseResult.GetValue(outOption);
-    var force = parseResult.GetValue(forceOption);
-    var ecosystem = parseResult.GetValue(ecosystemOption);
-    var maxImageMbRaw = parseResult.GetValue(maxImageMbOption);
-    var verbose = parseResult.GetValue(verboseOption);
-    var quiet = parseResult.GetValue(quietOption);
-    var allowRaw = parseResult.GetValue(allowOption);
-    var denyRaw = parseResult.GetValue(denyOption);
-    var directOnly = parseResult.GetValue(directOnlyOption);
-    var includeTransitive = parseResult.GetValue(includeTransitiveOption);
-    var groupByLicense = parseResult.GetValue(groupByLicenseOption);
-    var rulesPath = parseResult.GetValue(rulesOption);
+    var input = o.Input;
+    var format = o.Format;
+    var templatePath = o.TemplatePath;
+    var outPath = o.OutPath;
+    var force = o.Force;
+    var ecosystem = o.Ecosystem;
+    var maxImageMbRaw = o.MaxImageMbRaw;
+    var verbose = o.Verbose;
+    var quiet = o.Quiet;
+    var allowRaw = o.AllowRaw;
+    var denyRaw = o.DenyRaw;
+    var directOnly = o.DirectOnly;
+    var includeTransitive = o.IncludeTransitive;
+    var groupByLicense = o.GroupByLicense;
+    var rulesPath = o.RulesPath;
     // Issue #75: flag "presence" is token-presence (even an empty --allow ""
     // replaces the file list for that key). String options consume value
     // tokens; bool --strict takes none, so presence uses IsImplicit.
-    var allowFlagPresent = parseResult.GetResult(allowOption)?.Tokens.Count > 0;
-    var denyFlagPresent = parseResult.GetResult(denyOption)?.Tokens.Count > 0;
-    var strictFlagPresent = parseResult.GetResult(strictOption)?.IdentifierToken is not null;
+    // (Presence is computed per-command in each SetAction and packed into
+    // ScanOpts, so this core never touches ParseResult/Option instances.)
+    var allowFlagPresent = o.AllowFlagPresent;
+    var denyFlagPresent = o.DenyFlagPresent;
+    var strictFlagPresent = o.StrictFlagPresent;
+    var formatFlagPresent = o.FormatFlagPresent;
+    var allowEmpty = o.AllowEmpty;
 
     static HashSet<string> ParseSpdxSet(string? csv)
     {
@@ -352,7 +365,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     ILicenseFormatter formatter;
     if (templateText is not null)
     {
-        if (parseResult.GetResult(formatOption)?.Tokens.Count > 0)
+        if (formatFlagPresent)
         {
             LogVerbose($"Template overrides --format '{format}'.");
         }
@@ -382,6 +395,13 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     try
     {
         dependencies = new ParserRegistry().Scan(input, ecosystem);
+    }
+    catch (InvalidOperationException ex) when (allowEmpty && ex.Message.Contains("No manifests", StringComparison.Ordinal))
+    {
+        // Issue #76 generate-only: manifest-less input yields a valid empty
+        // SBOM (exit 0) via the normal format path below. The legacy --input
+        // path (allowEmpty: false) skips this arm and exits 2 below.
+        dependencies = [];
     }
     catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or InvalidDataException)
     {
@@ -673,7 +693,77 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     }
 
     return 0;
+}
+
+ScanOpts ReadScanOpts(ParseResult parseResult, string? inputOverride, bool allowEmpty)
+{
+    return new ScanOpts(
+        Input: inputOverride ?? parseResult.GetValue(inputOption),
+        Format: parseResult.GetValue(formatOption) ?? "json",
+        TemplatePath: parseResult.GetValue(templateOption),
+        OutPath: parseResult.GetValue(outOption),
+        Force: parseResult.GetValue(forceOption),
+        StrictFlagPresent: parseResult.GetResult(strictOption)?.IdentifierToken is not null,
+        Ecosystem: parseResult.GetValue(ecosystemOption),
+        MaxImageMbRaw: parseResult.GetValue(maxImageMbOption),
+        Verbose: parseResult.GetValue(verboseOption),
+        Quiet: parseResult.GetValue(quietOption),
+        AllowRaw: parseResult.GetValue(allowOption),
+        DenyRaw: parseResult.GetValue(denyOption),
+        DirectOnly: parseResult.GetValue(directOnlyOption),
+        IncludeTransitive: parseResult.GetValue(includeTransitiveOption),
+        GroupByLicense: parseResult.GetValue(groupByLicenseOption),
+        RulesPath: parseResult.GetValue(rulesOption),
+        AllowFlagPresent: parseResult.GetResult(allowOption)?.Tokens.Count > 0,
+        DenyFlagPresent: parseResult.GetResult(denyOption)?.Tokens.Count > 0,
+        FormatFlagPresent: parseResult.GetResult(formatOption)?.Tokens.Count > 0,
+        AllowEmpty: allowEmpty);
+}
+
+rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancellationToken) =>
+{
+    return await ScanAndReportAsync(ReadScanOpts(parseResult, null, allowEmpty: false), cancellationToken).ConfigureAwait(false);
 });
+
+var generateCommand = new Command("generate", """
+    Scan a project path and write a license report (zero-config).
+    Defaults: PATH "."; json report to stdout unless --out is given
+    (file output reuses the same atomic-write path as the root command).
+
+    Examples:
+      olaf generate .
+      olaf generate ./svc --format cyclonedx-json
+      olaf generate . --out sbom
+    """)
+{
+    pathArgument,
+    inputOption,
+    formatOption,
+    templateOption,
+    outOption,
+    forceOption,
+    strictOption,
+    allowOption,
+    denyOption,
+    rulesOption,
+    directOnlyOption,
+    includeTransitiveOption,
+    groupByLicenseOption,
+    ecosystemOption,
+    maxImageMbOption,
+    verboseOption,
+    quietOption,
+};
+
+generateCommand.SetAction(async (ParseResult parseResult, CancellationToken cancellationToken) =>
+{
+    var path = parseResult.GetValue(pathArgument) ?? ".";
+    var input = parseResult.GetValue(inputOption);
+    var resolvedInput = string.IsNullOrWhiteSpace(input) ? path : input;
+    return await ScanAndReportAsync(ReadScanOpts(parseResult, resolvedInput, allowEmpty: true), cancellationToken).ConfigureAwait(false);
+});
+
+rootCommand.Subcommands.Add(generateCommand);
 
 // System.CommandLine reports a trailing valueless option as a parse error
 // (exit 1); the exit-code contract requires exit 2 for a bad --max-image-mb.
@@ -684,3 +774,28 @@ if (args.Length > 0 && string.Equals(args[^1], "--max-image-mb", StringCompariso
 }
 
 return await rootCommand.Parse(args).InvokeAsync();
+
+// Issue #76: value object carrying every flag for ScanAndReportAsync.
+// Presence booleans are computed per-command in ReadScanOpts so the shared
+// core never touches ParseResult/Option instances.
+internal sealed record ScanOpts(
+    string? Input,
+    string Format,
+    string? TemplatePath,
+    string? OutPath,
+    bool Force,
+    bool StrictFlagPresent,
+    string? Ecosystem,
+    string? MaxImageMbRaw,
+    bool Verbose,
+    bool Quiet,
+    string? AllowRaw,
+    string? DenyRaw,
+    bool DirectOnly,
+    bool IncludeTransitive,
+    bool GroupByLicense,
+    string? RulesPath,
+    bool AllowFlagPresent,
+    bool DenyFlagPresent,
+    bool FormatFlagPresent,
+    bool AllowEmpty);
