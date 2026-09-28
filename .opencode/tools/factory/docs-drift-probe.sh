@@ -20,14 +20,23 @@
 #   asset-URL identity — README `releases/download/<tag>/…` URLs
 #     byte-identical to `gh release view <tag> --json assets` names+URLs
 #     (tag derived from pin-consistency); FAIL on bare `Olaf.Cli[.exe]`
-#     asset names. Repo is PRIVATE: `gh release view` (API path), never
-#     anonymous curl (returns 404). Reuses release-verify-probe Arm-2
-#     patterns (run_gate + python3 JSON parse) without reinvention.
-#   private-note — if direct download URLs present, require an adjacent
-#     `gh release download` command + private-404 note (presence + order +
-#     20-line adjacency window above the first URL line).
+#     asset names. Identity is always asserted via the `gh` API path
+#     (anonymous curl 404s on private repos, so `gh` is required there;
+#     on public repos curl also fetches but `gh` stays the source of
+#     truth). Reuses release-verify-probe Arm-2 patterns (run_gate +
+#     python3 JSON parse) without reinvention.
+#   visibility-aware install note — repo visibility resolved via
+#     `gh repo view --json visibility` (`--repo-visibility public|private`
+#     overrides, default auto; detection failure WARNs and falls back to
+#     private = strictest asserts). PRIVATE mode keeps the legacy asserts:
+#     adjacent `gh release download` command + private-404 note (presence
+#     + order + 20-line adjacency window above the first URL line).
+#     PUBLIC mode instead REQUIRES a public-anonymous note (`public` +
+#     `anonymously` adjacent ≤20 lines above the first URL) + a
+#     `curl -fSL .../releases/download/...` example; gh-download and
+#     private-404 notes become SKIP-with-INFO (never FAIL).
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.2.0"
+VERSION="0.3.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -39,6 +48,7 @@ REPO_ROOT=""
 TIMEOUT_SECS=900
 WORKDIR=""
 KEEP_TEMP=0
+REPO_VISIBILITY="auto"
 
 usage() {
   cat <<EOF
@@ -49,10 +59,16 @@ never rewrites): Tests:N vs live dotnet test, 3-RID size-table rows
 (existence+order+MiB +-5, missing publish dirs SKIP), no-tagged-release
 contradiction gate, pin-consistency (README v*/--version pins == csproj
 <Version>), asset-URL identity (README download URLs == gh release assets),
-private-note (gh-download + private-404 adjacency).
+private-note (visibility-aware: PRIVATE-mode gh-download + private-404
+adjacency; PUBLIC-mode public-anonymous note + curl -fSL example, private
+notes SKIP-with-INFO never FAIL).
 
 Options:
   --repo-root <dir>     Repo root (default: git top-level or script-relative fallback)
+  --repo-visibility <auto|public|private>
+                        Repo visibility (default: auto via 'gh repo view
+                        --json visibility'; detection failure WARNs and
+                        falls back to private = strictest asserts)
   --timeout <secs>      Timeout for dotnet test in seconds (default: 900)
   --workdir <dir>       Work dir for logs (default: mktemp)
   --keep-temp           Keep work dir for debugging (default: remove)
@@ -73,6 +89,8 @@ while [[ $# -gt 0 ]]; do
     --version) echo "$(basename "$0") $VERSION"; exit 0 ;;
     --repo-root) REPO_ROOT="${2:-}"; shift 2 ;;
     --repo-root=*) REPO_ROOT="${1#*=}"; shift ;;
+    --repo-visibility) REPO_VISIBILITY="${2:-}"; shift 2 ;;
+    --repo-visibility=*) REPO_VISIBILITY="${1#*=}"; shift ;;
     --timeout) TIMEOUT_SECS="${2:-}"; shift 2 ;;
     --timeout=*) TIMEOUT_SECS="${1#*=}"; shift ;;
     --workdir) WORKDIR="${2:-}"; shift 2 ;;
@@ -86,6 +104,11 @@ if ! [[ "$TIMEOUT_SECS" =~ ^[0-9]+$ ]]; then
   echo "Invalid --timeout '$TIMEOUT_SECS': must be a positive integer." >&2
   exit 2
 fi
+
+case "$REPO_VISIBILITY" in
+  auto|public|private) ;;
+  *) echo "Invalid --repo-visibility '$REPO_VISIBILITY': want auto|public|private." >&2; exit 2 ;;
+esac
 
 # Resolve repo root: explicit flag > git top-level > script-relative fallback.
 if [[ -z "$REPO_ROOT" ]]; then
@@ -298,12 +321,40 @@ else
   fi
 fi
 
+# ---- Visibility resolution (auto-detect, explicit override wins) ----
+echo "-- repo-visibility --"
+EFFECTIVE_VIS="$(printf '%s' "$REPO_VISIBILITY" | tr '[:lower:]' '[:upper:]')"
+if [[ "$EFFECTIVE_VIS" == "AUTO" ]]; then
+  EFFECTIVE_VIS=""
+  if command -v gh >/dev/null 2>&1; then
+    VIS_RAW="$(gh repo view --json visibility 2>/dev/null || true)"
+    EFFECTIVE_VIS="$(printf '%s' "$VIS_RAW" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("visibility","").upper())' 2>/dev/null || true)"
+    if [[ "$EFFECTIVE_VIS" != "PUBLIC" && "$EFFECTIVE_VIS" != "PRIVATE" ]]; then
+      # Older gh emits isPrivate instead of visibility; try that fallback.
+      ISPRIV="$(printf '%s' "$VIS_RAW" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("isPrivate",""))' 2>/dev/null || true)"
+      case "$ISPRIV" in
+        True|true) EFFECTIVE_VIS="PRIVATE" ;;
+        False|false) EFFECTIVE_VIS="PUBLIC" ;;
+        *) EFFECTIVE_VIS="" ;;
+      esac
+    fi
+  fi
+  if [[ -z "$EFFECTIVE_VIS" ]]; then
+    warn "repo-visibility: auto-detect failed (no gh / parse error) — falling back to PRIVATE (strictest asserts)"
+    EFFECTIVE_VIS="PRIVATE"
+  else
+    echo "repo-visibility: auto-detected $EFFECTIVE_VIS"
+  fi
+else
+  echo "repo-visibility: explicit override $EFFECTIVE_VIS (auto-detect skipped)"
+fi
+
 # ---- Arm 5: asset-URL identity (live source: release-verify-probe Arm 2) ----
 echo "-- asset-URL identity --"
 if [[ -z "${TAG:-}" ]]; then
   fail_msg "asset-URL identity: SKIP — no single TAG from pin-consistency"
 elif ! command -v gh >/dev/null 2>&1; then
-  fail_msg "asset-URL identity: missing required command: gh (private repo — gh API path, never anonymous curl)"
+  fail_msg "asset-URL identity: missing required command: gh (identity asserted via gh API path — anonymous curl 404s on private repos)"
 else
   DOC_URLS="$(grep -oE 'https://github\.com/[^ '"'"'`)]*releases/download/[^ '"'"'`)]+' "$README" || true)"
   if [[ -z "$DOC_URLS" ]]; then
@@ -325,7 +376,7 @@ else
     printf '%s\n' "$DOC_URLS" | sort -u >"$WORKDIR/doc-urls.txt"
     run_gate "$WORKDIR/release-view-assets.json" -- gh release view "$TAG" --json assets
     if [[ "$RC" -ne 0 ]]; then
-      fail_msg "asset-URL identity: gh release view $TAG exited $RC (private repo — use gh, never anonymous curl which 404s)"
+      fail_msg "asset-URL identity: gh release view $TAG exited $RC (use gh API path — anonymous curl 404s on private repos)"
     else
       LIVE_NAMES="$(python3 - "$WORKDIR/release-view-assets.json" <<'PY' 2>/dev/null
 import json, sys
@@ -372,11 +423,47 @@ PY
   fi
 fi
 
-# ---- Arm 6: private-note ----
+# ---- Arm 6: install note (visibility-aware) ----
 echo "-- private-note --"
 if ! grep -qF 'releases/download/' "$README"; then
   pass "private-note: no direct download URLs — note N/A"
+elif [[ "$EFFECTIVE_VIS" == "PUBLIC" ]]; then
+  # PUBLIC mode: curl-first ordering — REQUIRE the public-anonymous note
+  # (`public` + `anonymously` adjacent <=20 lines above the first URL) and
+  # a `curl -fSL .../releases/download/...` example. gh-download and
+  # private-404 notes are SKIP-with-INFO here, never FAIL.
+  FIRST_URL_LINE="$(grep -nF 'releases/download/' "$README" | head -1 | cut -d: -f1)"
+  PUBL_LINE="$(grep -ni 'public' "$README" | head -1 | cut -d: -f1 || true)"
+  ANON_LINE="$(grep -ni 'anonymously' "$README" | head -1 | cut -d: -f1 || true)"
+  CURL_LINE="$(grep -nF 'curl' "$README" | grep -F 'releases/download/' | head -1 | cut -d: -f1 || true)"
+  note_bad=0
+  if [[ -z "$PUBL_LINE" || -z "$ANON_LINE" ]]; then
+    fail_msg "private-note: PUBLIC repo with direct download URLs but no public-anonymous note (want 'public' + 'anonymously' adjacent above first URL)"
+    note_bad=1
+  else
+    for pair in "public:$PUBL_LINE" "anonymously:$ANON_LINE"; do
+      tok="${pair%%:*}"
+      ln="${pair##*:}"
+      if (( ln > FIRST_URL_LINE )) || (( FIRST_URL_LINE - ln > 20 )); then
+        fail_msg "private-note: '$tok' note (L$ln) not adjacent above first URL (L$FIRST_URL_LINE, want <=20 lines above)"
+        note_bad=1
+      fi
+    done
+  fi
+  if [[ -z "$CURL_LINE" ]]; then
+    fail_msg "private-note: PUBLIC repo with direct download URLs but no 'curl -fSL .../releases/download/...' example in README"
+    note_bad=1
+  elif ! sed -n "${CURL_LINE}p" "$README" | grep -qF -- '-fSL'; then
+    fail_msg "private-note: curl download example (L$CURL_LINE) lacks '-fSL' flags"
+    note_bad=1
+  fi
+  if (( ! note_bad )); then
+    pass "private-note: PUBLIC repo — public-anonymous note + curl -fSL example adjacent above first URL (L$FIRST_URL_LINE)"
+  fi
+  echo "INFO: private-note: gh-download / private-404 notes N/A on PUBLIC repos — SKIP (never FAIL)"
 else
+  # PRIVATE mode: legacy asserts unchanged — adjacent `gh release
+  # download` command + private-404 note above the first URL.
   FIRST_URL_LINE="$(grep -nF 'releases/download/' "$README" | head -1 | cut -d: -f1)"
   GH_LINE="$(grep -nF 'gh release download' "$README" | head -1 | cut -d: -f1 || true)"
   PRIV_LINE="$(grep -ni 'private' "$README" | head -1 | cut -d: -f1 || true)"
