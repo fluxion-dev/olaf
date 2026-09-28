@@ -24,7 +24,7 @@
     <Version>0.1.0-preview.3</Version>
     <Description>License scanner: scans npm, nuget, and pip projects, resolves licenses, and writes a report.</Description>
     <Authors>olaf contributors</Authors>
-    <!-- No LICENSE file in repo; using MIT expression. Add LICENSE and keep in sync if license changes. -->
+    <!-- Root LICENSE is MIT; keep PackageLicenseExpression in sync if license changes. -->
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 

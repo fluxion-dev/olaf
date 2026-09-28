@@ -1,5 +1,7 @@
 # olaf
 
+[![CI](https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml/badge.svg)](https://github.com/fluxion-dev/olaf/actions) [![Release](https://img.shields.io/github/v/release/fluxion-dev/olaf?include_prereleases=true)](https://github.com/fluxion-dev/olaf/releases) [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE) [![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
+
 License scanner: `olaf generate <DIR>` scans a project directory, resolves licenses, writes a report to stdout or a file.
 
 Supported ecosystems (13): `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan` (`pypi` alias for `pip`). Supported formats: `json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json` (7, zero aliases).
