@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.10"
+VERSION="0.2.11"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -316,6 +316,33 @@ KEEP_TEMP=0
 # #   caught the escaped form matching zero lines).
 # # call site (replaces bare grep -c Trait census):
 # #   n="$(grep -c -e "$E2E_TRAIT_RE" "$f" || [ $? -eq 1 ]); echo \"trait-attrs=$n facts=$(grep -c '\[Fact\]' "$f" || [ $? -eq 1 ])\""
+
+# ---- Canonical run_gate + test-count extraction (copy-paste; then call) ----
+# run_gate <logfile> -- <cmd...>: redirect-to-file gate with RC capture.
+#   `set +e` MUST precede the command (`set +e; <cmd>; RC=$?` — the reverse
+#   order captures set's own exit); the function always returns 0 so bare
+#   calls stay safe under `set -euo pipefail`, and RC carries the verdict.
+#   Requires RC defined live alongside (RC=0). Never `cmd | tee/head` +
+#   `${PIPESTATUS[0]}` (unreliable without a bash -c pipefail wrapper).
+# Count extraction is ALWAYS `grep -E 'Passed!|Failed!' <log> | tail -1`
+#   (last summary wins; `|| true` keeps empty logs from aborting) — never
+#   `grep "Total tests"` (build-plan lines also mention totals; only the
+#   Passed!/Failed! summary line carries the authoritative counts).
+# Canonical source promoted to template 0.2.11 after 2nd family use
+#   (test-count-probe.sh live gate + LAST extraction; cyclonedx-family
+#   run_scan RC shape — same set+e/capture/set-e skeleton).
+# run_gate() {
+#   local log="$1"; shift
+#   if [[ "${1:-}" == "--" ]]; then shift; fi
+#   set +e
+#   "$@" >"$log" 2>&1
+#   RC=$?
+#   set -e
+# }
+# # call site (replaces `if ! <cmd> >log 2>&1; then :; fi` + hand grep):
+# #   run_gate "$WORKDIR/t.stdout" -- dotnet test "$CSPROJ" --verbosity minimal
+# #   LAST="$(grep -E 'Passed!|Failed!' "$WORKDIR/t.stdout" | tail -1 || true)"
+# #   [[ -z "$LAST" ]] && { fail_msg "no Passed!/Failed! summary (build error?)"; return; }
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"

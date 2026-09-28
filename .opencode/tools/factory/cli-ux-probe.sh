@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # cli-ux-probe.sh — CLI UX probe for issue #123 (collapsed generate-only CLI).
 # Wraps: generate --help, exit-code matrix, stdout-vs-stderr split.
-# Matrix (all via `dotnet run --project src/Olaf.Cli -- ...`):
+# Build-once + DLL-direct (0.7.0): single `dotnet build` at step 0, then every
+# per-case run is `dotnet "$CLI_DLL" generate …` (no per-case `dotnet run`
+# rebuild check). Timeout + --help + exit-code arms identical to 0.6.0.
+# Matrix (all via DLL-direct `dotnet "$CLI_DLL" …` after the step-0 build):
 #   help (generate --help)               -> 0 + <=6 flags + 7-format list
 #   deleted-flags (each of 16 + --input) -> 2 (unknown option)
 #   bad-format (generate --format bogus) -> 2 + Unsupported-format stderr
@@ -11,9 +14,9 @@
 #   generate-default (empty dir)         -> 0 + empty SBOM (total 0)
 #   generate-fixture (npm fixture)       -> 0 + total matches offline re-run
 #   generate-missing (nonexistent path)  -> 2 + Input-not-found stderr
-# Split: successful --out run must have empty stdout (report -> file only).
+#   Split: successful --out run must have empty stdout (report -> file only).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.6.0"
+VERSION="0.7.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -30,6 +33,8 @@ usage() {
 Usage: $(basename "$0") [options]
 
 CLI UX probe (issue #123): generate --help, exit-code matrix, stdout/stderr split.
+Build-once + DLL-direct: single 'dotnet build', then every per-case run is
+'dotnet <built-Olaf.Cli.dll> generate …' (no per-case rebuild check).
 
 Options:
   --repo-root <dir>   Repo root (default: git top-level or CWD)
@@ -105,13 +110,31 @@ FAIL=0
 pass() { echo "PASS [$1]: $2"; }
 fail() { echo "FAIL [$1]: $2"; FAIL=1; }
 
+# ---- Canonical run_gate (from _template.sh 0.2.11; mechanical back-port) ----
+# run_gate <logfile> -- <cmd…>: redirect-to-file gate with RC capture.
+# `set +e` precedes the command; always returns 0 so bare calls stay safe
+# under `set -euo pipefail`; RC carries the verdict. run_cli below keeps its
+# own split-stdout/stderr variant of the same skeleton (run_gate cannot split
+# streams) — same set+e/capture/set-e order, cited here as canonical.
+RC=0
+run_gate() {
+  local log="$1"; shift
+  if [[ "${1:-}" == "--" ]]; then shift; fi
+  set +e
+  "$@" >"$log" 2>&1
+  RC=$?
+  set -e
+}
+
 # run_cli <outfile-prefix> <expected-exit> -- <cli args...>
+# DLL-direct: `timeout dotnet "$CLI_DLL" …` (CLI_DLL pinned at step 0 after
+# the single build). Timeout + exit-code arms identical to 0.6.0 `dotnet run`.
 run_cli() {
   local tag="$1" want="$2"; shift 2
   if [[ "${1:-}" == "--" ]]; then shift; fi
   local out="$WORKDIR/$tag.stdout" err="$WORKDIR/$tag.stderr"
   set +e
-  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- "$@" >"$out" 2>"$err"
+  timeout "${TIMEOUT_SECS}s" dotnet "$CLI_DLL" "$@" >"$out" 2>"$err"
   local rc=$?
   set -e
   if [[ "$rc" -eq 124 ]]; then
@@ -139,11 +162,20 @@ echo "repo: $REPO_ROOT"
 echo "project: $PROJECT_REL | fixture: $FIXTURE_REL"
 
 echo "-- step 0: build CLI (one-time, keeps per-run timeouts meaningful) --"
-if ! dotnet build "$PROJECT" --nologo -v minimal; then
-  echo "FAIL [build]: dotnet build failed." >&2
+run_gate "$WORKDIR/build.log" -- dotnet build "$PROJECT" --nologo -v minimal
+if [[ "$RC" -ne 0 ]]; then
+  echo "FAIL [build]: dotnet build exited $RC." >&2
+  tail -20 "$WORKDIR/build.log" >&2
   exit 1
 fi
 pass "build" "dotnet build OK"
+# Pin the built DLL: every per-case run below is DLL-direct (no rebuild check).
+CLI_DLL="$(find "$PROJECT/bin/Debug" -maxdepth 2 -name 'Olaf.Cli.dll' -print 2>/dev/null | head -1)"
+if [[ -z "${CLI_DLL:-}" || ! -f "$CLI_DLL" ]]; then
+  echo "FAIL [build]: built DLL not found under $PROJECT/bin/Debug." >&2
+  exit 1
+fi
+pass "build" "DLL pinned: ${CLI_DLL#"$REPO_ROOT"/}"
 
 echo "-- step 1: generate --help (<=6 flags + 7-format list) --"
 run_cli "help" 0 generate --help || true
@@ -194,8 +226,10 @@ run_cli "strict-fixture" 1 generate "$PHANTOM_DIR" --offline --strict || true
 
 echo "-- step 4: stdout-vs-stderr split (--out run must have empty stdout) --"
 SPLIT_OUT="$WORKDIR/split.json"
+# Split-stream variant of the canonical run_gate skeleton (run_gate cannot
+# split stdout/stderr): same set+e/capture/set-e order, DLL-direct.
 set +e
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- generate "$FIXTURE" --offline --out "$SPLIT_OUT" >"$WORKDIR/split.stdout" 2>"$WORKDIR/split.stderr"
+timeout "${TIMEOUT_SECS}s" dotnet "$CLI_DLL" generate "$FIXTURE" --offline --out "$SPLIT_OUT" >"$WORKDIR/split.stdout" 2>"$WORKDIR/split.stderr"
 SPLIT_RC=$?
 set -e
 if [[ "$SPLIT_RC" -ne 0 ]]; then
@@ -230,16 +264,10 @@ else
 fi
 
 # generate-fixture: offline run -> 0 + total matches a second offline re-run
+# (re-run rides run_cli: DLL-direct, exit-0 arm identical, output at
+# generate-parity.stdout for the total cross-check below).
 run_cli "generate-fixture" 0 generate "$FIXTURE" --offline || true
-set +e
-timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- generate "$FIXTURE" --offline >"$WORKDIR/generate-parity.stdout" 2>"$WORKDIR/generate-parity.stderr"
-PARITY_RC=$?
-set -e
-if [[ "$PARITY_RC" -eq 0 ]]; then
-  pass "generate-fixture" "offline re-run parity exit 0"
-else
-  fail "generate-fixture" "offline re-run parity exit $PARITY_RC (want 0)"
-fi
+run_cli "generate-parity" 0 generate "$FIXTURE" --offline || true
 GEN_TOTAL="$(grep -o '"total":[0-9]*' "$WORKDIR/generate-fixture.stdout" 2>/dev/null | head -1)"
 LEG_TOTAL="$(grep -o '"total":[0-9]*' "$WORKDIR/generate-parity.stdout" 2>/dev/null | head -1)"
 if [[ -n "$GEN_TOTAL" && "$GEN_TOTAL" == "$LEG_TOTAL" ]]; then

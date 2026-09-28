@@ -11,7 +11,12 @@
 # Allowlist by construction: `using System...;` directives (incl.
 #   global/static/alias forms), `//` comments (a token only counts when it
 #   precedes any `//` on the line), and files with <=2 hit lines never FAIL.
-VERSION="0.1.1"
+# Check 3 FAIL (exit 1): any promoted factory tool (*.sh, scratch excluded)
+#   reading `PIPESTATUS` without a pipefail wrapper (`set -euo pipefail` /
+#   `set -o pipefail` anywhere in the file). Exit-code hygiene per
+#   factory-qa: assert via redirect-to-file + RC capture (see _template.sh
+#   run_gate), never `cmd | tee/head` + `${PIPESTATUS[0]}`.
+VERSION="0.1.2"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -43,7 +48,9 @@ if [[ "${1:-}" == "--help" ]]; then
   echo "tokens (check 1), and per FQN token appearing in code lines across"
   echo ">=3 distinct files (check 2). \`using System...;\` directives"
   echo "(global/static/alias) and \`//\` comments are allowlisted by"
-  echo "construction; files with <=2 hit lines never FAIL."
+  echo "construction; files with <=2 hit lines never FAIL. Check 3 lints"
+  echo "promoted factory tools (*.sh) for bare \`PIPESTATUS\` use without a"
+  echo "pipefail wrapper (redirect-to-file + RC instead)."
   echo "Exit 0 = OK; 1 = FQN violation; 2 = usage/IO error."
   echo "Example: ./.opencode/tools/factory/fqn-lint.sh"
   exit 0
@@ -140,6 +147,23 @@ while IFS= read -r line; do
   fi
 done <<<"$SCAN"
 (( C2 )) || pass "no FQN spans >=3 files"
+
+echo "--- Check 3 (FAIL): PIPESTATUS without pipefail wrapper (factory *.sh) ---"
+FACTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+C3=0
+while IFS= read -r sh; do
+  [[ -z "$sh" ]] && continue
+  rel="${sh#"$ROOT"/}"
+  if grep -q 'PIPESTATUS' "$sh"; then
+    if grep -q 'set -o pipefail\|set -euo pipefail' "$sh"; then
+      note "$rel uses PIPESTATUS under a pipefail wrapper (allowed)"
+    else
+      fail_msg "$rel uses PIPESTATUS without pipefail wrapper — use redirect-to-file + RC (see _template.sh run_gate)"
+      C3=1
+    fi
+  fi
+done < <(find "$FACTORY" -maxdepth 1 -name '*.sh' -type f | LC_ALL=C sort)
+(( C3 )) || pass "no bare PIPESTATUS use in factory tools"
 
 echo "---"
 if (( fail )); then
