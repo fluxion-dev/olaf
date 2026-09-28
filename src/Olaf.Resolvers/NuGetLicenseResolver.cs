@@ -76,9 +76,6 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
             }
 
-            var text = await TryFetchLicenseTextAsync(licenseUrl, cancellationToken).ConfigureAwait(false)
-                ?? SpdxLicenseTexts.GetText(spdx);
-
             var source = string.IsNullOrWhiteSpace(licenseUrl)
                 ? $"https://www.nuget.org/packages/{dependency.Name}/{dependency.Version}"
                 : licenseUrl;
@@ -90,7 +87,11 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
             // Never copies SourceUrl to download.
             var enrichment = ParseNuGetEnrichment(catalogBody ?? body, dependency)
                 ?? (catalogBody is null ? null : ParseNuGetEnrichment(body, dependency));
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
+            // License text fills LicenseText ONLY (no id re-resolution):
+            // tarball (packageContent via Enrichment) > licenseUrl > DB > null.
+            var (text, textReason) = await LicenseTextFetcher.TryFetchLicenseTextAsync(
+                _http, enrichment?.DownloadUrl, licenseUrl, spdx, cancellationToken).ConfigureAwait(false);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -423,33 +424,5 @@ public sealed class NuGetLicenseResolver : ILicenseResolver
         }
 
         return false;
-    }
-
-    private async Task<string?> TryFetchLicenseTextAsync(string? licenseUrl, CancellationToken ct)
-    {
-        if (!TryCreateAbsoluteHttpUri(licenseUrl, out var uri) || uri is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            using var response = await _http.GetAsync(uri, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            return string.IsNullOrWhiteSpace(text) ? null : text;
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
     }
 }

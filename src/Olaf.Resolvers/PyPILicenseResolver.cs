@@ -58,13 +58,17 @@ public sealed class PyPILicenseResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
             }
 
-            var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://pypi.org/project/{dependency.Name}/{dependency.Version}/";
             // Enrichment reads the same already-fetched JSON API body
             // (NO-NEW-HTTP): info.digests via urls[] -> Hashes, info.author ->
             // Supplier, urls[] file URL -> DownloadUrl. Never copies SourceUrl.
             var enrichment = ParsePyPIEnrichment(body, dependency);
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
+            // License text fills LicenseText ONLY (no id re-resolution):
+            // tarball (sdist/wheel via Enrichment) > DB > null (PyPI bodies
+            // carry no licenseUrl field, so no new discovery endpoint).
+            var (text, textReason) = await LicenseTextFetcher.TryFetchLicenseTextAsync(
+                _http, enrichment?.DownloadUrl, licenseUrl: null, spdx, cancellationToken).ConfigureAwait(false);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -44,13 +44,17 @@ public sealed class CargoLicenseResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
             }
 
-            var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://crates.io/crates/{dependency.Name}/{dependency.Version}";
             // Enrichment reads the same already-fetched crates.io JSON
             // (NO-NEW-HTTP): version.checksum -> Hashes ("sha256:"), dl_path ->
             // DownloadUrl (absolute against crates.io). Never copies SourceUrl.
             var enrichment = ParseCargoEnrichment(body, dependency);
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
+            // License text fills LicenseText ONLY (no id re-resolution):
+            // tarball (.crate via Enrichment) > DB > null (crates.io bodies
+            // carry no licenseUrl field, so no new discovery endpoint).
+            var (text, textReason) = await LicenseTextFetcher.TryFetchLicenseTextAsync(
+                _http, enrichment?.DownloadUrl, licenseUrl: null, spdx, cancellationToken).ConfigureAwait(false);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -141,9 +141,17 @@ public sealed class GoLicenseResolver : ILicenseResolver
         var zipUrl = $"https://proxy.golang.org/{dependency.Name.Trim('/')}/@v/{Uri.EscapeDataString(dependency.Version)}.zip";
         var sourceUrl = $"https://pkg.go.dev/{dependency.Name}@{dependency.Version}";
 
+        // Caps only (issue #71): the zip scan below is unchanged on the happy
+        // path — a linked 5s budget, a 512-entry cap, absolute/..-escaping and
+        // symlink skips, and a 1 MiB per-entry cap bound it. No id
+        // re-resolution change: file content still maps via SpdxMapper only.
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(LicenseTextLimits.PerPackageTimeoutSeconds));
+        var timeoutToken = timeoutCts.Token;
+
         try
         {
-            using var response = await _http.GetAsync(zipUrl, cancellationToken).ConfigureAwait(false);
+            using var response = await _http.GetAsync(zipUrl, timeoutToken).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: go module '{dependency.Name} {dependency.Version}' not found.");
@@ -154,13 +162,20 @@ public sealed class GoLicenseResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", $"registry-error: Go proxy returned {(int)response.StatusCode}.");
             }
 
-            await using var zipStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-            using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: false);
+            await using var zipStream = await response.Content.ReadAsStreamAsync(timeoutToken).ConfigureAwait(false);
+            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read, leaveOpen: false);
 
+            var seen = 0;
             foreach (var entry in archive.Entries)
             {
+                if (++seen > LicenseTextLimits.MaxArchiveEntries)
+                {
+                    break;
+                }
+
                 var name = entry.FullName;
-                if (name is null)
+                if (!LicenseTextFetcher.IsSafeArchiveName(name)
+                    || LicenseTextFetcher.IsZipSymlink(entry))
                 {
                     continue;
                 }
@@ -184,9 +199,19 @@ public sealed class GoLicenseResolver : ILicenseResolver
                     continue;
                 }
 
+                if (entry.Length > LicenseTextLimits.MaxEntryBytes)
+                {
+                    continue;
+                }
+
                 await using var entryStream = entry.Open();
-                using var reader = new StreamReader(entryStream, leaveOpen: true);
-                var content = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+                var entryBytes = await LicenseTextFetcher.ReadUpToAsync(entryStream, LicenseTextLimits.MaxEntryBytes + 1, timeoutToken).ConfigureAwait(false);
+                if (entryBytes.Length > LicenseTextLimits.MaxEntryBytes)
+                {
+                    continue;
+                }
+
+                var content = LicenseTextFetcher.DecodeLicenseBytes(entryBytes);
 
                 if (string.IsNullOrWhiteSpace(content))
                 {
@@ -227,7 +252,7 @@ public sealed class GoLicenseResolver : ILicenseResolver
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"transport-error: {ex.Message}");
         }
-        catch (Exception ex) when (ex is System.IO.IOException or InvalidDataException or InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or InvalidOperationException or ArgumentException)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
         }

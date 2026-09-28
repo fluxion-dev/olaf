@@ -44,15 +44,16 @@ public sealed class NpmLicenseResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
             }
 
-            var text = await TryFetchLicenseTextAsync(licenseUrl, cancellationToken).ConfigureAwait(false)
-                ?? SpdxLicenseTexts.GetText(spdx);
-
             var source = $"https://www.npmjs.com/package/{dependency.Name}/v/{dependency.Version}";
             // Enrichment reads the same already-fetched versioned registry JSON
             // (NO-NEW-HTTP): dist.integrity -> Hashes, author/maintainers ->
             // Supplier, dist.tarball -> DownloadUrl. Never copies SourceUrl.
             var enrichment = ParseNpmEnrichment(body, dependency);
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
+            // License text fills LicenseText ONLY (no id re-resolution):
+            // tarball (dist.tarball via Enrichment) > licenseUrl > DB > null.
+            var (text, textReason) = await LicenseTextFetcher.TryFetchLicenseTextAsync(
+                _http, enrichment?.DownloadUrl, licenseUrl, spdx, cancellationToken).ConfigureAwait(false);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -269,44 +270,5 @@ public sealed class NpmLicenseResolver : ILicenseResolver
         }
 
         return (null, licenseUrl);
-    }
-
-    private async Task<string?> TryFetchLicenseTextAsync(string? licenseUrl, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(licenseUrl))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(licenseUrl, UriKind.Absolute, out var uri))
-        {
-            return null;
-        }
-
-        if (!uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase)
-            && !uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var response = await _http.GetAsync(uri, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            var text = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            return string.IsNullOrWhiteSpace(text) ? null : text;
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
     }
 }
