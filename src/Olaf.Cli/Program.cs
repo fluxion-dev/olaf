@@ -20,6 +20,10 @@ var outOption = new Option<string?>("--out")
 {
     Description = "Output file path (default: stdout; parent directories are created)",
 };
+var templateOption = new Option<string?>("--template")
+{
+    Description = "Custom attribution template file (overrides --format)",
+};
 var forceOption = new Option<bool>("--force")
 {
     Description = "Overwrite output file if it exists",
@@ -84,6 +88,7 @@ var rootCommand = new RootCommand($"""
 {
     inputOption,
     formatOption,
+    templateOption,
     outOption,
     forceOption,
     strictOption,
@@ -101,6 +106,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 {
     var input = parseResult.GetValue(inputOption);
     var format = parseResult.GetValue(formatOption) ?? "json";
+    var templatePath = parseResult.GetValue(templateOption);
     var outPath = parseResult.GetValue(outOption);
     var force = parseResult.GetValue(forceOption);
     var strict = parseResult.GetValue(strictOption);
@@ -217,15 +223,52 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         ContainerImageParser.MaxImageBytes = ContainerImageParser.DefaultMaxImageBytes;
     }
 
-    ILicenseFormatter formatter;
-    try
+    string? templateText = null;
+    if (templatePath is not null)
     {
-        formatter = new FormatterRegistry().GetFormatter(format);
+        if (!File.Exists(templatePath))
+        {
+            Console.Error.WriteLine($"Template not found: '{templatePath}'.");
+            return 2;
+        }
+
+        try
+        {
+            templateText = await File.ReadAllTextAsync(templatePath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            Console.Error.WriteLine($"Failed to read template '{templatePath}': {ex.Message}");
+            return 2;
+        }
     }
-    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
+
+    ILicenseFormatter formatter;
+    if (templateText is not null)
     {
-        Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json.");
-        return 2;
+        if (parseResult.GetResult(formatOption)?.Tokens.Count > 0)
+        {
+            LogVerbose($"Template overrides --format '{format}'.");
+        }
+
+        formatter = new TemplateFormatter(templateText);
+    }
+    else
+    {
+        try
+        {
+            formatter = new FormatterRegistry().GetFormatter(format);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
+        {
+            Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json.");
+            return 2;
+        }
     }
 
     if (outPath is not null && File.Exists(outPath) && !force)
@@ -328,7 +371,22 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     }
 
     var scanResult = new ScanResult(resolved);
-    var output = formatter.FormatResult(scanResult);
+    string output;
+    try
+    {
+        output = formatter.FormatResult(scanResult);
+    }
+    catch (TemplateSyntaxException ex)
+    {
+        Console.Error.WriteLine($"template error line {ex.Line}: {ex.Message}");
+        return 2;
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+    {
+        // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+        Console.Error.WriteLine($"template error: {ex.Message}");
+        return 2;
+    }
 
     if (outPath is not null)
     {

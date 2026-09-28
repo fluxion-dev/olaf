@@ -9,9 +9,12 @@
 #   out-exists (--out existing, no force) -> 2
 #   nested-out (missing parents created)  -> 0 + file exists
 #   strict phantom (Unknown + --strict)   -> 1
+#   template-missing (--template nofile)  -> 2 + Template-not-found stderr
+#   template-badsyntax (unclosed {{#each}})-> 2 + line-N stderr
 # Split: successful --out run must have empty stdout (report -> file only).
+# Help: --help output mentions --template (additive, --input check untouched).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.2.0"
+VERSION="0.3.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -37,10 +40,12 @@ Options:
   --version           Show version and exit 0
 
 Checks:
-  help exit 0 (+ mentions --input) | version exit 0 (non-empty)
+  help exit 0 (+ mentions --input, --template) | version exit 0 (non-empty)
   missing-input->2 | bare-path->1 (+ Unrecognized-command stderr)
   bad-format->2 | bad-ecosystem->2 | out-exists->2
   nested-out->0 (+ file created) | strict-phantom->1
+  template-missing->2 (+ Template-not-found stderr)
+  template-badsyntax->2 (+ line-N stderr)
   split: --out run has empty stdout
 
 Exit codes: 0 all PASS, 1 assertion failure, 2 usage/environment error.
@@ -143,6 +148,11 @@ if grep -q -- "--input" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--inpu
 else
   fail "help" "output missing --input"
 fi
+if grep -q -- "--template" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--template" "$WORKDIR/help.stderr" 2>/dev/null; then
+  pass "help" "mentions --template"
+else
+  fail "help" "output missing --template"
+fi
 run_cli "version" 0 --version || true
 if [[ -s "$WORKDIR/version.stdout" ]]; then
   pass "version" "non-empty stdout ($(tr -d '\n' <"$WORKDIR/version.stdout" | head -c 80))"
@@ -209,6 +219,21 @@ else
   else
     fail "split" "stdout NOT empty ($(wc -c <"$WORKDIR/split.stdout" | tr -d ' ') bytes leak to stdout)"
   fi
+fi
+
+echo "-- step 4: template exit-code arms (issue #73, additive) --"
+run_cli "template-missing" 2 --input "$FIXTURE" --template "$WORKDIR/does-not-exist.scriban" || true
+if grep -q "Template not found" "$WORKDIR/template-missing.stderr" 2>/dev/null; then
+  pass "template-missing" "stderr mentions Template not found"
+else
+  fail "template-missing" "stderr missing Template not found (tail: $(tail -c 200 "$WORKDIR/template-missing.stderr" | tr '\n' ' '))"
+fi
+printf 'header\n{{#each licenses}}\nno-close\n' > "$WORKDIR/bad-template.scriban"
+run_cli "template-badsyntax" 2 --input "$FIXTURE" --template "$WORKDIR/bad-template.scriban" || true
+if grep -qE "line [0-9]+" "$WORKDIR/template-badsyntax.stderr" 2>/dev/null; then
+  pass "template-badsyntax" "stderr carries line number"
+else
+  fail "template-badsyntax" "stderr missing line number (tail: $(tail -c 200 "$WORKDIR/template-badsyntax.stderr" | tr '\n' ' '))"
 fi
 
 echo "== summary =="
