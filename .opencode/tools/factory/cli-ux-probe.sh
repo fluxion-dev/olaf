@@ -11,10 +11,11 @@
 #   strict phantom (Unknown + --strict)   -> 1
 #   template-missing (--template nofile)  -> 2 + Template-not-found stderr
 #   template-badsyntax (unclosed {{#each}})-> 2 + line-N stderr
+#   rules-missing (--rules nofile)        -> 2 + Rules-file-not-found stderr
 # Split: successful --out run must have empty stdout (report -> file only).
-# Help: --help output mentions --template (additive, --input check untouched).
+# Help: --help output mentions --template, --rules (additive, --input check untouched).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.3.0"
+VERSION="0.4.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -40,12 +41,13 @@ Options:
   --version           Show version and exit 0
 
 Checks:
-  help exit 0 (+ mentions --input, --template) | version exit 0 (non-empty)
+  help exit 0 (+ mentions --input, --template, --rules) | version exit 0 (non-empty)
   missing-input->2 | bare-path->1 (+ Unrecognized-command stderr)
   bad-format->2 | bad-ecosystem->2 | out-exists->2
   nested-out->0 (+ file created) | strict-phantom->1
   template-missing->2 (+ Template-not-found stderr)
   template-badsyntax->2 (+ line-N stderr)
+  rules-missing->2 (+ Rules-file-not-found stderr)
   split: --out run has empty stdout
 
 Exit codes: 0 all PASS, 1 assertion failure, 2 usage/environment error.
@@ -130,6 +132,13 @@ run_cli() {
   return 0
 }
 
+# ---- Canonical mkphantom (from _template.sh 0.2.7; guard-free: no python3 dep) ----
+mkphantom() {
+  local d="$1"
+  mkdir -p "$d"
+  printf '{\n  "name": "olaf-ux-strict-probe",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$PHANTOM_VER" > "$d/package.json"
+}
+
 echo "== cli-ux-probe v$VERSION =="
 echo "repo: $REPO_ROOT"
 echo "project: $PROJECT_REL | fixture: $FIXTURE_REL"
@@ -152,6 +161,11 @@ if grep -q -- "--template" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--t
   pass "help" "mentions --template"
 else
   fail "help" "output missing --template"
+fi
+if grep -q -- "--rules" "$WORKDIR/help.stdout" 2>/dev/null || grep -q -- "--rules" "$WORKDIR/help.stderr" 2>/dev/null; then
+  pass "help" "mentions --rules"
+else
+  fail "help" "output missing --rules"
 fi
 run_cli "version" 0 --version || true
 if [[ -s "$WORKDIR/version.stdout" ]]; then
@@ -187,16 +201,7 @@ fi
 
 # strict phantom: guaranteed Unknown offline -> 1
 PHANTOM_DIR="$WORKDIR/phantom"
-mkdir -p "$PHANTOM_DIR"
-cat > "$PHANTOM_DIR/package.json" <<EOF
-{
-  "name": "olaf-ux-strict-probe",
-  "version": "1.0.0",
-  "dependencies": {
-    "$PHANTOM_PKG": "$PHANTOM_VER"
-  }
-}
-EOF
+mkphantom "$PHANTOM_DIR"
 run_cli "strict-fixture" 1 --input "$PHANTOM_DIR" --strict || true
 
 echo "-- step 3: stdout-vs-stderr split (--out run must have empty stdout) --"
@@ -234,6 +239,14 @@ if grep -qE "line [0-9]+" "$WORKDIR/template-badsyntax.stderr" 2>/dev/null; then
   pass "template-badsyntax" "stderr carries line number"
 else
   fail "template-badsyntax" "stderr missing line number (tail: $(tail -c 200 "$WORKDIR/template-badsyntax.stderr" | tr '\n' ' '))"
+fi
+
+echo "-- step 5: rules explicit-missing arm (issue #75, additive) --"
+run_cli "rules-missing" 2 --input "$FIXTURE" --rules "$WORKDIR/does-not-exist-rules.yaml" || true
+if grep -q "Rules file not found" "$WORKDIR/rules-missing.stderr" 2>/dev/null; then
+  pass "rules-missing" "stderr mentions Rules file not found"
+else
+  fail "rules-missing" "stderr missing Rules file not found (tail: $(tail -c 200 "$WORKDIR/rules-missing.stderr" | tr '\n' ' '))"
 fi
 
 echo "== summary =="

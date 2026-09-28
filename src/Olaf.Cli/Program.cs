@@ -1,4 +1,5 @@
 ﻿using System.CommandLine;
+using System.Globalization;
 using Olaf.Cli;
 using Olaf.Core;
 using Olaf.Formatters;
@@ -219,7 +220,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     if (ecosystem is not null && !IsSupportedEcosystem(ecosystem))
     {
-        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm.");
+        Console.Error.WriteLine($"Unsupported ecosystem '{ecosystem}'. Supported: {SupportedEcosystems}.");
         return 2;
     }
 
@@ -233,8 +234,8 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     {
         if (!double.TryParse(
                 maxImageMbRaw,
-                System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
                 out var maxImageMb)
             || double.IsNaN(maxImageMb)
             || double.IsInfinity(maxImageMb)
@@ -366,7 +367,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException)
         {
-            Console.Error.WriteLine($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json.");
+            Console.Error.WriteLine($"Unsupported format '{format}'. Supported: {SupportedFormats}.");
             return 2;
         }
     }

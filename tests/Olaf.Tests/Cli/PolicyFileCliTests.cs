@@ -504,7 +504,7 @@ public sealed class PolicyFileCliTests
             CliTestHelpers.DeleteTempDir(parent);
         }
 
-        // Wave 5b rule: --help documents the new flag.
+        // --help documents the --rules flag.
         var help = CliTestHelpers.RunCli("--help");
         Assert.Equal(0, help.ExitCode);
         Assert.Contains("--rules", help.Stdout + help.Stderr, StringComparison.Ordinal);

@@ -27,3 +27,4 @@ Wave 5b hardening (binding, threshold-HIT):
 - SBOM/XSD envelope pins: SBOM/XSD stories must pre-declare envelope pins (specVersion-attr vs xmlns, serialNumber freshness, version const), per-component child order, purl conditionality, scope shape, and supplier explicitly in/out — deviations from issue shorthand get plan bindings, not post-hoc improvisation.
 - SBOM hash lexical pins: SBOM stories must pre-declare hash `algorithm`/`hashes[]` lexical form (e.g. SHA-512 vs SHA512 vs sha512) + stored-vs-emit normalization point — deviations get plan bindings, not post-hoc improvisation.
 - No vacuous secondary sorts: secondary sort keys on distinct-key groupings must be struck or justified at plan time (never carried as dead text).
+- Flag-overrides-file granularity: plan must state per-key REPLACE (present flag replaces that key only) vs UNION, plus allow-rescues-deny + strict-forces-failOnUnknown anchors (M3 pattern).

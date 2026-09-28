@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.6"
+VERSION="0.2.7"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -224,6 +224,44 @@ KEEP_TEMP=0
 # ANCHOR_RC=$?
 # set -e
 # if [[ "$ANCHOR_RC" -eq 0 ]]; then pass "<label>: anchor order ok"; else fail_msg "<label>: anchor/pinning wrong"; fi
+
+# ---- Canonical mkphantom fixture (copy-paste; then call) ----
+# mkphantom <dir>: synth phantom package.json carrying the never-resolvable
+#   dep this-package-definitely-does-not-exist-olaf-xyz@9.9.9 (404 online /
+#   transport-error offline, both Unknown with a pinned unresolved-prefix
+#   reason). Requires PHANTOM_PKG/PHANTOM_VER vars (older probes use
+#   PKG_NAME/PKG_VERSION — adapt the two variable refs) + pass()/fail_msg()
+#   only when the optional python guard is kept (keep it when the probe
+#   already depends on python3; drop it for guard-free minimal back-ports —
+#   the printf output is static valid JSON either way).
+#   Frozen-date idiom for synth rules files (documented here, NOT in the
+#   function — mkphantom stays phantom-carrier only): `expires: 2099-01-01`
+#   = bounded-live exception, `expires: 2000-01-01` = expired
+#   ("(exception expired:"), absent `expires:` = perpetual. Frozen literals
+#   keep expiry arms deterministic (never `date +%Y` computed dates).
+#   Root "name" field is cosmetic (scanner keys on dependencies only):
+#   back-ports keep their historical root names (olaf-reliability-probe,
+#   olaf-policy-gate-probe, olaf-ux-strict-probe, olaf-policy-fixture).
+# Canonical source promoted to template 0.2.7 after 4th family use
+#   (policy-file-probe.sh live mkphantom + resolve-reliability-probe.sh +
+#   policy-gate-probe.sh + cli-ux-probe.sh step-2 inline heredocs — all the
+#   same package.json shape).
+#   Back-ported: all four probes now call mkphantom live (three heredocs
+#   replaced by calls, policy-file header cites canonical; behavior
+#   identical, probe versions unchanged).
+# mkphantom() {
+#   local d="$1"
+#   mkdir -p "$d"
+#   printf '{\n  "name": "olaf-phantom-fixture",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$PHANTOM_VER" > "$d/package.json"
+#   # optional guard (keep only when probe already depends on python3):
+#   # if command -v python3 >/dev/null 2>&1; then
+#   #   if ! python3 -c "import json,sys;json.load(open(sys.argv[1]))" "$d/package.json" 2>/dev/null; then
+#   #     fail_msg "synth fixture invalid JSON: $d/package.json"
+#   #   fi
+#   # fi
+# }
+# # call site (replaces the inline cat-heredoc package.json block):
+# #   PHANTOM="$WORKDIR/phantom"; mkphantom "$PHANTOM"
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"

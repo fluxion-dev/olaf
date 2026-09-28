@@ -103,15 +103,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cat > "$FIXTURE_DIR/package.json" <<EOF
-{
-  "name": "olaf-reliability-probe",
-  "version": "1.0.0",
-  "dependencies": {
-    "$PKG_NAME": "$PKG_VERSION"
-  }
+# ---- Canonical mkphantom (from _template.sh 0.2.7; vars adapted to PKG_NAME/PKG_VERSION) ----
+mkphantom() {
+  local d="$1"
+  mkdir -p "$d"
+  printf '{\n  "name": "olaf-reliability-probe",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PKG_NAME" "$PKG_VERSION" > "$d/package.json"
 }
-EOF
+
+mkphantom "$FIXTURE_DIR"
 echo "fixture: $FIXTURE_DIR/package.json"
 
 # NOTE: scan exit codes captured explicitly with `set +e` (timeout/dotnet non-zero expected).

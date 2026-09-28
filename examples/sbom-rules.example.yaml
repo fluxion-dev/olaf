@@ -9,6 +9,8 @@
 # Precedence is per key: a present --allow/--deny flag REPLACES the file
 # list for that key; --strict forces failOnUnknown:true. Explicit allow
 # rescues: a license on `allow` never offends even if also on `deny`.
+# Allow-list exclusivity: a non-empty `allow` list offends on any license
+# NOT on it (even with failOnUnknown:false) — allow is a gate, not a filter.
 # Unknown keys and wrong types are schema errors (exit 2, before any report).
 # Exceptions match (purl OR name, case-insensitive) AND license (exact SPDX,
 # case-insensitive); missing `expires` is perpetual; empty `reason` is a

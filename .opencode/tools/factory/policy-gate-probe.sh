@@ -4,13 +4,15 @@
 # and asserts:
 #   (a) non-strict            -> exit 0
 #   (b) --strict              -> exit 1 + stderr mentions strict/unknown
-#   (c) --allow <present SPDX> -> exit 0 where applicable (SKIP if flags unsupported)
-#   (d) --deny <present>      -> exit 1 + offender listed
-#   (e) --allow <mismatch>    -> exit 1
+#   (c) --allow <present SPDX> -> exit 0 (SKIP only if --allow absent from --help)
+#   (d) --deny <present>      -> exit 1 + offender listed (SKIP only if --deny absent)
+#   (e) --allow <mismatch>    -> exit 1 (SKIP only if --allow absent from --help)
 # Phantom license is Unknown, so: present=Unknown, mismatch=MIT.
-# If --allow/--deny are absent from --help, (c)-(e) SKIP and (a)+(b) decide.
+# Flags are live (Program.cs allowOption/denyOption in --help): (c)-(e) assert
+# live exit codes; the HAS_ALLOW/HAS_DENY auto-SKIP fires only if a flag is
+# genuinely absent from --help (e.g. stripped build). No exit-2 leniency.
 # Rules: repo-relative, idempotent (temp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -31,9 +33,9 @@ Policy gate probe (issue #5): strict-phantom fixture + allow/deny gate.
 Checks:
   (a) non-strict scan of phantom fixture            -> exit 0
   (b) --strict scan of phantom fixture              -> exit 1 + stderr (strict|unknown)
-  (c) --allow <present SPDX=Unknown>                -> exit 0 (SKIP if --allow unsupported)
-  (d) --deny <present SPDX=Unknown>                 -> exit 1 + offender listed
-  (e) --allow <mismatch SPDX=MIT>                   -> exit 1 (SKIP if --allow unsupported)
+  (c) --allow <present SPDX=Unknown>                -> exit 0 (SKIP only if --allow absent from --help)
+  (d) --deny <present SPDX=Unknown>                 -> exit 1 + offender listed (SKIP only if --deny absent)
+  (e) --allow <mismatch SPDX=MIT>                   -> exit 1 (SKIP only if --allow absent from --help)
 
 Options:
   --repo-root <dir>   Repo root (default: git top-level or CWD)
@@ -110,15 +112,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cat > "$FIXTURE_DIR/package.json" <<EOF
-{
-  "name": "olaf-policy-gate-probe",
-  "version": "1.0.0",
-  "dependencies": {
-    "$PHANTOM_PKG": "$PHANTOM_VER"
-  }
+# ---- Canonical mkphantom (from _template.sh 0.2.7; guard-free: no python3 dep) ----
+mkphantom() {
+  local d="$1"
+  mkdir -p "$d"
+  printf '{\n  "name": "olaf-policy-gate-probe",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$PHANTOM_VER" > "$d/package.json"
 }
-EOF
+
+mkphantom "$FIXTURE_DIR"
 echo "fixture: $FIXTURE_DIR/package.json"
 
 FAIL=0
@@ -174,8 +175,6 @@ else
   echo "allow-present exit: $RC"
   if [[ "$RC" -eq 0 ]]; then
     pass "c/allow-present" "--allow $PRESENT_SPDX exit 0"
-  elif [[ "$RC" -eq 2 ]]; then
-    skip "c/allow-present" "--allow $PRESENT_SPDX exit 2 (value/flag not applicable yet)"
   else
     fail "c/allow-present" "--allow $PRESENT_SPDX exit $RC (want 0)"
   fi
@@ -207,8 +206,6 @@ else
   echo "allow-mismatch exit: $RC"
   if [[ "$RC" -eq 1 ]]; then
     pass "e/allow-mismatch" "--allow $MISMATCH_SPDX exit 1"
-  elif [[ "$RC" -eq 2 ]]; then
-    skip "e/allow-mismatch" "--allow $MISMATCH_SPDX exit 2 (not applicable yet)"
   else
     fail "e/allow-mismatch" "--allow $MISMATCH_SPDX exit $RC (want 1)"
   fi
@@ -216,7 +213,7 @@ fi
 
 echo "== summary =="
 if [[ "$FAIL" -eq 0 ]]; then
-  echo "POLICY-GATE-PROBE OK: (a)+(b) pass, skips=$SKIPPED (allow/deny where applicable)."
+  echo "POLICY-GATE-PROBE OK: (a)-(e) pass, skips=$SKIPPED (only when a flag is genuinely absent from --help)."
   exit 0
 else
   echo "POLICY-GATE-PROBE FAILED: see FAIL lines above." >&2

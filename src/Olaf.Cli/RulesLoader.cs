@@ -1,6 +1,7 @@
 using System.Globalization;
 using Olaf.Core;
 using Olaf.Formatters;
+using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
 namespace Olaf.Cli;
@@ -222,7 +223,7 @@ public static class RulesLoader
         return !row.Expires.HasValue || row.Expires.Value >= today;
     }
 
-    private static string At(string displayPath, YamlDotNet.Core.Mark mark)
+    private static string At(string displayPath, Mark mark)
     {
         return mark.Line <= 0 ? $"{displayPath}:1:1" : $"{displayPath}:{mark.Line}:{mark.Column}";
     }

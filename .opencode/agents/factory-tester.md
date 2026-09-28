@@ -32,3 +32,6 @@ Rules:
 - Sbom-ignore-matrix gate (Wave 5b #74 harvest): SBOM ignore covers all SBOM formats × verbose/silent.
 - First-sorted-text-wins gate (Wave 5b #74 harvest): tie-break pin — first sorted text wins; count-vacuous ordering pinned.
 - CountOccurrences-reuse guard (Wave 5b #74 harvest): new tests call FormatterTestHelpers.CountOccurrences — no per-file private copy.
+- Replace-not-union gate (Wave 5b #75 harvest): per-key flag-replaces-file tests must include a gate on/off transition arm (empty-flag-clears-gate), never offender-silence alone (M2 exemplar).
+- Probe-every-policy-assertion (Wave 5b #75 harvest): new policy-gate CLI asserts file a policy-file-probe arm in the same issue or record why inapplicable.
+- Multi-tail-Fact label (Wave 5b #75 harvest): single-Fact loop/tail holders must comment the tail count so reconcile survives expansion review.
