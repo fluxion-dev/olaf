@@ -503,18 +503,12 @@ public sealed class CycloneDxXmlFormatterTests
         Assert.NotNull(xml);
         Assert.Equal("cyclonedx-xml", xml.Format, StringComparer.OrdinalIgnoreCase);
 
-        // cyclonedx stays JSON.
-        var alias = FormatterTestHelpers.GetFormatterViaRegistry("cyclonedx");
-        Assert.NotNull(alias);
-        Assert.Equal("cyclonedx-json", alias.Format, StringComparer.OrdinalIgnoreCase);
-        Assert.NotEqual(xml.GetType(), alias.GetType());
-
         // toml still throws; the message names the new format.
         var thrown = Assert.Throws<ArgumentException>(() => new FormatterRegistry().GetFormatter("toml"));
         Assert.Contains("cyclonedx-xml", thrown.Message, StringComparison.Ordinal);
 
-        // --help lists the new format (automated assert).
-        var help = CliTestHelpers.RunCli("--help");
+        // generate --help lists the new format (automated assert).
+        var help = CliTestHelpers.RunCli("generate", "--help");
         Assert.Equal(0, help.ExitCode);
         Assert.Contains("cyclonedx-xml", help.Stdout + help.Stderr, StringComparison.Ordinal);
     }
@@ -523,21 +517,29 @@ public sealed class CycloneDxXmlFormatterTests
     [Fact]
     public void Should_ExitZeroWithBom_When_FormatCycloneDxXml()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
+        var dir = CliTestHelpers.CreateTempDir();
+        try
+        {
+            File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(dir, "package.json"));
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "cyclonedx-xml");
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "cyclonedx-xml");
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        var doc = LoadXml(result.Stdout);
-        Assert.Equal("bom", doc.DocumentElement!.LocalName);
-        Assert.Equal(BomNamespace, doc.DocumentElement.NamespaceURI);
-        Assert.Matches(@"^urn:uuid:[0-9a-fA-F-]{36}$", doc.DocumentElement.Attributes!["serialNumber"]!.Value);
-        Assert.NotNull(doc.SelectSingleNode("/c:bom/c:components", Ns(doc)));
+            Assert.Equal(0, result.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+            var doc = LoadXml(result.Stdout);
+            Assert.Equal("bom", doc.DocumentElement!.LocalName);
+            Assert.Equal(BomNamespace, doc.DocumentElement.NamespaceURI);
+            Assert.Matches(@"^urn:uuid:[0-9a-fA-F-]{36}$", doc.DocumentElement.Attributes!["serialNumber"]!.Value);
+            Assert.NotNull(doc.SelectSingleNode("/c:bom/c:components", Ns(doc)));
 
-        // Bad-format exit-2 contract preserved.
-        var badFormat = CliTestHelpers.RunCli("--input", input, "--format", "toml");
-        Assert.Equal(2, badFormat.ExitCode);
+            // Bad-format exit-2 contract preserved.
+            var badFormat = CliTestHelpers.RunCli("generate", dir, "--format", "toml");
+            Assert.Equal(2, badFormat.ExitCode);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     // M1: duplicate bom-ref margin.

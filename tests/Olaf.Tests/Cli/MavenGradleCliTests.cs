@@ -3,10 +3,11 @@ using System.Text.Json;
 namespace Olaf.Tests.Cli;
 
 /// <summary>
-/// CLI end-to-end for maven/gradle (issue #12). Subprocess e2e via CliTestHelpers;
-/// fixtures are local files only (no live network). Phantom pom.xml/build.gradle
-/// fixtures guarantee Unknown licenses (404 or offline cache-miss), so
-/// --strict deterministically exits 1.
+/// CLI end-to-end for maven/gradle (issue #12, generate-only shape for issue
+/// #123). Subprocess e2e via CliTestHelpers; each run scans a temp dir
+/// holding the committed fixture file (no live network). Phantom
+/// pom.xml/build.gradle fixtures guarantee Unknown licenses (404 or offline
+/// cache-miss), so --strict deterministically exits 1.
 /// </summary>
 public sealed class MavenGradleCliTests
 {
@@ -42,50 +43,65 @@ public sealed class MavenGradleCliTests
         return dir;
     }
 
-    [Fact]
-    public void Should_ExitZero_When_EcosystemMavenFiltersPom()
+    private static string CopyFixtureToTempDir(string ecoDir, string fileName)
     {
-        var input = CliTestHelpers.FixturePath("maven", "pom.xml");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "maven");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("guava", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+        var dir = CliTestHelpers.CreateTempDir();
+        File.Copy(CliTestHelpers.FixturePath(ecoDir, fileName), Path.Combine(dir, fileName));
+        return dir;
     }
 
     [Fact]
-    public void Should_ExitZero_When_EcosystemGradleFiltersBuildGradle()
+    public void Should_ExitZero_When_GenerateMavenFixture()
     {
-        var input = CliTestHelpers.FixturePath("gradle", "build.gradle");
+        var dir = CopyFixtureToTempDir("maven", "pom.xml");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "gradle");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("guava", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("guava", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
-    public void Should_ExitZero_When_EcosystemGradleFiltersCatalog()
+    public void Should_ExitZero_When_GenerateGradleFixture()
     {
-        var input = CliTestHelpers.FixturePath("gradle", "libs.versions.toml");
+        var dir = CopyFixtureToTempDir("gradle", "build.gradle");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "gradle");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("guava", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("guava", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
-    public void Should_Exit2_When_EcosystemFilterMatchesNothing()
+    public void Should_ExitZero_When_GenerateGradleCatalogFixture()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
+        var dir = CopyFixtureToTempDir("gradle", "libs.versions.toml");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "maven");
-
-        Assert.Equal(2, result.ExitCode);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("guava", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
@@ -94,7 +110,7 @@ public sealed class MavenGradleCliTests
         var fixtureDir = CreateMavenStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -110,7 +126,7 @@ public sealed class MavenGradleCliTests
         var fixtureDir = CreateGradleStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -126,7 +142,7 @@ public sealed class MavenGradleCliTests
         var fixtureDir = CreateMavenStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--offline");
 
             Assert.Equal(0, result.ExitCode);
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));

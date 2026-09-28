@@ -143,30 +143,12 @@ internal static class CliTestHelpers
     }
 
     /// <summary>
-    /// Mixed npm fixture dir shared by transitive-filter CLI tests and the
-    /// SPDX --direct-only CLI test: svc-a/package.json (4 direct deps) +
-    /// svc-b/package-lock.json (2 transitive deps). Caller owns cleanup via
-    /// DeleteTempDir (try/finally).
-    /// </summary>
-    internal static string CreateMixedNpmFixtureDir()
-    {
-        var root = CreateTempDir();
-        var svcA = Path.Combine(root, "svc-a");
-        var svcB = Path.Combine(root, "svc-b");
-        Directory.CreateDirectory(svcA);
-        Directory.CreateDirectory(svcB);
-        File.Copy(FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
-        File.Copy(FixturePath("npm", "package-lock.json"), Path.Combine(svcB, "package-lock.json"));
-        return root;
-    }
-
-    /// <summary>
     /// Mixed npm+pip monorepo fixture shared by the generate CLI tests and
     /// the cross-ecosystem CLI test: svc-a/package.json + svc-b/requirements.txt
     /// (exact CanHandle filenames). Null contents copy the committed fixtures
     /// (offline); callers may pass phantom contents for deterministic
     /// Unknown-tolerant asserts. Caller owns cleanup via DeleteTempDir
-    /// (try/finally). (The npm+lock variant CreateMixedNpmFixtureDir stays distinct.)
+    /// (try/finally).
     /// </summary>
     internal static string CreateMixedNpmPipFixtureDir(string? packageJsonContent = null, string? requirementsContent = null)
     {
@@ -202,104 +184,69 @@ internal static class CliTestHelpers
         return doc.RootElement.GetProperty("summary").GetProperty("total").GetInt32();
     }
 }
-
 public sealed class CliEndToEndTests
 {
-    [Fact]
-    public void Should_OutputJsonToStdout_When_InputIsFileAndFormatJson()
+    // Issue #123: generate-only contract. Subprocess e2e on fixture DIRS +
+    // temp dirs only — generate takes a project directory (single-file input
+    // is exit 2, pinned below). No live network: strict arms use phantom
+    // fixtures whose deps stay Unknown via 404 or offline cache-miss; exit-0
+    // arms pin names from parsing, never resolved licenses.
+    // Exit-code contract: 0 success (including manifest-less empty report),
+    // 1 --strict gate on Unknown, 2 usage/scan/format/write errors.
+    private static string CreateNpmFixtureDir()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        using var doc = JsonDocument.Parse(result.Stdout); // stdout must be JSON
-        Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
+        var dir = CliTestHelpers.CreateTempDir();
+        File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(dir, "package.json"));
+        return dir;
     }
 
     [Fact]
-    public void Should_OutputTxtToStdout_When_FormatTxt()
+    public void Should_OutputJsonToStdout_When_GenerateDirectory()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "txt");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        Assert.Contains("Total:", result.Stdout, StringComparison.Ordinal);
-        Assert.Contains("express@", result.Stdout, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_OutputMarkdownToStdout_When_FormatMd()
-    {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "md");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        Assert.Contains("# Third-Party Attribution", result.Stdout, StringComparison.Ordinal);
-        Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_OutputMarkdownToStdout_When_FormatMarkdownAlias()
-    {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "markdown");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        Assert.Contains("# Third-Party Attribution", result.Stdout, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Should_ExitZero_When_InputIsFileOrDirectory(bool useDirectory)
-    {
-        string? tempDir = null;
+        var dir = CreateNpmFixtureDir();
         try
         {
-            string input;
-            if (useDirectory)
-            {
-                tempDir = CliTestHelpers.CreateTempDir();
-                File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(tempDir, "package.json"));
-                input = tempDir;
-            }
-            else
-            {
-                input = CliTestHelpers.FixturePath("npm", "package.json");
-            }
-
-            var result = CliTestHelpers.RunCli("--input", input, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
             Assert.Equal(0, result.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+            using var doc = JsonDocument.Parse(result.Stdout); // stdout must be JSON
             Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
         }
         finally
         {
-            if (tempDir is not null)
-            {
-                CliTestHelpers.DeleteTempDir(tempDir);
-            }
+            CliTestHelpers.DeleteTempDir(dir);
         }
     }
 
     [Fact]
-    public void Should_WriteOutputFile_When_OutSpecified()
+    public void Should_OutputMarkdownToStdout_When_GenerateMd()
     {
-        var tempDir = CliTestHelpers.CreateTempDir();
+        var dir = CreateNpmFixtureDir();
         try
         {
-            var input = CliTestHelpers.FixturePath("npm", "package.json");
-            var outFile = Path.Combine(tempDir, "out.json");
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "md");
 
-            var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--out", outFile);
+            Assert.Equal(0, result.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+            Assert.Contains("# Third-Party Attribution", result.Stdout, StringComparison.Ordinal);
+            Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
+    }
+
+    [Fact]
+    public void Should_WriteOutputFile_When_GenerateOutSpecified()
+    {
+        var dir = CreateNpmFixtureDir();
+        try
+        {
+            var outFile = Path.Combine(dir, "out.json");
+
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json", "--out", outFile);
 
             Assert.Equal(0, result.ExitCode);
             Assert.True(File.Exists(outFile));
@@ -309,42 +256,40 @@ public sealed class CliEndToEndTests
         }
         finally
         {
-            CliTestHelpers.DeleteTempDir(tempDir);
+            CliTestHelpers.DeleteTempDir(dir);
         }
     }
 
     [Fact]
-    public void Should_Exit2_When_OutExistsWithoutForce()
+    public void Should_Exit2_When_GenerateOutExistsWithoutForce()
     {
-        var tempDir = CliTestHelpers.CreateTempDir();
+        var dir = CreateNpmFixtureDir();
         try
         {
-            var input = CliTestHelpers.FixturePath("npm", "package.json");
-            var outFile = Path.Combine(tempDir, "out.json");
+            var outFile = Path.Combine(dir, "out.json");
             File.WriteAllText(outFile, "sentinel");
 
-            var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--out", outFile);
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json", "--out", outFile);
 
             Assert.Equal(2, result.ExitCode);
             Assert.Equal("sentinel", File.ReadAllText(outFile)); // must not overwrite
         }
         finally
         {
-            CliTestHelpers.DeleteTempDir(tempDir);
+            CliTestHelpers.DeleteTempDir(dir);
         }
     }
 
     [Fact]
-    public void Should_Overwrite_When_ForceSpecified()
+    public void Should_Overwrite_When_GenerateForceSpecified()
     {
-        var tempDir = CliTestHelpers.CreateTempDir();
+        var dir = CreateNpmFixtureDir();
         try
         {
-            var input = CliTestHelpers.FixturePath("npm", "package.json");
-            var outFile = Path.Combine(tempDir, "out.json");
+            var outFile = Path.Combine(dir, "out.json");
             File.WriteAllText(outFile, "sentinel");
 
-            var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--out", outFile, "--force");
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json", "--out", outFile, "--force");
 
             Assert.Equal(0, result.ExitCode);
             var content = File.ReadAllText(outFile);
@@ -353,19 +298,20 @@ public sealed class CliEndToEndTests
         }
         finally
         {
-            CliTestHelpers.DeleteTempDir(tempDir);
+            CliTestHelpers.DeleteTempDir(dir);
         }
     }
 
     [Fact]
-    public void Should_Exit1_When_StrictAndUnknownLicenses()
+    public void Should_Exit1_When_GenerateStrictAndUnknownLicenses()
     {
         var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict");
 
             Assert.Equal(1, result.ExitCode);
+            Assert.Contains("Strict mode: unknown licenses found.", result.Stderr, StringComparison.Ordinal);
         }
         finally
         {
@@ -374,12 +320,12 @@ public sealed class CliEndToEndTests
     }
 
     [Fact]
-    public void Should_Exit0_When_NotStrictAndUnknownLicenses()
+    public void Should_Exit0_When_GenerateNotStrictAndUnknownLicenses()
     {
         var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json");
 
             Assert.Equal(0, result.ExitCode);
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
@@ -392,185 +338,95 @@ public sealed class CliEndToEndTests
     }
 
     [Fact]
-    public void Should_Exit2_When_InputFileMissing()
+    public void Should_Exit2_When_GeneratePathMissing()
     {
-        var missing = Path.Combine(CliTestHelpers.CreateTempDir(), "does-not-exist.json");
+        var missing = Path.Combine(CliTestHelpers.CreateTempDir(), "does-not-exist");
 
-        var result = CliTestHelpers.RunCli("--input", missing, "--format", "json");
+        var result = CliTestHelpers.RunCli("generate", missing, "--format", "json");
 
         Assert.Equal(2, result.ExitCode);
     }
 
-    /// <summary>
-    /// Policy gate (--allow/--deny, issue #5): all cases use the phantom
-    /// fixture whose single dependency never resolves, so the effective SPDX
-    /// is always "Unknown" whether resolvers go over the network (404) or
-    /// stay offline (cache-miss) — no live network required.
-    /// Implemented behavior (verified via dotnet run): --allow/--deny imply
-    /// the gate even without --strict (with a warning on stderr); an
-    /// allow-list containing "Unknown" exempts unknown licenses.
-    /// QA note: enforcing without --strict goes beyond a strict-only reading
-    /// of the issue — flag if the spec intended --strict to be required.
-    /// </summary>
+    [Fact]
+    public void Should_Exit2WithSupportedList_When_GenerateFormatUnsupported()
+    {
+        var dir = CreateNpmFixtureDir();
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "toml");
+
+            Assert.Equal(2, result.ExitCode);
+            Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
+            foreach (var format in new[] { "json", "yaml", "xml", "md", "cyclonedx-json", "cyclonedx-xml", "spdx-json" })
+            {
+                Assert.Contains(format, result.Stderr, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
+    }
+
     [Theory]
-    [InlineData(true, "MIT", null, 1)] // allow-list excludes Unknown -> violation
-    [InlineData(true, "Unknown", null, 0)] // Unknown explicitly allowed
-    [InlineData(true, "MIT,Unknown", null, 0)] // multi-entry allow-list
-    [InlineData(true, null, "Unknown", 1)] // deny-list hits Unknown
-    [InlineData(false, null, "Unknown", 1)] // enforced without --strict
-    [InlineData(false, "Unknown", null, 0)] // allow passes without --strict
-    [InlineData(true, null, "MIT", 1)] // deny misses, Unknown-fallback still fails
-    public void Should_PolicyGate_When_AllowDeny(bool strict, string? allow, string? deny, int expectedExit)
+    [InlineData("txt")]
+    [InlineData("html")]
+    [InlineData("markdown")]
+    [InlineData("cyclonedx")]
+    public void Should_Exit2WithSupportedList_When_GenerateDeletedFormat(string format)
     {
-        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
+        // Issue #123: txt/html retired, markdown + cyclonedx aliases removed —
+        // all four are usage errors naming the 7-format canonical list.
+        var dir = CreateNpmFixtureDir();
         try
         {
-            var args = new List<string> { "--input", fixtureDir, "--format", "json" };
-            if (strict)
-            {
-                args.Add("--strict");
-            }
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", format);
 
-            if (allow is not null)
-            {
-                args.Add("--allow");
-                args.Add(allow);
-            }
-
-            if (deny is not null)
-            {
-                args.Add("--deny");
-                args.Add(deny);
-            }
-
-            var result = CliTestHelpers.RunCli([.. args]);
-
-            Assert.Equal(expectedExit, result.ExitCode);
+            Assert.Equal(2, result.ExitCode);
+            Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
         }
         finally
         {
-            CliTestHelpers.DeleteTempDir(fixtureDir);
+            CliTestHelpers.DeleteTempDir(dir);
         }
     }
 
     [Fact]
-    public void Should_PolicyGate_DenyPresentSpdx_OnNpmFixture()
+    public void Should_ShowGenerateHelp_When_GenerateHelp()
     {
-        // MIT is the SPDX the npm fixture would resolve to; --deny MIT fails
-        // (exit 1) whether the sandbox resolves it (direct deny match) or
-        // stays Unknown (unknown-fallback enforcement) — deterministic either
-        // way. Stderr must name the offender, not just the count.
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
+        var generate = CliTestHelpers.RunCli("generate", "--help");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--deny", "MIT");
+        Assert.Equal(0, generate.ExitCode);
+        Assert.Contains("--format", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--out", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--force", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--strict", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("--offline", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("olaf generate .", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("olaf generate ./svc --format cyclonedx-json", generate.Stdout, StringComparison.Ordinal);
+        Assert.Contains("olaf generate . --out sbom", generate.Stdout, StringComparison.Ordinal);
 
-        Assert.Equal(1, result.ExitCode);
-        Assert.Contains("express", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("policy gate violations", result.Stderr, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("offender(s) found", result.Stderr, StringComparison.Ordinal);
+        var root = CliTestHelpers.RunCli("--help");
+
+        Assert.Equal(0, root.ExitCode);
+        Assert.Contains("generate", root.Stdout, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Should_PolicyGate_Warn_When_AllowDenyWithoutStrict()
+    public void Should_Exit2WithUsage_When_BareRootWithoutSubcommand()
     {
-        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
-        try
-        {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--deny", "Unknown");
+        // A positional path with no subcommand is not routed to generate —
+        // the parser rejects it (exit 2). Users must spell `generate .`.
+        var positional = CliTestHelpers.RunCli(".");
 
-            Assert.Equal(1, result.ExitCode);
-            Assert.Contains("Warning: --allow/--deny without --strict", result.Stderr, StringComparison.Ordinal);
-        }
-        finally
-        {
-            CliTestHelpers.DeleteTempDir(fixtureDir);
-        }
-    }
+        Assert.Equal(2, positional.ExitCode);
+        Assert.Contains("Unrecognized command", positional.Stderr, StringComparison.Ordinal);
 
-    [Fact]
-    public void Should_PolicyGate_ReportOffenderDetails_InStderr()
-    {
-        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
-        try
-        {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict", "--deny", "Unknown");
+        var bare = CliTestHelpers.RunCli();
 
-            Assert.Equal(1, result.ExitCode);
-            Assert.Contains("this-package-definitely-does-not-exist-olaf-xyz", result.Stderr, StringComparison.Ordinal);
-            Assert.Contains("-> Unknown", result.Stderr, StringComparison.Ordinal);
-            Assert.Contains("1 offender(s) found", result.Stderr, StringComparison.Ordinal);
-        }
-        finally
-        {
-            CliTestHelpers.DeleteTempDir(fixtureDir);
-        }
-    }
-
-    [Fact]
-    public void Should_PolicyGate_TrimAndCaseInsensitiveCsv()
-    {
-        // " mit , Unknown " must parse as {MIT, Unknown} -> Unknown allowed -> 0.
-        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
-        try
-        {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict", "--allow", " mit , Unknown ");
-
-            Assert.Equal(0, result.ExitCode);
-        }
-        finally
-        {
-            CliTestHelpers.DeleteTempDir(fixtureDir);
-        }
-    }
-
-    [Fact]
-    public void Should_PolicyGate_EmptyAllow_FallsBackToStrictGate()
-    {
-        // Empty --allow carries no entries, so the default strict message/contract applies.
-        var fixtureDir = CliTestHelpers.CreateStrictFixtureDir();
-        try
-        {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict", "--allow", string.Empty);
-
-            Assert.Equal(1, result.ExitCode);
-            Assert.Contains("Strict mode: unknown licenses found.", result.Stderr, StringComparison.Ordinal);
-        }
-        finally
-        {
-            CliTestHelpers.DeleteTempDir(fixtureDir);
-        }
-    }
-
-    [Fact]
-    public void Should_Exit2_When_FormatUnsupported()
-    {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "toml");
-
-        Assert.Equal(2, result.ExitCode);
-    }
-
-    [Fact]
-    public void Should_Help_DocumentsAllFlagsAndExamples()
-    {
-        var result = CliTestHelpers.RunCli("--help");
-
-        Assert.Equal(0, result.ExitCode);
-        var combined = result.Stdout + result.Stderr;
-        Assert.Contains("--input", combined, StringComparison.Ordinal);
-        Assert.Contains("--format", combined, StringComparison.Ordinal);
-        Assert.Contains("--out", combined, StringComparison.Ordinal);
-        Assert.Contains("--force", combined, StringComparison.Ordinal);
-        Assert.Contains("--strict", combined, StringComparison.Ordinal);
-        Assert.Contains("--allow", combined, StringComparison.Ordinal);
-        Assert.Contains("--deny", combined, StringComparison.Ordinal);
-        Assert.Contains("--ecosystem", combined, StringComparison.Ordinal);
-        Assert.Contains("--verbose", combined, StringComparison.Ordinal);
-        Assert.Contains("--quiet", combined, StringComparison.Ordinal);
-        Assert.Contains("--version", combined, StringComparison.Ordinal);
-        Assert.Contains("Examples:", combined, StringComparison.Ordinal);
-        Assert.Contains("olaf --input", combined, StringComparison.Ordinal);
+        Assert.Equal(2, bare.ExitCode);
+        Assert.Contains("generate", bare.Stderr, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -585,26 +441,14 @@ public sealed class CliEndToEndTests
     }
 
     [Fact]
-    public void Should_Exit2_When_EcosystemUnsupported()
+    public void Should_CreateParentDirs_When_GenerateOutNestedMissing()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "spm");
-
-        Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_CreateParentDirs_When_OutNestedMissing()
-    {
-        var tempDir = CliTestHelpers.CreateTempDir();
+        var dir = CreateNpmFixtureDir();
         try
         {
-            var input = CliTestHelpers.FixturePath("npm", "package.json");
-            var outFile = Path.Combine(tempDir, "a", "b", "out.json");
+            var outFile = Path.Combine(dir, "a", "b", "out.json");
 
-            var result = CliTestHelpers.RunCli("--input", input, "--out", outFile);
+            var result = CliTestHelpers.RunCli("generate", dir, "--out", outFile);
 
             Assert.Equal(0, result.ExitCode);
             Assert.True(File.Exists(outFile));
@@ -614,7 +458,7 @@ public sealed class CliEndToEndTests
         }
         finally
         {
-            CliTestHelpers.DeleteTempDir(tempDir);
+            CliTestHelpers.DeleteTempDir(dir);
         }
     }
 }

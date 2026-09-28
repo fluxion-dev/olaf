@@ -145,14 +145,4 @@ public sealed class GoCargoRegistryTests
         }
     }
 
-    [Fact]
-    public void Should_ScanGoSumFile_When_SingleGoSumFileGiven()
-    {
-        var deps = new ParserRegistry().Scan(ParserTestHelpers.FixturePath("go", "go.sum"));
-
-        Assert.Equal(4, deps.Count);
-        Assert.All(deps, d => Assert.Equal("go", d.Ecosystem));
-        Assert.All(deps, d => Assert.True(d.IsTransitive));
-        Assert.Contains(deps, d => d.Name == "github.com/spf13/cobra" && d.Version == "v1.8.0");
-    }
 }

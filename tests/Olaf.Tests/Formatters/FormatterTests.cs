@@ -221,15 +221,7 @@ internal static class FormatterTestHelpers
                 break;
             }
 
-            case "html":
-                foreach (var header in new[] { "<th>Ecosystem</th>", "<th>Name</th>", "<th>Version</th>", "<th>SPDX</th>", "<th>License</th>", "<th>Source</th>", "<th>Status</th>", "<th>Reason</th>" })
-                {
-                    Assert.Contains(header, output, StringComparison.Ordinal);
-                }
-
-                break;
             case "md":
-            case "markdown":
                 foreach (var header in new[] { "| Ecosystem |", "| Name |", "| Version |", "| SPDX |", "| License |", "| Source |", "| Status |", "| Reason |" })
                 {
                     Assert.Contains(header, output, StringComparison.Ordinal);
@@ -274,14 +266,7 @@ internal static class FormatterTestHelpers
                 break;
             }
 
-            case "html":
-                Assert.Contains("<th>Direct</th>", output, StringComparison.Ordinal);
-                break;
-            case "txt":
-                Assert.Contains("direct=", output, StringComparison.Ordinal);
-                break;
             case "md":
-            case "markdown":
                 Assert.Contains("| Direct |", output, StringComparison.Ordinal);
                 break;
             default:
@@ -364,8 +349,7 @@ internal static class FormatterTestHelpers
 
     /// <summary>
     /// Ordinal substring count shared by every occurrence-counting suite
-    /// (GroupByLicense/DirectField/MarkdownReportE2E/HtmlReportE2E).
-    /// Non-overlapping matches.
+    /// (DirectField/MarkdownReportE2E). Non-overlapping matches.
     /// </summary>
     internal static int CountOccurrences(string haystack, string needle)
     {
@@ -617,110 +601,8 @@ public sealed class XmlFormatterTests
 }
 
 /// <summary>
-/// HtmlFormatter.
-/// </summary>
-public sealed class HtmlFormatterTests
-{
-    [Fact]
-    public void Should_ContainTableWithHeaders_When_ScanResultHasMixedLicenses()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("html");
-
-        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
-
-        Assert.Contains("<table", output, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Name", output, StringComparison.Ordinal);
-        Assert.Contains("Version", output, StringComparison.Ordinal);
-        Assert.Contains("License", output, StringComparison.Ordinal);
-        Assert.Contains("express", output, StringComparison.Ordinal);
-        Assert.Contains("4.18.2", output, StringComparison.Ordinal);
-        Assert.Contains("MIT", output, StringComparison.Ordinal);
-        Assert.Contains("mystery-pkg", output, StringComparison.Ordinal);
-
-        // Full 8-column headers + summary + encoded sourceUrl/reason.
-        Assert.Contains("<th>Ecosystem</th>", output, StringComparison.Ordinal);
-        Assert.Contains("<th>Reason</th>", output, StringComparison.Ordinal);
-        Assert.Contains("Total: 2", output, StringComparison.Ordinal);
-        Assert.Contains("Resolved: 1", output, StringComparison.Ordinal);
-        Assert.Contains("Unknown: 1", output, StringComparison.Ordinal);
-        Assert.Contains(WebUtility.HtmlEncode("https://example.com/express/LICENSE"), output, StringComparison.Ordinal);
-        Assert.Contains(WebUtility.HtmlEncode("not-found: no license for 'mystery-pkg 1.0.0'."), output, StringComparison.Ordinal);
-
-        FormatterTestHelpers.AssertEightFieldsPresent(output, "html");
-        FormatterTestHelpers.AssertSummaryCounts(output);
-    }
-
-    [Fact]
-    public void Should_EscapeHtml_When_FieldsContainMarkup()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("html");
-
-        var output = formatter.FormatResult(FormatterTestHelpers.EscapingScanResult());
-
-        Assert.DoesNotContain("<script>", output, StringComparison.Ordinal);
-        Assert.Contains(WebUtility.HtmlEncode("evil<script>&\"pkg"), output, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_FallbackToUnknown_When_SpdxIsWhitespace()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("html");
-
-        var result = new ScanResult(new List<ResolvedLicense>
-        {
-            new(
-                new Dependency("npm", "ws-pkg", "1.0.0", false),
-                "   ",
-                null,
-                null,
-                "Resolved",
-                null),
-        });
-        var output = formatter.FormatResult(result);
-
-        Assert.Contains(">Unknown<", output, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_ProduceValidHtml_When_ScanResultEmpty()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("html");
-
-        var output = formatter.FormatResult(ScanResult.Empty);
-
-        Assert.Contains("<table", output, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("express", output, StringComparison.Ordinal);
-        // Empty envelope keeps table with zero-count summary.
-        Assert.Contains("Total: 0", output, StringComparison.Ordinal);
-
-        FormatterTestHelpers.AssertSummaryCounts(output, total: 0, resolved: 0, unknown: 0);
-    }
-
-    [Theory]
-    [InlineData("json")]
-    [InlineData("yaml")]
-    [InlineData("xml")]
-    [InlineData("html")]
-    [InlineData("txt")]
-    [InlineData("md")]
-    [InlineData("markdown")]
-    public void Should_SortByEcosystemNameVersion_When_InputUnsorted(string format)
-    {
-        // Stable sort (ecosystem, name, version) — express before mystery-pkg in every format.
-        var formatter = FormatterTestHelpers.ResolveFormatter(format);
-
-        var output = formatter.FormatResult(FormatterTestHelpers.UnsortedSampleScanResult());
-
-        var express = output.IndexOf("express", StringComparison.Ordinal);
-        var mystery = output.IndexOf("mystery-pkg", StringComparison.Ordinal);
-        Assert.True(express >= 0, $"[{format}] missing 'express'.");
-        Assert.True(mystery >= 0, $"[{format}] missing 'mystery-pkg'.");
-        Assert.True(express < mystery, $"[{format}] expected 'express' before 'mystery-pkg'.");
-    }
-}
-
-/// <summary>
-/// FormatterRegistry backs --format json|yaml|xml|html selection.
+/// FormatterRegistry backs --format json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json
+/// (issue #123: 7 canonical formats, zero aliases).
 /// </summary>
 public sealed class FormatterRegistryTests
 {
@@ -728,9 +610,10 @@ public sealed class FormatterRegistryTests
     [InlineData("json")]
     [InlineData("yaml")]
     [InlineData("xml")]
-    [InlineData("html")]
-    [InlineData("txt")]
     [InlineData("md")]
+    [InlineData("cyclonedx-json")]
+    [InlineData("cyclonedx-xml")]
+    [InlineData("spdx-json")]
     public void Should_ResolveFormatter_When_FormatSupported(string format)
     {
         var formatter = FormatterTestHelpers.GetFormatterViaRegistry(format);
@@ -739,13 +622,23 @@ public sealed class FormatterRegistryTests
         Assert.Equal(format, formatter.Format, StringComparer.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Should_ResolveMarkdownAlias_When_FormatIsMarkdown()
+    [Theory]
+    [InlineData("json")]
+    [InlineData("yaml")]
+    [InlineData("xml")]
+    [InlineData("md")]
+    public void Should_SortByEcosystemNameVersion_When_InputUnsorted(string format)
     {
-        var formatter = FormatterTestHelpers.GetFormatterViaRegistry("markdown");
+        // Stable sort (ecosystem, name, version) — express before mystery-pkg in every format.
+        var formatter = FormatterTestHelpers.GetFormatterViaRegistry(format);
 
-        Assert.NotNull(formatter);
-        Assert.Equal("md", formatter.Format, StringComparer.OrdinalIgnoreCase);
+        var output = formatter.FormatResult(FormatterTestHelpers.UnsortedSampleScanResult());
+
+        var express = output.IndexOf("express", StringComparison.Ordinal);
+        var mystery = output.IndexOf("mystery-pkg", StringComparison.Ordinal);
+        Assert.True(express >= 0, $"[{format}] missing 'express'.");
+        Assert.True(mystery >= 0, $"[{format}] missing 'mystery-pkg'.");
+        Assert.True(express < mystery, $"[{format}] expected 'express' before 'mystery-pkg'.");
     }
 
     [Fact]
@@ -765,61 +658,6 @@ public sealed class FormatterRegistryTests
         }
 
         Assert.Fail("Expected error for unsupported format 'toml'.");
-    }
-}
-
-/// <summary>
-/// TxtFormatter: human-readable per-package blocks with header summary.
-/// </summary>
-public sealed class TxtFormatterTests
-{
-    [Fact]
-    public void Should_ProduceBlocksWithSummary_When_ScanResultHasMixedLicenses()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("txt");
-
-        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
-
-        Assert.False(string.IsNullOrWhiteSpace(output));
-        // Header summary.
-        Assert.Contains("Total: 2", output, StringComparison.Ordinal);
-        Assert.Contains("Resolved: 1", output, StringComparison.Ordinal);
-        Assert.Contains("Unknown: 1", output, StringComparison.Ordinal);
-        // Per-package blocks: name@version (ecosystem).
-        Assert.Contains("express@4.18.2 (npm)", output, StringComparison.Ordinal);
-        Assert.Contains("mystery-pkg@1.0.0 (npm)", output, StringComparison.Ordinal);
-        // SPDX + source + status/reason coverage (8-field contract in text form).
-        Assert.Contains("MIT", output, StringComparison.Ordinal);
-        Assert.Contains("https://example.com/express/LICENSE", output, StringComparison.Ordinal);
-        Assert.Contains("Resolved", output, StringComparison.Ordinal);
-        Assert.Contains("Unknown", output, StringComparison.Ordinal);
-        Assert.Contains("not-found: no license for 'mystery-pkg 1.0.0'.", output, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_FallbackToUnknown_When_SpdxIsNull()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("txt");
-
-        var output = formatter.FormatResult(FormatterTestHelpers.SampleScanResult());
-
-        // mystery-pkg has null SpdxId — the SPDX line must fall back to Unknown.
-        var block = output.Substring(output.IndexOf("mystery-pkg@1.0.0", StringComparison.Ordinal));
-        Assert.Contains("SPDX: Unknown", block, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_ProduceHeaderOnly_When_ScanResultEmpty()
-    {
-        var formatter = FormatterTestHelpers.ResolveFormatter("txt");
-
-        var output = formatter.FormatResult(ScanResult.Empty);
-
-        Assert.Contains("Total: 0", output, StringComparison.Ordinal);
-        Assert.Contains("Resolved: 0", output, StringComparison.Ordinal);
-        Assert.Contains("Unknown: 0", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("express", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("@", output, StringComparison.Ordinal);
     }
 }
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): --template flag + TemplateEngine/TemplateFormatter deleted — no template surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # template-probe.sh — Custom-template probe for issue #73 (promoted v0.1.0, 2 uses ≥ bar: prototype + smoke PASS).
 # Model: enrichment-probe.sh T-structure with template_check per arm.
 # Offline-safe: never passes --strict; committed npm fixture + committed

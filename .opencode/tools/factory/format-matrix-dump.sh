@@ -1,44 +1,42 @@
 #!/usr/bin/env bash
 # format-matrix-dump.sh — CLI format matrix on committed npm fixture (issue #3).
-# Runs: for f in json yaml xml html txt md cyclonedx-json cyclonedx-xml spdx-json; do
-#   dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format $f; done
-# then checks each output for 8 fields + direct (9th) + summary counts; HTML additionally
-# requires <table> and HTML-encoded cell output; cyclonedx-json asserts the
+# Issue #123: canonical 7 (txt/html deleted, zero aliases).
+# Runs: for f in json yaml xml md cyclonedx-json cyclonedx-xml spdx-json; do
+#   dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format $f; done
+# then checks each output for 8 fields + direct (9th) + summary counts; cyclonedx-json asserts the
 # CycloneDX envelope (bomFormat/specVersion/components); cyclonedx-xml asserts the
 # CycloneDX XML envelope (<bom/xmlns bom/1.5/metadata/components) + <scope>
 # element + olaf: counts props + well-formedness (python xml parse); spdx-json
 # asserts the SPDX envelope (spdxVersion==SPDX-2.3/dataLicense==CC0-1.0/packages/
 # relationships) + DESCRIBES+CONTAINS relationships + olaf: counts comment.
-# NOTE: empty-components case not applicable — the CLI exits 2 ("No manifests
-# found") on manifest-less input before any formatter runs, so every matrix
-# scan carries ≥1 component.
+# NOTE: manifest-less input yields a valid empty report (exit 0, #123 generate
+# behavior); the matrix fixture scan carries ≥1 component.
 # Offline-safe: never passes --strict; resolver network failures degrade to
 # Unknown with exit 0 (deterministic continue in Program.cs).
 # Rules: repo-relative, idempotent (stdout only, temp files cleaned), no secrets.
-VERSION="0.5.0"
+VERSION="0.6.0"
 set -euo pipefail
 
 TIMEOUT_SECS=60
-FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml spdx-json"
+FORMATS="json yaml xml md cyclonedx-json cyclonedx-xml spdx-json"
 FIXTURE_REL="tests/Olaf.Tests/Fixtures/npm"
 PROJECT_REL="src/Olaf.Cli"
 WORKDIR=""
 KEEP_TEMP=0
 
 usage() {
-  echo "Usage: $(basename "$0") [--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json|all] [--timeout <secs>] [--workdir <dir>] [--keep-temp] [--help] [--version]"
+  echo "Usage: $(basename "$0") [--format json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json|all] [--timeout <secs>] [--workdir <dir>] [--keep-temp] [--help] [--version]"
   echo ""
   echo "CLI format matrix on the committed npm fixture (offline-safe, non-strict)."
-  echo "Runs 'dotnet run --project $PROJECT_REL -- --input $FIXTURE_REL --format <f>'"
-  echo "for each format (default: all nine) with 'timeout <secs>s' per scan"
+  echo "Runs 'dotnet run --project $PROJECT_REL -- generate $FIXTURE_REL --format <f>'"
+  echo "for each format (default: all seven) with 'timeout <secs>s' per scan"
   echo "(default: 60), then verifies:"
   echo "  - 8 fields present (ecosystem,name,version,spdx,licenseText,sourceUrl,status,reason"
-  echo "    or per-format equivalents: <th> headers for html, <elements> for xml, keys for yaml,"
-  echo "    SPDX:/Status: lines for txt, | table | headers for md, components[] for cyclonedx-json)"
-  echo "  - 9th field 'direct' present (json \"direct\" / yaml direct: / xml <direct> / html <th>Direct</th>"
-  echo "    / txt direct= / md | Direct | / cyclonedx-json scope required|optional / cyclonedx-xml <scope>required|optional</scope>)"
+  echo "    or per-format equivalents: <elements> for xml, keys for yaml,"
+  echo "    | table | headers for md, components[] for cyclonedx-json)"
+  echo "  - 9th field 'direct' present (json \"direct\" / yaml direct: / xml <direct>"
+  echo "    / md | Direct | / cyclonedx-json scope required|optional / cyclonedx-xml <scope>required|optional</scope>)"
   echo "  - summary counts present (total/resolved/unknown or per-format equivalent)"
-  echo "  - html additionally contains <table> and HTML-encoded cell output"
   echo "  - cyclonedx-json additionally asserts bomFormat==CycloneDX + specVersion==1.5"
   echo "  - cyclonedx-xml additionally asserts <bom + xmlns bom/1.5 + <metadata>/<components>"
   echo "    + well-formedness (python xml parse)"
@@ -56,7 +54,7 @@ usage() {
   echo "Exit codes: 0 matrix passed, 1 check failure, 2 usage/environment error."
   echo "Examples:"
   echo "  $(basename "$0")"
-  echo "  $(basename "$0") --format html"
+  echo "  $(basename "$0") --format md"
   echo "  $(basename "$0") --format json --timeout 30"
   echo "  $(basename "$0") --workdir /tmp/fm --keep-temp"
 }
@@ -75,9 +73,9 @@ while [[ $# -gt 0 ]]; do
     --format)
       [[ $# -lt 2 ]] && { echo "Missing value for --format." >&2; exit 2; }
       case "$2" in
-        json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json) FORMATS="$2" ;;
-        all) FORMATS="json yaml xml html txt md cyclonedx-json cyclonedx-xml spdx-json" ;;
-        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json|all." >&2; exit 2 ;;
+        json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json) FORMATS="$2" ;;
+        all) FORMATS="json yaml xml md cyclonedx-json cyclonedx-xml spdx-json" ;;
+        *) echo "Unsupported --format '$2'. Expected json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json|all." >&2; exit 2 ;;
       esac
       shift 2
       ;;
@@ -160,7 +158,7 @@ for f in $FORMATS; do
   OUT="$TMP/out.$f"
   echo "=== format: $f ==="
   if command -v timeout >/dev/null 2>&1; then
-    if timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$FIXTURE" --format "$f" >"$OUT" 2>"$TMP/err.$f"; then
+    if timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- generate "$FIXTURE" --offline --format "$f" >"$OUT" 2>"$TMP/err.$f"; then
       :
     else
       rc=$?
@@ -172,7 +170,7 @@ for f in $FORMATS; do
       continue
     fi
   else
-    if dotnet run --project "$PROJECT" -- --input "$FIXTURE" --format "$f" >"$OUT" 2>"$TMP/err.$f"; then
+    if dotnet run --project "$PROJECT" -- generate "$FIXTURE" --offline --format "$f" >"$OUT" 2>"$TMP/err.$f"; then
       :
     else
       rc=$?
@@ -210,15 +208,6 @@ for f in $FORMATS; do
       fi
       if check_contains "$f" "$OUT" "direct" '<direct>'; then
         pass "$f" "9th field 'direct' present"
-      fi
-      ;;
-    txt)
-      if check_contains "$f" "$OUT" "fields" 'SPDX:' 'Status:' \
-        && check_contains "$f" "$OUT" "counts" 'Total:' 'Resolved:' 'Unknown:'; then
-        pass "$f" "fields + summary counts present"
-      fi
-      if check_contains "$f" "$OUT" "direct" 'direct='; then
-        pass "$f" "9th field 'direct=' present"
       fi
       ;;
     md)
@@ -273,28 +262,6 @@ PY
       fi
       ;;
 
-    html)
-      if check_contains "$f" "$OUT" "fields/headers" '<th>Ecosystem</th>' '<th>Name</th>' '<th>Version</th>' '<th>SPDX</th>' '<th>License</th>' '<th>Source</th>' '<th>Status</th>' '<th>Reason</th>' \
-        && check_contains "$f" "$OUT" "counts" 'Total:' 'Resolved:' 'Unknown:'; then
-        pass "$f" "8 <th> headers + summary counts present"
-      fi
-      if check_contains "$f" "$OUT" "direct-header" '<th>Direct</th>'; then
-        pass "$f" "9th header <th>Direct</th> present"
-      fi
-      if check_contains "$f" "$OUT" "table" '<table>' '</table>' '<td>'; then
-        pass "$f" "<table> with cells present"
-      fi
-      # Encoded output: formatter HTML-encodes every cell via WebUtility.HtmlEncode.
-      # Runtime proof: at least one HTML entity in cell data, OR source-level proof
-      # that the encoder is wired (keeps check green on fixtures without &<>" chars).
-      if grep -qE '&(amp|lt|gt|quot|#39);' "$OUT"; then
-        pass "$f" "HTML-encoded entity found in output"
-      elif grep -q 'HtmlEncode' "$ROOT/src/Olaf.Formatters/HtmlFormatter.cs" 2>/dev/null; then
-        pass "$f" "no entity chars in fixture data; encoder wired (HtmlEncode in HtmlFormatter.cs)"
-      else
-        fail "$f" "no HTML-encoded entity and HtmlEncode not found in HtmlFormatter.cs"
-      fi
-      ;;
   esac
 done
 

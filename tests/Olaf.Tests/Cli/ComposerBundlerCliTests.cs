@@ -3,8 +3,9 @@ using System.Text.Json;
 namespace Olaf.Tests.Cli;
 
 /// <summary>
-/// CLI end-to-end for composer/bundler (issue #13). Subprocess e2e via
-/// CliTestHelpers; fixtures are local files only (no live network). Phantom
+/// CLI end-to-end for composer/bundler (issue #13, generate-only shape for
+/// issue #123). Subprocess e2e via CliTestHelpers; each run scans a temp dir
+/// holding the committed fixture file (no live network). Phantom
 /// composer.json/Gemfile fixtures guarantee Unknown licenses (404 or offline
 /// cache-miss), so --strict deterministically exits 1.
 /// </summary>
@@ -28,51 +29,47 @@ public sealed class ComposerBundlerCliTests
         return dir;
     }
 
-    [Fact]
-    public void Should_ExitZero_When_EcosystemComposerFiltersComposerJson()
+    private static string CopyFixtureToTempDir(string ecoDir, string fileName)
     {
-        var input = CliTestHelpers.FixturePath("composer", "composer.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "composer");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("monolog", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+        var dir = CliTestHelpers.CreateTempDir();
+        File.Copy(CliTestHelpers.FixturePath(ecoDir, fileName), Path.Combine(dir, fileName));
+        return dir;
     }
 
     [Fact]
-    public void Should_ExitZero_When_EcosystemBundlerFiltersGemfile()
+    public void Should_ExitZero_When_GenerateComposerFixture()
     {
-        var input = CliTestHelpers.FixturePath("bundler", "Gemfile");
+        var dir = CopyFixtureToTempDir("composer", "composer.json");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "bundler");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("rails", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("monolog", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
-    public void Should_Exit2WithSupportedList_When_EcosystemInvalid()
+    public void Should_ExitZero_When_GenerateBundlerFixture()
     {
-        var input = CliTestHelpers.FixturePath("composer", "composer.json");
+        var dir = CopyFixtureToTempDir("bundler", "Gemfile");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "conda");
-
-        Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("composer", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("bundler", result.Stderr, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Should_Exit2_When_EcosystemFilterMatchesNothing()
-    {
-        var input = CliTestHelpers.FixturePath("composer", "composer.json");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "bundler");
-
-        Assert.Equal(2, result.ExitCode);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("rails", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
@@ -81,7 +78,7 @@ public sealed class ComposerBundlerCliTests
         var fixtureDir = CreateComposerStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -97,7 +94,7 @@ public sealed class ComposerBundlerCliTests
         var fixtureDir = CreateBundlerStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -113,7 +110,7 @@ public sealed class ComposerBundlerCliTests
         var fixtureDir = CreateComposerStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--offline");
 
             Assert.Equal(0, result.ExitCode);
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));

@@ -5,7 +5,7 @@ using Olaf.Core;
 namespace Olaf.Tests.Formatters;
 
 /// <summary>
-/// Issue #66: `direct` field surfaced by all six formatters (offline unit
+/// Issue #66/#123: `direct` field surfaced by the kept human formats (offline unit
 /// style — ScanResult constructed directly, no network). Mixed fixture: one
 /// direct (IsTransitive:false) + one transitive (IsTransitive:true) entry so
 /// both boolean surfaces are pinned. Every test also calls the shared
@@ -90,51 +90,6 @@ public sealed class DirectFieldFormatterTests
         Assert.Equal("false", byName["shadow-dep"].SelectSingleNode("direct")!.InnerText);
 
         FormatterTestHelpers.AssertDirectFieldPresent(output, "xml");
-    }
-
-    [Fact]
-    public void Should_SurfaceDirectColumn_When_FormatHtml()
-    {
-        var output = FormatterTestHelpers.ResolveFormatter("html").FormatResult(MixedDirectTransitiveScanResult());
-
-        Assert.Contains("<th>Direct</th>", output, StringComparison.Ordinal);
-        // Header Direct is the LAST column.
-        var reasonTh = output.IndexOf("<th>Reason</th>", StringComparison.Ordinal);
-        var directTh = output.IndexOf("<th>Direct</th>", StringComparison.Ordinal);
-        Assert.True(reasonTh >= 0 && directTh > reasonTh, "Expected '<th>Direct</th>' after '<th>Reason</th>'.");
-        // 2 body rows x 9 columns = 18 td cells; per-row values pinned.
-        var tbody = output.Substring(output.IndexOf("<tbody>", StringComparison.Ordinal));
-        Assert.Equal(18, FormatterTestHelpers.CountOccurrences(tbody, "<td>"));
-        var expressAt = tbody.IndexOf("express", StringComparison.Ordinal);
-        var expressRow = tbody.Substring(expressAt, Math.Min(600, tbody.Length - expressAt));
-        Assert.Contains("<td>true</td>", expressRow, StringComparison.Ordinal);
-        var shadowAt = tbody.IndexOf("shadow-dep", StringComparison.Ordinal);
-        var shadowRow = tbody.Substring(shadowAt, Math.Min(600, tbody.Length - shadowAt));
-        Assert.Contains("<td>false</td>", shadowRow, StringComparison.Ordinal);
-
-        FormatterTestHelpers.AssertDirectFieldPresent(output, "html");
-    }
-
-    [Fact]
-    public void Should_SurfaceDirectTrailingToken_When_FormatTxt()
-    {
-        var output = FormatterTestHelpers.ResolveFormatter("txt").FormatResult(MixedDirectTransitiveScanResult());
-
-        // Additive trailing token; existing header shape untouched.
-        Assert.Contains("express@4.18.2 (npm) direct=true", output, StringComparison.Ordinal);
-        Assert.Contains("shadow-dep@1.0.0 (npm) direct=false", output, StringComparison.Ordinal);
-        foreach (var line in output.Split('\n'))
-        {
-            var trimmed = line.TrimEnd();
-            if (trimmed.Contains('@') && trimmed.Contains("(npm)"))
-            {
-                Assert.True(
-                    trimmed.EndsWith("direct=true", StringComparison.Ordinal) || trimmed.EndsWith("direct=false", StringComparison.Ordinal),
-                    $"Expected trailing direct token, got '{trimmed}'.");
-            }
-        }
-
-        FormatterTestHelpers.AssertDirectFieldPresent(output, "txt");
     }
 
     [Fact]

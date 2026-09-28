@@ -53,8 +53,9 @@ public class CachedResolverTests
             Directory.CreateDirectory(parent);
         }
 
-        // Lowercase schema per DiskLicenseCache.ParseEntry (B1 store shape).
-        File.WriteAllText(filePath, "{\"entries\":{" + entriesJson + "}}");
+        // Lowercase schema per DiskLicenseCache.ParseEntry (B1 store shape),
+        // including the current SchemaVersion (#123 load-validate).
+        File.WriteAllText(filePath, "{\"version\":" + DiskLicenseCache.SchemaVersion + ",\"entries\":{" + entriesJson + "}}");
     }
 
     private static string EntryJson(string? spdx, string status, string reason, DateTime fetchedAtUtc)

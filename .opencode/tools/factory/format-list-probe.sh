@@ -1,26 +1,20 @@
 #!/usr/bin/env bash
 # format-list-probe.sh — Supported-format list drift probe (format-list class).
-# Verifies the canonical 9-token format list stays consistent across:
-#   1. src/Olaf.Cli/Program.cs SupportedFormats const (canonical source)
-#   2. FormatterRegistry error string (must equal const) + per-token switch
-#      arms (plus the `markdown` alias arm, which is NOT in the const)
-#   3. live `dotnet run -- --help` runtime text (must print const verbatim)
-#   4. README anchored lines (Supported-formats, Flags --format, --help
-#      excerpt): 9 primary tokens in order (FAIL on missing/misorder); an
-#      absent `cyclonedx` alias token is WARN when an alias parenthetical on
-#      the same line documents it, else FAIL (all three carry the full
-#      10-token list on the accurate tree; the WARN branch covers future
-#      alias-parenthetical-only wording)
-#   5. alias notes README-wide (markdown->md, cyclonedx->cyclonedx-json,
-#      cyclonedx-xml has no alias, spdx-json has no alias)
-#   6. format-matrix-dump.sh FORMATS allowlist (9 primaries in order; the
-#      `cyclonedx` alias omission is WARN — the alias duplicates the
-#      cyclonedx-json branch) + --format case acceptance per token
+# Issue #123: canonical 7-token format list, zero aliases.
+# 0.3.1: ScanRunner.CLI const may alias FormatterRegistry.SupportedFormats
+#   (single source of truth) instead of repeating the literal — both PASS.
+# Verifies the canonical 7-token format list stays consistent across:
+#   1. FormatterRegistry SupportedFormats const (canonical source) vs
+#      Registry error string (must equal const) + per-token switch arms
+#      (deleted aliases markdown/cyclonedx must be ABSENT)
+#   2. live `generate --help` runtime text (must print const verbatim)
+#   3. README anchored lines (WARN-only until the Step 7 rewrite lands)
+#   4. format-matrix-dump.sh FORMATS allowlist (7 tokens in order)
 # Rules: repo-relative, read-only (never edits src/docs), idempotent
 # (stdout only), no secrets. No temp files: live --help is captured in a
 # shell variable, so no --workdir/--keep-temp flags.
 # Template-based (_template 0.2.2 blocks: root resolution + pass/fail_msg).
-VERSION="0.2.0"
+VERSION="0.3.1"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -50,15 +44,12 @@ usage() {
   echo "Usage: $(basename "$0") [--timeout <secs>] [--help] [--version]"
   echo ""
   echo "Supported-format list drift probe (read-only; never edits src/docs)."
-  echo "Verifies the canonical 10-token format list (9 primaries + cyclonedx alias) agrees across:"
-  echo "  1. src/Olaf.Cli/Program.cs SupportedFormats const (canonical source)"
-  echo "  2. FormatterRegistry error string + per-token switch arms (+ markdown alias arm)"
-  echo "  3. live '--help' runtime text (must print the const verbatim)"
-  echo "  4. README anchored lines (Supported-formats, Flags --format, --help excerpt):"
-  echo "     9 primary tokens in order (FAIL); missing 'cyclonedx' alias token is"
-  echo "     WARN when an alias parenthetical documents it, else FAIL"
-  echo "  5. alias notes (markdown->md, cyclonedx->cyclonedx-json, cyclonedx-xml/spdx-json no alias)"
-  echo "  6. format-matrix-dump.sh FORMATS allowlist (9 primaries in order; alias WARN)"
+  echo "Verifies the canonical 7-token format list (zero aliases) agrees across:"
+  echo "  1. FormatterRegistry SupportedFormats const (canonical source)"
+  echo "  2. Registry error string + per-token switch arms (aliases absent)"
+  echo "  3. live 'generate --help' runtime text (must print the const verbatim)"
+  echo "  4. README anchored lines (WARN-only until Step 7 rewrite)"
+  echo "  5. format-matrix-dump.sh FORMATS allowlist (7 tokens in order)"
   echo ""
   echo "Options:"
   echo "  --timeout <n>  per-scan timeout in seconds for live --help (default: 180)"
@@ -94,12 +85,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-PROGRAM="$ROOT/src/Olaf.Cli/Program.cs"
 REGISTRY="$ROOT/src/Olaf.Formatters/FormatterRegistry.cs"
+SCANRUNNER="$ROOT/src/Olaf.Cli/ScanRunner.cs"
 README="$ROOT/README.md"
 MATRIX="$ROOT/.opencode/tools/factory/format-matrix-dump.sh"
-[[ -f "$PROGRAM" ]] || { echo "Not found: $PROGRAM" >&2; exit 2; }
 [[ -f "$REGISTRY" ]] || { echo "Not found: $REGISTRY" >&2; exit 2; }
+[[ -f "$SCANRUNNER" ]] || { echo "Not found: $SCANRUNNER" >&2; exit 2; }
 [[ -f "$README" ]] || { echo "Not found: $README" >&2; exit 2; }
 [[ -f "$MATRIX" ]] || { echo "Not found: $MATRIX" >&2; exit 2; }
 command -v dotnet >/dev/null 2>&1 || { echo "dotnet not on PATH." >&2; exit 2; }
@@ -115,10 +106,30 @@ sys.exit(0 if all(any(t == n for t in it) for n in needle) else 1)
 PY
 }
 
-echo "--- Check 1 (FAIL): Program.cs const vs Registry error string vs live --help ---"
-CANON="$(grep -oE 'SupportedFormats = "[^"]+"' "$PROGRAM" | head -n 1 | sed 's/.*= *"//; s/"$//' || true)"
-[[ -n "${CANON:-}" ]] || fail_msg "SupportedFormats const missing in src/Olaf.Cli/Program.cs"
-REGERR="$(grep -oE 'Supported: [a-z][a-z|-]*\.' "$REGISTRY" | head -n 1 | sed 's/^Supported: //; s/\.$//' || true)"
+CANON7="json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json"
+
+echo "--- Check 1 (FAIL): Registry const vs CLI const vs error string vs switch arms ---"
+CANON="$(grep -oE 'SupportedFormats = "[^"]+"' "$REGISTRY" | head -n 1 | sed 's/.*= *"//; s/"$//' || true)"
+[[ -n "${CANON:-}" ]] || fail_msg "SupportedFormats const missing in FormatterRegistry.cs"
+if [[ -n "${CANON:-}" && "$CANON" != "$CANON7" ]]; then
+  fail_msg "registry const [$CANON] != canonical 7 [$CANON7]"
+elif [[ -n "${CANON:-}" ]]; then
+  pass "registry const == canonical 7 [$CANON]"
+fi
+CLICONST="$(grep -oE 'SupportedFormats = "[^"]+"' "$SCANRUNNER" | head -n 1 | sed 's/.*= *"//; s/"$//' || true)"
+if [[ -n "${CLICONST:-}" && "$CLICONST" == "$CANON" ]]; then
+  pass "ScanRunner const == registry const"
+elif grep -qE 'SupportedFormats = FormatterRegistry\.SupportedFormats' "$SCANRUNNER"; then
+  pass "ScanRunner const aliases FormatterRegistry.SupportedFormats (single source of truth)"
+else
+  fail_msg "ScanRunner const [${CLICONST:-<missing>}] != registry const [$CANON]"
+fi
+REGERR="$(grep -oE 'Supported: [a-z|][a-z|-]*\.' "$REGISTRY" | head -n 1 | sed 's/^Supported: //; s/\.$//' || true)"
+if [[ -z "${REGERR:-}" ]] && grep -qF 'Supported: {SupportedFormats}' "$REGISTRY"; then
+  # Interpolated const: error string equals CANON by construction.
+  REGERR="$CANON"
+  pass "registry error string interpolates SupportedFormats const"
+fi
 [[ -n "${REGERR:-}" ]] || fail_msg "Supported: error string missing in FormatterRegistry.cs"
 if [[ -n "${CANON:-}" && -n "${REGERR:-}" ]]; then
   if [[ "$REGERR" == "$CANON" ]]; then
@@ -139,107 +150,58 @@ if [[ -n "${CANON:-}" ]]; then
   else
     fail_msg "registry missing switch arm(s):$missing_arms"
   fi
-  if grep -qE '"markdown" =>' "$REGISTRY"; then
-    pass "registry markdown alias arm present"
-  else
-    fail_msg "registry markdown alias arm missing"
-  fi
+  for alias in markdown cyclonedx txt html; do
+    if grep -qE "\"$alias\" =>" "$REGISTRY"; then
+      fail_msg "registry still carries deleted alias/format arm: $alias"
+    else
+      pass "deleted arm absent: $alias"
+    fi
+  done
 fi
-HELP_TEXT="$(timeout "${TIMEOUT_SECS}s" dotnet run --project "$ROOT/src/Olaf.Cli" -- --help 2>&1)" || { echo "live --help failed (exit $?) — environment error." >&2; exit 2; }
+HELP_TEXT="$(timeout "${TIMEOUT_SECS}s" dotnet run --project "$ROOT/src/Olaf.Cli" -- generate --help 2>&1)" || { echo "live generate --help failed (exit $?) — environment error." >&2; exit 2; }
 if [[ -n "${CANON:-}" ]]; then
   if grep -qF "$CANON" <<<"$HELP_TEXT"; then
-    pass "live --help prints canonical token set in order"
+    pass "live generate --help prints canonical token set in order"
   else
     SEEN="$(grep -oE 'Output format: [a-z][a-z|-]*' <<<"$HELP_TEXT" | head -n 1 | sed 's/^Output format: //' || true)"
-    fail_msg "live --help missing canonical list [$CANON]; seen [${SEEN:-<none>}]"
+    fail_msg "live generate --help missing canonical list [$CANON]; seen [${SEEN:-<none>}]"
   fi
 fi
 
-echo "--- Check 2 (FAIL/WARN): README anchored lines carry tokens in order ---"
-PRIMARY="json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx-xml|spdx-json"
-PRIMARY_SP="${PRIMARY//|/ }"
+echo "--- Check 2 (WARN-only): README anchors (Step 7 rewrite pending) ---"
+warn_msg "README format lists rewrite in Step 7 (docs-only lock); src is authoritative"
 for anchor in "Supported formats:" "Flags:.*--format" "Output format:"; do
   line="$(grep -E "$anchor" "$README" | head -n 1 || true)"
   if [[ -z "${line:-}" ]]; then
-    fail_msg "README anchor missing: $anchor"
+    warn_msg "README anchor missing: $anchor"
     continue
   fi
   run="$(grep -oE '[a-z][a-z-]*(\|[a-z][a-z-]+)+' <<<"$line" | grep -F "json" | head -n 1 || true)"
-  if [[ -z "${run:-}" ]]; then
-    fail_msg "README [$anchor] has no json pipe-list"
-    continue
-  fi
-  run_sp="${run//|/ }"
-  if tokens_in_order "$run_sp" "$PRIMARY_SP"; then
-    pass "README [$anchor] 9 primaries in order [$run]"
-    if grep -qE '(^|\|)cyclonedx(\||$)' <<<"$run"; then
-      if [[ "$run" == *"cyclonedx-json|cyclonedx|cyclonedx-xml"* ]]; then
-        pass "README [$anchor] cyclonedx alias token in canonical position"
-      else
-        fail_msg "README [$anchor] cyclonedx alias token misordered [$run]"
-      fi
-    else
-      if grep -qiE 'cyclonedx.{0,30}alias|alias.{0,30}cyclonedx' <<<"$line"; then
-        warn_msg "README [$anchor] omits 'cyclonedx' alias token from pipe-list but documents alias parenthetically"
-      else
-        fail_msg "README [$anchor] missing 'cyclonedx' token with no alias note [$run]"
-      fi
-    fi
-  else
-    fail_msg "README [$anchor] primary-token missing/misordered [$run] want [$PRIMARY]"
-  fi
+  echo "INFO: README [$anchor] pipe-list: [${run:-<none>}]"
 done
 
-echo "--- Check 3 (FAIL): alias notes present README-wide ---"
-if grep -qE 'markdown.{0,30}alias.{0,10}md' "$README"; then
-  pass "markdown->md alias note present"
-else
-  fail_msg "markdown->md alias note missing from README"
-fi
-if grep -qE 'cyclonedx.{0,30}alias.{0,30}cyclonedx-json' "$README"; then
-  pass "cyclonedx->cyclonedx-json alias note present"
-else
-  fail_msg "cyclonedx->cyclonedx-json alias note missing from README"
-fi
-if grep -qE 'cyclonedx-xml.{0,30}no alias' "$README"; then
-  pass "cyclonedx-xml no-alias note present"
-else
-  fail_msg "cyclonedx-xml no-alias note missing from README"
-fi
-if grep -qE 'spdx-json.{0,30}no alias' "$README"; then
-  pass "spdx-json no-alias note present"
-else
-  fail_msg "spdx-json no-alias note missing from README"
-fi
-
-echo "--- Check 4 (FAIL/WARN): format-matrix-dump.sh allowlist ---"
+echo "--- Check 3 (FAIL): format-matrix-dump.sh allowlist ---"
 MFORMATS="$(grep -E '^FORMATS=' "$MATRIX" | head -n 1 | sed 's/^FORMATS="//; s/"$//' || true)"
+CANON7_SP="${CANON7//|/ }"
 if [[ -z "${MFORMATS:-}" ]]; then
   fail_msg "FORMATS= line missing in format-matrix-dump.sh"
+elif [[ "$MFORMATS" == "$CANON7_SP" ]]; then
+  pass "matrix FORMATS == canonical 7 in order"
+elif tokens_in_order "$MFORMATS" "$CANON7_SP"; then
+  warn_msg "matrix FORMATS covers canonical 7 but differs textually [$MFORMATS]"
 else
-  if [[ "$MFORMATS" == "$PRIMARY_SP" ]]; then
-    pass "matrix FORMATS == 9 primaries in order"
-  elif tokens_in_order "$MFORMATS" "$PRIMARY_SP"; then
-    warn_msg "matrix FORMATS covers primaries but differs textually [$MFORMATS]"
-  else
-    fail_msg "matrix FORMATS missing/misordered primaries [$MFORMATS] want [$PRIMARY_SP]"
+  fail_msg "matrix FORMATS missing/misordered tokens [$MFORMATS] want [$CANON7_SP]"
+fi
+case_missing=""
+for tok in $MFORMATS; do
+  if ! grep -E '\|' "$MATRIX" | grep -qF "$tok"; then
+    case_missing="$case_missing $tok"
   fi
-  if grep -qE '(^| )cyclonedx( |$)' <<<"$MFORMATS"; then
-    pass "matrix FORMATS carries cyclonedx alias token"
-  else
-    warn_msg "matrix FORMATS omits 'cyclonedx' alias token (expected: alias duplicates cyclonedx-json branch)"
-  fi
-  case_missing=""
-  for tok in $MFORMATS; do
-    if ! grep -E '\|' "$MATRIX" | grep -qF "$tok"; then
-      case_missing="$case_missing $tok"
-    fi
-  done
-  if [[ -z "${case_missing// }" ]]; then
-    pass "matrix --format case accepts all FORMATS tokens"
-  else
-    fail_msg "matrix --format case missing token(s):$case_missing"
-  fi
+done
+if [[ -z "${case_missing// }" ]]; then
+  pass "matrix --format case accepts all FORMATS tokens"
+else
+  fail_msg "matrix --format case missing token(s):$case_missing"
 fi
 
 if (( fail == 0 )); then

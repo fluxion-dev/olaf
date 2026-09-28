@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): apk/dpkg/rpm/container parsers + --max-image-mb deleted — no image-scan surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # image-scan-probe: container-image scan probe (issue #64).
 # Synthesizes minimal docker-save-style tarballs (apk installed / dpkg status
 # layers) + an OCI exploded-layout dir, then scans each via

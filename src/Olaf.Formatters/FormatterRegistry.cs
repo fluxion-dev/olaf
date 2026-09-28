@@ -2,8 +2,11 @@ using Olaf.Core;
 
 namespace Olaf.Formatters;
 
+// Issue #123: canonical formats (7, zero aliases).
 public sealed class FormatterRegistry
 {
+    public const string SupportedFormats = "json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json";
+
     public ILicenseFormatter GetFormatter(string format)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(format);
@@ -12,15 +15,11 @@ public sealed class FormatterRegistry
             "json" => new JsonFormatter(),
             "yaml" => new YamlFormatter(),
             "xml" => new XmlFormatter(),
-            "html" => new HtmlFormatter(),
-            "txt" => new TxtFormatter(),
             "md" => new MarkdownFormatter(),
-            "markdown" => new MarkdownFormatter(),
             "cyclonedx-json" => new CycloneDxFormatter(),
-            "cyclonedx" => new CycloneDxFormatter(),
             "cyclonedx-xml" => new CycloneDxXmlFormatter(),
             "spdx-json" => new SpdxJsonFormatter(),
-            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json.", nameof(format)),
+            _ => throw new ArgumentException($"Unsupported format '{format}'. Supported: {SupportedFormats}.", nameof(format)),
         };
     }
 }

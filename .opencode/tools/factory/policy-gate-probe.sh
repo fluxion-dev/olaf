@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): --allow/--deny flags deleted (--strict is exit-1-on-Unknown only) — no gate surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # policy-gate-probe.sh — policy gate probe for issue #5 (--strict, --allow/--deny).
 # Builds a strict-phantom fixture (definitely-missing npm package => Unknown offline)
 # and asserts:

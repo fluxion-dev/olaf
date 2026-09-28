@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): --group-by-license flag + LicenseGrouper deleted — no grouping surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # grouping-probe.sh — Grouping probe for issue #74 (promoted v0.1.0, 2 uses ≥ bar:
 #   scratch prototype 1st use + promote-verify 2nd use).
 # Model: template-probe.sh run_scan/check shape + canonical R1 block.

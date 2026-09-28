@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DEPRECATED (issue #123): --direct-only/--include-transitive flags deleted — no transitive-filter surface remains. Kept one issue cycle per lifecycle; delete next cycle if still unused.
 # transitive-surface-probe.sh — transitive surface probe for issue #66.
 # Promoted tool (issue #66; prototype + Wave-3 smoke = 2 uses).
 # Per-parser direct-vs-transitive matrix + formatter direct-field check +

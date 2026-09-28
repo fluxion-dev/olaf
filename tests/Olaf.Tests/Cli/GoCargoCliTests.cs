@@ -3,10 +3,11 @@ using System.Text.Json;
 namespace Olaf.Tests.Cli;
 
 /// <summary>
-/// CLI end-to-end for go/cargo (issue #11). Subprocess e2e via CliTestHelpers;
-/// fixtures are local files only (no live network). Phantom go.mod/Cargo.toml
-/// fixtures guarantee Unknown licenses (404 or offline cache-miss), so
-/// --strict deterministically exits 1.
+/// CLI end-to-end for go/cargo (issue #11, generate-only shape for issue
+/// #123). Subprocess e2e via CliTestHelpers; each run scans a temp dir
+/// holding the committed fixture file (no live network). Phantom
+/// go.mod/Cargo.toml fixtures guarantee Unknown licenses (404 or offline
+/// cache-miss), so --strict deterministically exits 1.
 /// </summary>
 public sealed class GoCargoCliTests
 {
@@ -28,51 +29,47 @@ public sealed class GoCargoCliTests
         return dir;
     }
 
-    [Fact]
-    public void Should_ExitZero_When_EcosystemGoFiltersGoMod()
+    private static string CopyFixtureToTempDir(string ecoDir, string fileName)
     {
-        var input = CliTestHelpers.FixturePath("go", "go.mod");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "go");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("cobra", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+        var dir = CliTestHelpers.CreateTempDir();
+        File.Copy(CliTestHelpers.FixturePath(ecoDir, fileName), Path.Combine(dir, fileName));
+        return dir;
     }
 
     [Fact]
-    public void Should_ExitZero_When_EcosystemCargoFiltersCargoToml()
+    public void Should_ExitZero_When_GenerateGoFixture()
     {
-        var input = CliTestHelpers.FixturePath("cargo", "Cargo.toml");
+        var dir = CopyFixtureToTempDir("go", "go.mod");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "cargo");
-
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("serde", result.Stdout, StringComparison.Ordinal);
-        using var doc = JsonDocument.Parse(result.Stdout);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("cobra", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
-    public void Should_Exit2_When_EcosystemFilterMatchesNothing()
+    public void Should_ExitZero_When_GenerateCargoFixture()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
+        var dir = CopyFixtureToTempDir("cargo", "Cargo.toml");
+        try
+        {
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "json");
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--ecosystem", "go");
-
-        Assert.Equal(2, result.ExitCode);
-    }
-
-    [Fact]
-    public void Should_Exit2WithSupportedList_When_EcosystemInvalid()
-    {
-        var input = CliTestHelpers.FixturePath("go", "go.mod");
-
-        var result = CliTestHelpers.RunCli("--input", input, "--ecosystem", "spm");
-
-        Assert.Equal(2, result.ExitCode);
-        Assert.Contains("Supported:", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("go", result.Stderr, StringComparison.Ordinal);
-        Assert.Contains("cargo", result.Stderr, StringComparison.Ordinal);
+            Assert.Equal(0, result.ExitCode);
+            Assert.Contains("serde", result.Stdout, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(result.Stdout);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 
     [Fact]
@@ -81,7 +78,7 @@ public sealed class GoCargoCliTests
         var fixtureDir = CreateGoStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -97,7 +94,7 @@ public sealed class GoCargoCliTests
         var fixtureDir = CreateCargoStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json", "--strict");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--strict", "--offline");
 
             Assert.Equal(1, result.ExitCode);
         }
@@ -113,7 +110,7 @@ public sealed class GoCargoCliTests
         var fixtureDir = CreateGoStrictFixtureDir();
         try
         {
-            var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
+            var result = CliTestHelpers.RunCli("generate", fixtureDir, "--format", "json", "--offline");
 
             Assert.Equal(0, result.ExitCode);
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));

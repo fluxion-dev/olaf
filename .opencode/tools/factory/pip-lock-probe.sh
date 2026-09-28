@@ -4,7 +4,8 @@
 #   (a) canonical lock (default requests ==2.31.0 w/ extras+markers+hashes,
 #       shared-pkg collision default 1.0.0 vs develop 2.0.0, 1 git + 1 path +
 #       1 file + 1 editable, develop pytest ==7.4.0) scanned via
-#       `dotnet run --project src/Olaf.Cli -- --input <dir> --format json`
+#       `dotnet run --project src/Olaf.Cli -- generate <dir> --format json`
+#       (issue #123: collapsed to `generate <DIR>`, legacy --input removed)
 #       -> exit 0, stripped versions, VCS/local -> *, count 7, default-wins
 #   (b) malformed JSON lock -> exit 0, count 0
 #   (c) dir-preference: Pipfile + poetry.lock + uv.lock + requirements.txt
@@ -12,7 +13,8 @@
 #   (d) IsTransitive=false static check on ParsePipfileLock
 #       (CLI JSON carries `direct` field, issue #66)
 # Rules: repo-relative, idempotent (temp cleaned), no secrets, exit 0/1/2.
-VERSION="0.1.1"
+# Issue #123: collapsed to `generate <DIR>` (legacy --input path removed).
+VERSION="0.1.2"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -169,7 +171,7 @@ run_scan() {
   # run_scan <tag> <inputdir>; stdout-><tag>.stdout, stderr-><tag>.stderr, sets RC.
   local tag="$1" input="$2"
   set +e
-  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- --input "$input" --format json >"$WORKDIR/$tag.stdout" 2>"$WORKDIR/$tag.stderr"
+  timeout "${TIMEOUT_SECS}s" dotnet run --project "$PROJECT" -- generate "$input" --format json >"$WORKDIR/$tag.stdout" 2>"$WORKDIR/$tag.stderr"
   RC=$?
   set -e
   if [[ "$RC" -eq 124 ]]; then

@@ -351,24 +351,9 @@ public sealed class CycloneDxFormatterTests
     }
 
     [Fact]
-    public void Should_ResolveSameType_When_AliasCycloneDx()
-    {
-        var canonical = FormatterTestHelpers.GetFormatterViaRegistry("cyclonedx-json");
-        var alias = FormatterTestHelpers.GetFormatterViaRegistry("cyclonedx");
-
-        Assert.NotNull(alias);
-        Assert.Equal(canonical.GetType(), alias.GetType());
-        Assert.Equal("cyclonedx-json", alias.Format, StringComparer.OrdinalIgnoreCase);
-
-        // toml still throws; the message names the new format.
-        var thrown = Assert.Throws<ArgumentException>(() => new FormatterRegistry().GetFormatter("toml"));
-        Assert.Contains("cyclonedx-json", thrown.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Should_ListCycloneDxJson_When_HelpFlag()
     {
-        var result = CliTestHelpers.RunCli("--help");
+        var result = CliTestHelpers.RunCli("generate", "--help");
 
         Assert.Equal(0, result.ExitCode);
         var combined = result.Stdout + result.Stderr;
@@ -378,19 +363,27 @@ public sealed class CycloneDxFormatterTests
     [Fact]
     public void Should_ExitZeroWithBom_When_FormatCycloneDxJson()
     {
-        var input = CliTestHelpers.FixturePath("npm", "package.json");
+        var dir = CliTestHelpers.CreateTempDir();
+        try
+        {
+            File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(dir, "package.json"));
 
-        var result = CliTestHelpers.RunCli("--input", input, "--format", "cyclonedx-json");
+            var result = CliTestHelpers.RunCli("generate", dir, "--format", "cyclonedx-json");
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-        var root = RootComponents(result.Stdout);
-        Assert.Equal("CycloneDX", root.GetProperty("bomFormat").GetString());
-        Assert.Equal("1.5", root.GetProperty("specVersion").GetString());
-        Assert.NotEmpty(ComponentList(root));
+            Assert.Equal(0, result.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
+            var root = RootComponents(result.Stdout);
+            Assert.Equal("CycloneDX", root.GetProperty("bomFormat").GetString());
+            Assert.Equal("1.5", root.GetProperty("specVersion").GetString());
+            Assert.NotEmpty(ComponentList(root));
 
-        // Bad-format exit-2 contract preserved.
-        var badFormat = CliTestHelpers.RunCli("--input", input, "--format", "toml");
-        Assert.Equal(2, badFormat.ExitCode);
+            // Bad-format exit-2 contract preserved.
+            var badFormat = CliTestHelpers.RunCli("generate", dir, "--format", "toml");
+            Assert.Equal(2, badFormat.ExitCode);
+        }
+        finally
+        {
+            CliTestHelpers.DeleteTempDir(dir);
+        }
     }
 }
