@@ -14,19 +14,15 @@ namespace Olaf.Tests.Formatters;
 /// NOT null/Unknown), summary is /report/summary attributes, no XML namespace.
 /// e2e_trait_gate: every Fact below carries [Trait("Category", "E2E")] (4 Facts,
 /// 0 Theories) so the Category!=E2E gate excludes this live-network file.
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// </summary>
 public sealed class XmlReportE2ETests
 {
     private const string PhantomName = "this-package-definitely-does-not-exist-olaf-xyz";
 
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     private static async Task<(ScanResult Scan, string Output)> BuildRealXmlReportAsync(bool phantomFirst = false)
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("npm", http);
         var express = await resolver.ResolveAsync(new Dependency("npm", "express", "4.18.2", false));
         var lodash = await resolver.ResolveAsync(new Dependency("npm", "lodash", "4.17.21", false));

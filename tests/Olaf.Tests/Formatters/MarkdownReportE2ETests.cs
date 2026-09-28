@@ -10,19 +10,15 @@ namespace Olaf.Tests.Formatters;
 /// [Trait("Category", "E2E")] so CI can filter with --filter "Category!=E2E".
 /// Markdown divergences: SpdxId ?? Unknown fallback (phantom SPDX renders Unknown,
 /// not null), table plus per-package ## sections with - bullets.
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// </summary>
 public sealed class MarkdownReportE2ETests
 {
     private const string PhantomName = "this-package-definitely-does-not-exist-olaf-xyz";
 
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     private static async Task<(ScanResult Scan, string Output)> BuildRealMarkdownReportAsync(bool phantomFirst = false)
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("npm", http);
         var express = await resolver.ResolveAsync(new Dependency("npm", "express", "4.18.2", false));
         var lodash = await resolver.ResolveAsync(new Dependency("npm", "lodash", "4.17.21", false));

@@ -8,19 +8,15 @@ namespace Olaf.Tests.Resolvers;
 /// [Trait("Category", "E2E")] so CI can filter with
 /// --filter "Category!=E2E" to keep unit tests fast.
 /// Packages are pinned versions with stable, well-known licenses.
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// </summary>
 public sealed class PyPIResolverE2ETests
 {
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     [Fact]
     [Trait("Category", "E2E")]
     public async Task Should_ResolveRequests_Apache2_When_RealPyPICall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
         var dep = new Dependency("pypi", "requests", "2.31.0", false);
 
@@ -38,7 +34,7 @@ public sealed class PyPIResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveFlask_BSD3_When_RealPyPICall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
         var dep = new Dependency("pypi", "flask", "3.0.0", false);
 
@@ -55,7 +51,7 @@ public sealed class PyPIResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveDjango_BSD3_When_RealPyPICall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
         var dep = new Dependency("pypi", "django", "5.0.0", false);
 
@@ -72,7 +68,7 @@ public sealed class PyPIResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_PackageNotFound()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
         var dep = new Dependency("pypi", "this-package-definitely-does-not-exist-olaf-xyz", "9.9.9", false);
 
@@ -88,7 +84,7 @@ public sealed class PyPIResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_VersionDoesNotExist()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = ResolverTestHelpers.ResolveResolver("pypi", http);
         var dep = new Dependency("pypi", "requests", "999.999.999", false);
 

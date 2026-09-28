@@ -9,21 +9,16 @@ namespace Olaf.Tests.Resolvers;
 /// [Trait("Category", "E2E")] so CI can filter with
 /// --filter "Category!=E2E" to keep unit tests fast.
 /// Artifacts are pinned versions with stable, well-known licenses.
-/// Maven Central needs no User-Agent header (unlike crates.io).
+/// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// The shared MavenLicenseResolver serves both "maven" and "gradle" labels.
 /// </summary>
 public sealed class MavenResolverE2ETests
 {
-    private static HttpClient CreateRealClient()
-    {
-        return new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-    }
-
     [Fact]
     [Trait("Category", "E2E")]
     public async Task Should_ResolveGuava_Apache2_When_RealCentralCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = new MavenLicenseResolver(http);
         var dep = new Dependency("maven", "com.google.guava:guava", "32.1.2-jre", false);
 
@@ -41,7 +36,7 @@ public sealed class MavenResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveSlf4j_MIT_When_RealCentralCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = new MavenLicenseResolver(http);
         var dep = new Dependency("maven", "org.slf4j:slf4j-api", "2.0.9", false);
 
@@ -57,7 +52,7 @@ public sealed class MavenResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveJunit_EPL_When_RealCentralCall()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = new MavenLicenseResolver(http);
         var dep = new Dependency("maven", "junit:junit", "4.13.2", false);
 
@@ -72,7 +67,7 @@ public sealed class MavenResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ResolveGuava_When_EcosystemIsGradle()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = new MavenLicenseResolver(http);
         var dep = new Dependency("gradle", "com.google.guava:guava", "32.1.2-jre", false);
 
@@ -86,7 +81,7 @@ public sealed class MavenResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_ArtifactNotFound()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = new MavenLicenseResolver(http);
         var dep = new Dependency("maven", "org.example:this-artifact-definitely-does-not-exist-olaf-xyz", "9.9.9", false);
 
@@ -102,7 +97,7 @@ public sealed class MavenResolverE2ETests
     [Trait("Category", "E2E")]
     public async Task Should_ReturnUnknown_When_VersionDoesNotExist()
     {
-        using var http = CreateRealClient();
+        using var http = E2ETestHelpers.CreateRealClient();
         var resolver = new MavenLicenseResolver(http);
         var dep = new Dependency("maven", "com.google.guava:guava", "999.999.999", false);
 
