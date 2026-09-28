@@ -1,0 +1,6 @@
+{{#each groups}}
+## {{spdx}} ({{count}})
+{{#each items}}
+- {{name}}@{{version}} ({{ecosystem}})
+{{/each}}
+{{/each}}

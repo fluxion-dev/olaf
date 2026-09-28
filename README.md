@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 723 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 739 passing (`dotnet test`).
 
 ## Usage
 
@@ -34,13 +34,16 @@ dotnet run --project src/Olaf.Cli -- --input package.json --format cyclonedx-jso
 dotnet run --project src/Olaf.Cli -- --input package.json --format cyclonedx-xml
 # SPDX SBOM (spec 2.3; `spdx-json` has no alias)
 dotnet run --project src/Olaf.Cli -- --input package.json --format spdx-json
+# custom attribution template (overrides --format; see `### Custom attribution templates`)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/header-footer-loop.scriban
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/groups.scriban
 # direct-only filter (report direct dependencies only; counts recompute on the filtered set)
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/go --format json --direct-only
 # allow-list gate
 dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,Apache-2.0
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--direct-only`, `--include-transitive`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate.
 Transitive filter: neither flag (default) reports all dependencies; `--direct-only` reports direct dependencies only (`direct == true`); `--include-transitive` explicitly reports all (same result as neither, documents intent). `--direct-only` + `--include-transitive` together is a usage conflict (stderr + exit `2`). The filter runs post-scan/pre-format so `summary` counts recompute on the filtered set, and the `--strict`/`--allow`/`--deny` gates see the FILTERED set.
@@ -54,6 +57,7 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 --strict                 Fail on unresolved or unknown licenses
 --direct-only            Report direct dependencies only (exclude transitive; strict/allow/deny gates see the filtered set)
 --include-transitive     Explicitly include transitive dependencies (same as default: report all)
+--template <template>    Custom attribution template file (overrides --format)
 ```
 
 ## Reliability
@@ -264,13 +268,83 @@ dotnet run --project src/Olaf.Cli -- --input ./oci-dir --format json
 dotnet run --project src/Olaf.Cli -- --input image.tar --format json --max-image-mb 2048
 ```
 
+### Custom attribution templates (`--template`)
+
+`--template <file>` renders the scan through a user-supplied attribution template instead of a built-in `--format`.
+
+- Flag: `--template <file>` (default null; CLI form is `--input`/`--format`, no subcommand).
+- Override contract: `--template` overrides `--format` — when both are given the template wins and `--verbose` prints `Template overrides --format '<f>'.` on stderr (quiet suppresses). There is no conflict exit.
+- Defaults stay hand-coded: the built-in `txt`/`md`/`html` formatters remain hand-coded C# (byte-stability for legal output); the template engine never renders them. Byte-parity snapshot tests pin `txt`/`md`/`html` output identical on empty + holders + special-chars scans.
+
+Engine choice (minimal built-in, zero new dependencies): templates render with a ~150-line built-in mustache-ish renderer (`TemplateEngine`, no NuGet package). The repo carries exactly 2 runtime dependencies (`System.CommandLine 2.0.0`, `YamlDotNet 16.3.0`); a template-library dependency would add a third plus a transitive restore surface. Air-gap rationale: the built-in builds fully offline against the existing pinned graph, while a library would require nuget.org at restore time on every clean/air-gapped build (restore failure = build failure). The engine executes no code and fetches nothing — no member access, no includes/partials, no remote fetch — so there is nothing to sandbox beyond hard caps: template input ≤ 256 KiB, expansion ≤ 1 MiB, loop iterations ≤ 10_000 (exceeding a cap fails the run with exit `2`).
+
+Syntax (exactly these four; no `{{else}}`, no filters, no sorting inside templates):
+
+- `{{field}}` — value lookup with dotted-path support; innermost scope wins (e.g. `{{spdx}}` inside `{{#each groups}}` resolves the group's `spdx`, while inside `{{#each licenses}}` it resolves the package's `spdx`). Top-level fields include `{{total}}`, `{{generatedAt}}`; per-package fields include `{{name}}`, `{{version}}`, `{{ecosystem}}`, `{{spdx}}`.
+- `{{#each licenses}}…{{/each}}` — repeats the block per package (row order is ecosystem → name → version, same as `txt`/`md`/`html`).
+- `{{#each groups}}…{{/each}}` with nested `{{#each items}}…{{/each}}` — repeats per SPDX group (`groups[]` is precomputed, grouped by `spdx`, sorted by `spdx` Ordinal; `items` sorted ecosystem → name → version), so no engine-level `group_by`/`sort`/`where` is needed.
+- `{{#if field}}…{{/if}}` — renders the block only when the field is truthy (non-empty string, non-zero count, `direct == true`); used for omit-when-empty lines such as `{{#if copyright}}…{{/if}}`.
+
+Model reference (exact field names — templates MUST use these; anything else renders empty):
+
+| Path | Meaning |
+|------|---------|
+| `total` | int — `== ScanResult.TotalCount` |
+| `resolved` | int — `== ScanResult.ResolvedCount` |
+| `unknown` | int — `== ScanResult.UnknownCount` |
+| `generatedAt` | string — ISO-8601 UTC (`DateTime.UtcNow.ToString("o")`) |
+| `toolVersion` | string — `"0.1.0-preview.1"` const (mirrors `Olaf.Cli.csproj` Version; no reflection) |
+| `licenses[]` | per-package rows, each with `name`, `version`, `ecosystem`, `direct` (bool), `spdx` (`LicenseDisplay.EffectiveSpdx`), `status`, `reason` (`""` when null, never a null literal), `sourceUrl` (`""` when null), `purl`, `supplier`, `downloadUrl` (`""` when null; #70 enrichment), `hashes` (`";"`-joined `algo:value`, lexical form preserved as stored, else `""`), `copyright` (`"; "`-joined holders, else `""` — omit-when-empty is the template's `{{#if}}` job, #72) |
+| `groups[]` | `{ spdx: string, count: int, items: licenses[] }` — grouped by `spdx`, sorted by `spdx` Ordinal; `items` sorted ecosystem → name → version |
+
+(`LicenseText` is NOT in the model — unbounded full text stays out; templates needing it are a follow-up.)
+
+Example 1 — header/footer/loop (`tests/Olaf.Tests/Fixtures/templates/header-footer-loop.scriban`):
+
+```text
+Third-Party Attribution
+Total: {{total}}, Resolved: {{resolved}}, Unknown: {{unknown}}
+{{#each licenses}}
+{{name}}@{{version}} ({{ecosystem}}) SPDX: {{spdx}}
+{{/each}}
+Generated by olaf {{toolVersion}} at {{generatedAt}}.
+```
+
+```bash
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/header-footer-loop.scriban
+```
+
+Example 2 — grouped by license (`tests/Olaf.Tests/Fixtures/templates/groups.scriban`):
+
+```text
+{{#each groups}}
+## {{spdx}} ({{count}})
+{{#each items}}
+- {{name}}@{{version}} ({{ecosystem}})
+{{/each}}
+{{/each}}
+```
+
+```bash
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --template tests/Olaf.Tests/Fixtures/templates/groups.scriban
+```
+
+Error matrix:
+
+| Condition | Exit | Stderr |
+|---|---|---|
+| `--template` file missing (path is also a directory — `File.Exists` is false for both) | `2` | `Template not found: '<p>'.` |
+| Unclosed/mismatched block or bad tag (e.g. unclosed `{{#each licenses}}`) | `2` | `template error line <N>: …` with the 1-based line number |
+| Render caps exceeded (256 KiB input / 1 MiB output / 10_000 loop iterations) | `2` | `template error…` / read-failure message |
+| Unknown field/path in template | `0` (renders empty string — never throws, never the `null` literal) | — |
+
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
 | `1` | `--strict` found unresolved/`Unknown` licenses, or `--allow`/`--deny` policy-gate offenders |
-| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive` |
+| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive`, missing `--template` file, template syntax error (`template error line <N>` on stderr), template render-cap exceeded |
 
 ## Output contract
 
