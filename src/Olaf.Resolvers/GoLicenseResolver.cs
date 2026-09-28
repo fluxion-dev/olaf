@@ -47,7 +47,15 @@ public sealed class GoLicenseResolver : ILicenseResolver
 
             var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://pkg.go.dev/{dependency.Name}@{dependency.Version}";
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // PARTIAL enrichment (NO-NEW-HTTP): the module zip URL is
+            // constructed, never fetched, -> DownloadUrl. The .ziphash
+            // endpoint is unfetched -> Hashes null; author null.
+            var enrichment = EnrichmentHelpers.Create(
+                dependency,
+                hashes: null,
+                supplier: null,
+                $"https://proxy.golang.org/{dependency.Name.Trim('/')}/@v/{Uri.EscapeDataString(dependency.Version)}.zip");
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -190,7 +198,14 @@ public sealed class GoLicenseResolver : ILicenseResolver
 
                 if (spdx is not null)
                 {
-                    return new ResolvedLicense(dependency, spdx, SpdxLicenseTexts.GetText(spdx), sourceUrl, "Resolved", null);
+                    // Same PARTIAL enrichment as the .info path: constructed zip
+                    // URL -> DownloadUrl; Hashes null; author null.
+                    var zipEnrichment = EnrichmentHelpers.Create(
+                        dependency,
+                        hashes: null,
+                        supplier: null,
+                        zipUrl);
+                    return new ResolvedLicense(dependency, spdx, SpdxLicenseTexts.GetText(spdx), sourceUrl, "Resolved", null, zipEnrichment);
                 }
 
                 // If we found a license file but couldn't map to SPDX, report what we found

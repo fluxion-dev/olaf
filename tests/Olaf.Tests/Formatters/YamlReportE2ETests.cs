@@ -31,8 +31,10 @@ public sealed class YamlReportE2ETests
         [YamlMember(Alias = "summary")]
         public YamlSummaryDto Summary { get; set; } = new();
 
+        // Issue #70: object-tolerant — enriched entries carry non-scalar nodes
+        // (hashes sequence) that a string-only dictionary cannot deserialize.
         [YamlMember(Alias = "licenses")]
-        public List<Dictionary<string, string?>> Licenses { get; set; } = new();
+        public List<Dictionary<string, object?>> Licenses { get; set; } = new();
     }
 
     private static HttpClient CreateRealClient()
@@ -66,10 +68,16 @@ public sealed class YamlReportE2ETests
         return report;
     }
 
-    private static string? Get(Dictionary<string, string?> entry, string key)
+    private static string? Get(Dictionary<string, object?> entry, string key)
     {
-        entry.TryGetValue(key, out var value);
-        return value;
+        // Object-tolerant: scalar YAML values surface as strings; pulling a
+        // sequence (e.g. hashes) through Get is unsupported — use TryGetValue.
+        if (!entry.TryGetValue(key, out var value) || value is null)
+        {
+            return null;
+        }
+
+        return value as string ?? value.ToString();
     }
 
     [Fact]
@@ -99,7 +107,10 @@ public sealed class YamlReportE2ETests
         Assert.Equal(3, report.Licenses.Count);
         foreach (var entry in report.Licenses)
         {
-            Assert.Equal(9, entry.Count);
+            // Issue #70: live-npm entries are enriched (purl/supplier/
+            // downloadUrl/hashes trail after direct), so the count is a floor,
+            // not an exact pin — the base 9 keys are still required.
+            Assert.True(entry.Count >= 9, $"Expected at least 9 keys per entry, got {entry.Count}.");
             foreach (var key in new[] { "ecosystem", "name", "version", "spdx", "licenseText", "sourceUrl", "status", "reason", "direct" })
             {
                 Assert.True(entry.ContainsKey(key), $"YAML licenses[] entry missing key '{key}'.");
@@ -122,13 +133,13 @@ public sealed class YamlReportE2ETests
             unknown: scan.UnknownCount);
 
         // Hard pins: express/lodash resolve MIT, phantom is Unknown not-found.
-        var express = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", "express");
+        var express = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName as string : null, "YAML licenses[]", "express");
         Assert.Equal("Resolved", Get(express, "status"));
         Assert.Equal("MIT", Get(express, "spdx"));
-        var lodash = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", "lodash");
+        var lodash = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName as string : null, "YAML licenses[]", "lodash");
         Assert.Equal("Resolved", Get(lodash, "status"));
         Assert.Equal("MIT", Get(lodash, "spdx"));
-        var phantom = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", PhantomName);
+        var phantom = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName as string : null, "YAML licenses[]", PhantomName);
         Assert.Equal("Unknown", Get(phantom, "status"));
         Assert.Contains("not-found", Get(phantom, "reason") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
@@ -159,7 +170,7 @@ public sealed class YamlReportE2ETests
         var (_, output) = await BuildRealYamlReportAsync();
 
         var report = ParseYamlReport(output);
-        var phantom = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName : null, "YAML licenses[]", PhantomName);
+        var phantom = FormatterTestHelpers.FindByName(report.Licenses, e => e.TryGetValue("name", out var entryName) ? entryName as string : null, "YAML licenses[]", PhantomName);
         Assert.Equal("Unknown", Get(phantom, "status"));
         // YAML nulls serialize as empty/null — assert tolerant, not exact null.
         var spdx = Get(phantom, "spdx");

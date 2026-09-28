@@ -367,14 +367,15 @@ public sealed class CycloneDxXmlFormatterTests
             .ToArray();
         Assert.Equal(new[] { "required", "required", "optional", "required" }, scopes);
 
-        // Purl emitted unconditionally on every component.
+        // Purl emitted unconditionally on every component (issue #70 B4:
+        // conan has a dedicated purl type, never generic).
         var purls = components
             .Select(c => c.SelectSingleNode("c:purl", manager)!.InnerText)
             .ToArray();
         Assert.Equal(
             new[]
             {
-                "pkg:generic/fmt@10.2.1",
+                "pkg:conan/fmt@10.2.1",
                 "pkg:maven/org.example/artifact@2.0.0",
                 "pkg:npm/%40scope/name@1.0.0",
                 "pkg:pypi/requests@2.31.0",

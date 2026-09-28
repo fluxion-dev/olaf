@@ -45,7 +45,11 @@ public sealed class CargoLicenseResolver : ILicenseResolver
 
             var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://crates.io/crates/{dependency.Name}/{dependency.Version}";
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null);
+            // Enrichment reads the same already-fetched crates.io JSON
+            // (NO-NEW-HTTP): version.checksum -> Hashes ("sha256:"), dl_path ->
+            // DownloadUrl (absolute against crates.io). Never copies SourceUrl.
+            var enrichment = ParseCargoEnrichment(body, dependency);
+            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -66,6 +70,50 @@ public sealed class CargoLicenseResolver : ILicenseResolver
         catch (Exception ex)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
+        }
+    }
+
+    internal static Enrichment? ParseCargoEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            // crates.io nests per-version fields under "version"; fall back to
+            // the root for stub/minimal shapes.
+            var version = root.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.Object
+                ? v
+                : root;
+
+            string? hash = null;
+            if (EnrichmentHelpers.TryGetString(version, "checksum", out var checksum))
+            {
+                hash = "sha256:" + checksum!.Trim();
+            }
+
+            string? downloadUrl = null;
+            if (EnrichmentHelpers.TryGetString(version, "dl_path", out var dlPath))
+            {
+                var path = dlPath!.Trim();
+                downloadUrl = path.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? path
+                    : "https://crates.io" + (path.StartsWith("/", StringComparison.Ordinal) ? path : "/" + path);
+            }
+
+            return EnrichmentHelpers.Create(
+                dependency,
+                EnrichmentHelpers.HashList(hash),
+                supplier: null,
+                downloadUrl);
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 

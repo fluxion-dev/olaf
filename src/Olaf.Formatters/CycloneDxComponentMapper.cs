@@ -21,7 +21,11 @@ public sealed record CycloneDxComponent(
     CycloneDxLicenseKind LicenseKind,
     string? LicenseValue,
     IReadOnlyList<CycloneDxProperty> Properties,
-    string? Group);
+    string? Group,
+    // Issue #70 enrichment slots (trailing, defaulted): omit-null downstream.
+    string? Supplier = null,
+    string[]? Hashes = null,
+    string? DownloadUrl = null);
 
 /// <summary>
 /// Neutral DTO mapper shared by the CycloneDX JSON and XML formatters.
@@ -103,13 +107,16 @@ public static class CycloneDxComponentMapper
             components.Add(new CycloneDxComponent(
                 dep.Name,
                 dep.Version,
-                CycloneDxPurl.Build(dep),
+                license.Enrichment?.Purl ?? CycloneDxPurl.Build(dep),
                 bomRef,
                 dep.Direct ? "required" : "optional",
                 licenseKind,
                 licenseValue,
                 properties,
-                group));
+                group,
+                license.Enrichment?.Supplier,
+                license.Enrichment?.Hashes,
+                license.Enrichment?.DownloadUrl));
         }
 
         return components;
@@ -128,4 +135,69 @@ public static class CycloneDxComponentMapper
 
     public static string ToolVersion =>
         typeof(CycloneDxComponentMapper).Assembly.GetName().Version?.ToString() ?? "0.0.0-dev";
+
+    /// <summary>
+    /// Issue #70: splits an "algo:value" enrichment hash on the first colon.
+    /// Entries without a colon (or with blank halves) are unparseable and
+    /// dropped by every SBOM formatter (never emitted, never throw).
+    /// </summary>
+    public static bool TrySplitHash(string? entry, out string algorithm, out string value)
+    {
+        algorithm = string.Empty;
+        value = string.Empty;
+        if (string.IsNullOrWhiteSpace(entry))
+        {
+            return false;
+        }
+
+        var sep = entry.IndexOf(':');
+        if (sep <= 0 || sep >= entry.Length - 1)
+        {
+            return false;
+        }
+
+        algorithm = entry.Substring(0, sep).Trim();
+        value = entry.Substring(sep + 1).Trim();
+        return algorithm.Length > 0 && value.Length > 0;
+    }
+
+    /// <summary>
+    /// CycloneDX hash-alg names ("SHA-512"); unknown algos pass through
+    /// uppercased (spec-tolerant, never dropped when parseable).
+    /// </summary>
+    public static string ToCycloneDxAlg(string algorithm)
+    {
+        return algorithm.Trim().ToLowerInvariant() switch
+        {
+            "md5" => "MD5",
+            "sha1" => "SHA-1",
+            "sha224" or "sha-224" => "SHA-224",
+            "sha256" or "sha-256" => "SHA-256",
+            "sha384" or "sha-384" => "SHA-384",
+            "sha512" or "sha-512" => "SHA-512",
+            "sha3-256" => "SHA3-256",
+            "sha3-512" => "SHA3-512",
+            _ => algorithm.Trim().ToUpperInvariant(),
+        };
+    }
+
+    /// <summary>
+    /// SPDX checksum algorithm names ("SHA256"); unknown algos pass through
+    /// uppercased without hyphens (never dropped when parseable).
+    /// </summary>
+    public static string ToSpdxAlg(string algorithm)
+    {
+        return algorithm.Trim().ToLowerInvariant().Replace("-", string.Empty, StringComparison.Ordinal) switch
+        {
+            "md5" => "MD5",
+            "sha1" => "SHA1",
+            "sha224" => "SHA224",
+            "sha256" => "SHA256",
+            "sha384" => "SHA384",
+            "sha512" => "SHA512",
+            "sha3256" => "SHA3-256",
+            "sha3512" => "SHA3-512",
+            _ => algorithm.Trim().ToUpperInvariant().Replace("-", string.Empty, StringComparison.Ordinal),
+        };
+    }
 }

@@ -47,6 +47,42 @@ public sealed class CycloneDxFormatter : ILicenseFormatter
                 component["group"] = item.Group;
             }
 
+            // Issue #70 enrichment (omit-null: unenriched output is byte-stable).
+            // Pinned optional order: group, supplier, hashes, externalReferences.
+            if (item.Supplier is not null)
+            {
+                component["supplier"] = new Dictionary<string, object?> { ["name"] = item.Supplier };
+            }
+
+            if (item.Hashes is { Length: > 0 })
+            {
+                var hashes = new List<Dictionary<string, string?>>();
+                foreach (var entry in item.Hashes)
+                {
+                    if (CycloneDxComponentMapper.TrySplitHash(entry, out var algo, out var content))
+                    {
+                        hashes.Add(new Dictionary<string, string?>
+                        {
+                            ["alg"] = CycloneDxComponentMapper.ToCycloneDxAlg(algo),
+                            ["content"] = content,
+                        });
+                    }
+                }
+
+                if (hashes.Count > 0)
+                {
+                    component["hashes"] = hashes;
+                }
+            }
+
+            if (item.DownloadUrl is not null)
+            {
+                component["externalReferences"] = new[]
+                {
+                    new Dictionary<string, string?> { ["type"] = "distribution", ["url"] = item.DownloadUrl },
+                };
+            }
+
             components.Add(component);
         }
 

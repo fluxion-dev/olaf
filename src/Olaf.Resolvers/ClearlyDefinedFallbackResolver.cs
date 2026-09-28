@@ -65,7 +65,11 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
                 return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: ClearlyDefined returned no usable license.");
             }
 
-            return new ResolvedLicense(dependency, spdx, SpdxLicenseTexts.GetText(spdx), definitionUrl, "Resolved", null);
+            // Trivial sibling enrichment from the same already-fetched
+            // definitions JSON (NO-NEW-HTTP): files[].sha (first sha256) ->
+            // Hashes, parties[] supplier-ish -> Supplier; else null.
+            var enrichment = ParseClearlyDefinedEnrichment(body, dependency);
+            return new ResolvedLicense(dependency, spdx, SpdxLicenseTexts.GetText(spdx), definitionUrl, "Resolved", null, enrichment);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -119,6 +123,116 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
             "go" => $"https://api.clearlydefined.io/definitions/go/github/-/{name}/{version}",
             _ => null,
         };
+    }
+
+    internal static Enrichment? ParseClearlyDefinedEnrichment(string body, Dependency dependency)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            string? hash = null;
+            if (root.TryGetProperty("files", out var files) && files.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var file in files.EnumerateArray())
+                {
+                    if (file.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+
+                    // First sha256 wins: direct "sha256"/"sha" fields, else a
+                    // nested "hashes" object.
+                    if (EnrichmentHelpers.TryGetString(file, "sha256", out var sha256))
+                    {
+                        hash = "sha256:" + sha256!.Trim();
+                        break;
+                    }
+
+                    if (EnrichmentHelpers.TryGetString(file, "sha", out var sha))
+                    {
+                        hash = "sha256:" + sha!.Trim();
+                        break;
+                    }
+
+                    if (file.TryGetProperty("hashes", out var hashes)
+                        && hashes.ValueKind == JsonValueKind.Object
+                        && EnrichmentHelpers.TryGetString(hashes, "sha256", out var nested))
+                    {
+                        hash = "sha256:" + nested!.Trim();
+                        break;
+                    }
+                }
+            }
+
+            string? supplier = null;
+            foreach (var scope in EnumeratePartiesScopes(root))
+            {
+                supplier = ReadPartySupplier(scope);
+                if (supplier is not null)
+                {
+                    break;
+                }
+            }
+
+            return EnrichmentHelpers.Create(
+                dependency,
+                EnrichmentHelpers.HashList(hash),
+                supplier,
+                downloadUrl: null);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static IEnumerable<JsonElement> EnumeratePartiesScopes(JsonElement root)
+    {
+        if (root.TryGetProperty("parties", out var direct) && direct.ValueKind == JsonValueKind.Array)
+        {
+            yield return direct;
+        }
+
+        if (root.TryGetProperty("licensed", out var licensed) && licensed.ValueKind == JsonValueKind.Object
+            && licensed.TryGetProperty("parties", out var nested) && nested.ValueKind == JsonValueKind.Array)
+        {
+            yield return nested;
+        }
+    }
+
+    private static string? ReadPartySupplier(JsonElement parties)
+    {
+        foreach (var party in parties.EnumerateArray())
+        {
+            if (party.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            // Supplier-ish: prefer a human name, else url, else email.
+            if (EnrichmentHelpers.TryGetString(party, "name", out var name))
+            {
+                return name!.Trim();
+            }
+
+            if (EnrichmentHelpers.TryGetString(party, "url", out var url))
+            {
+                return url!.Trim();
+            }
+
+            if (EnrichmentHelpers.TryGetString(party, "email", out var email))
+            {
+                return email!.Trim();
+            }
+        }
+
+        return null;
     }
 
     private static string? ParseDeclared(string body)

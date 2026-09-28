@@ -10,6 +10,9 @@ public sealed class TxtFormatter : ILicenseFormatter
     public string FormatResult(ScanResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
+        // Issue #70: enrichment (purl/hashes/supplier/download) is consciously
+        // omitted here — fixed-line human attribution; SBOM/structured formats
+        // carry enrichment.
         var sb = new StringBuilder();
         sb.AppendLine("Third-Party Attribution");
         sb.AppendLine($"Total: {result.TotalCount}, Resolved: {result.ResolvedCount}, Unknown: {result.UnknownCount}");

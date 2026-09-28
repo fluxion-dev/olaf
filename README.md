@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 644 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 674 passing (`dotnet test`).
 
 ## Usage
 
@@ -182,6 +182,62 @@ Empty scan: `total`/`resolved`/`unknown` are all `0`; JSON/YAML emit an empty `l
 - Relationships are flat-list honest (no tree is inferred): every package gets BOTH `DESCRIBES` and `CONTAINS` from `SPDXRef-DOCUMENT` (`relationships` count is `2 × packages`, referentially closed); `documentDescribes` lists every package `SPDXID`. An empty scan carries a single self-`DESCRIBES` (`SPDXRef-DOCUMENT` → `SPDXRef-DOCUMENT`) with `documentDescribes: ["SPDXRef-DOCUMENT"]`.
 - Counts ride in `comment` (`olaf:total=<n>/resolved=<n>/unknown=<n>`, always equal to the `ScanResult` counts, so `--direct-only` filtering is reflected).
 - SPDX 2.3 only: no 3.0 profile/context fields are emitted. A future SPDX-3.0 formatter ships as a separate format, not an extension — this output stays valid 2.3 input for converters (v3.0-ready in that sense, not by emitting 3.0 fields).
+
+### Enrichment (component PURL + hashes + supplier + download)
+
+`ResolvedLicense` carries an optional 7th `Enrichment` record — `Enrichment(Purl, Hashes, Supplier, DownloadUrl)` (default `null`, so unenriched output is byte-stable). `Hashes` entries are `algo:value` strings (e.g. `sha512:…`).
+
+NO-NEW-HTTP rule: enrichment is harvested ONLY from the response body the resolver already fetched for license resolution. No resolver issues a new `GET` for enrichment (the pre-existing license-text fetch stays license-text-only). Absent fields stay `null` (never `""` or fabricated values); when hashes, supplier, and download URL are ALL absent the whole `Enrichment` is `null`, and the purl is only emitted alongside real enrichment data.
+
+Per-resolver availability (payload → fields):
+
+| Resolver | Already-fetched payload | Hashes | Supplier | DownloadUrl |
+|----------|-------------------------|--------|----------|-------------|
+| `npm` | versioned registry JSON | `dist.integrity` (`algo-base64` → `algo:value`) | `author` then `maintainers[]` (name/email) | `dist.tarball` |
+| `nuget` | registration / catalog JSON (catalog doc only when already fetched for license resolution) | `packageHash` + `packageHashAlgorithm` (default `sha512`) | `authors` | `packageContent` |
+| `pip` | PyPI JSON API | `urls[].digests{algo: value}` | `info.author` | `urls[]` file URL |
+| `cargo` | crates.io JSON | `version.checksum` → `sha256:` | — (null) | `version.dl_path` (absolutized against `https://crates.io`) |
+| `composer` | packagist JSON | `dist.shasum` → `sha1:` | `authors[]` (name/email) | `dist.url` |
+| `maven` | fetched POM XML | — (null; POM carries no hashes) | `organization.name`, else `developers/developer/name` | project `<url>` (license `<url>` elements are never read) |
+| `bundler` | rubygems JSON (PARTIAL) | — (null; versioned sha lives on an unfetched endpoint) | `authors` | `gem_uri` |
+| `go` | proxy `.info` / license-file path (PARTIAL) | — (null; `.ziphash` endpoint unfetched) | — (null) | constructed `https://proxy.golang.org/<module>/@v/<version>.zip` (never fetched) |
+| `swift` / `cocoapods` / `vcpkg` / `conan` | current endpoints (NULL group) | — | — | — (endpoints lack enrichment data → `Enrichment` null) |
+| ClearlyDefined fallback | definitions JSON | `files[]` first `sha256`/`sha` (incl. nested `hashes.sha256`) → `sha256:` | `parties[]` (name, else url, else email; top-level or `licensed.parties`) | — (null) |
+
+Deferred parser hashes: `go.sum` `h1:` hashes and npm-lock `integrity` values are validated-but-deferred — parsed, never stored (`Hashes` stays `null` for them).
+
+PURL mapping (`PurlBuilder.Build` in `Olaf.Core` — the single home shared by resolvers and formatters; `CycloneDxPurl.Build` delegates to it, never forks; never throws, null/empty inputs degrade to the generic fallback):
+
+| Ecosystem input | PURL type | Notes |
+|-----------------|-----------|-------|
+| `npm` | `pkg:npm/…` | scoped `@scope/name` encodes `@` as `%40`, keeps `/` |
+| `pip` / `pypi` (alias) | `pkg:pypi/…` | — |
+| `go` / `golang` (alias) | `pkg:golang/…` | — |
+| `maven` / `gradle` | `pkg:maven/<group>/<artifact>…` | `group:artifact` split on the first `:`; bare name without `:` falls back to `pkg:maven/<name>…` |
+| `nuget` | `pkg:nuget/…` | — |
+| `cargo` | `pkg:cargo/…` | — |
+| `bundler` / `gem` (alias) | `pkg:gem/…` | — |
+| `composer` | `pkg:composer/…` | — |
+| `swift` | `pkg:swift/…` | — |
+| `cocoapods` | `pkg:cocoapods/…` | — |
+| `vcpkg` | `pkg:vcpkg/…` | — |
+| `conan` | `pkg:conan/…` | — |
+| `apk` / `dpkg` / `rpm` | `pkg:generic/…` | explicit: distro packages have no dedicated purl type here |
+| unmapped / null | `pkg:generic/…` | fallback, never throws |
+
+Qualifiers: `PurlBuilder.Build` accepts optional `qualifiers` (emitted as `?k=v&…` when non-empty, e.g. `pkg:npm/express@4.18.2?arch=x64`); null/empty means no suffix. All formatters pass `null` for now.
+
+SBOM consumption (omit-null everywhere — unenriched SBOM output is stable):
+
+- CycloneDX JSON: enriched purl is preferred (else the computed purl); `supplier` → `supplier: {name}`; `Hashes` → `hashes[]` (`{alg, content}`, alg names `SHA-512` style, unknown algos pass through uppercased); `DownloadUrl` → `externalReferences: [{type: distribution, url}]`. Optional order after `group`: `supplier`, `hashes`, `externalReferences`. Unparseable hash entries (no colon, blank halves) are dropped, never emitted, never throw.
+- CycloneDX XML: mirrors JSON — `supplier`, `hashes` (`<hash alg="…">`), `externalReferences` (`<reference type="distribution">`) after `<purl>`, before `<properties>`.
+- SPDX JSON: `supplier` → `supplier` (`Person: <name>` when enriched, else literal `NOASSERTION`); `DownloadUrl` → `downloadLocation` (else `NOASSERTION`); `Hashes` → `checksums[]` (`{algorithm, checksumValue}`, algorithm names `SHA256` style, unknown algos pass through uppercased without hyphens), omitted entirely when absent. `copyrightText` stays `NOASSERTION` (no copyright scraping).
+
+Legacy structured formats: JSON/YAML emit optional `purl` / `supplier` / `downloadUrl` / `hashes` keys AFTER `direct`, omitted-when-null (unenriched rows keep the 9-field shape).
+
+Fixed-shape human formats consciously omit enrichment: `xml` (fixed-shape report), `html`/`md` (fixed-column tables), `txt` (fixed-line attribution) — SBOM (`cyclonedx-json`/`cyclonedx-xml`/`spdx-json`) and structured (`json`/`yaml`) formats carry enrichment.
+
+Null-tolerance + provenance rules: blank suppliers/URLs normalize to `null`; non-`http(s)` download URLs are rejected to `null`; blank hash entries are dropped. `SourceUrl` (a registry page) is NEVER copied into `DownloadUrl` (a download URI) — when no harvestable download URL exists, `DownloadUrl` stays `null` even though `SourceUrl` is set.
 
 ```bash
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
