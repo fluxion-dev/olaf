@@ -4,7 +4,7 @@ using Olaf.Formatters;
 namespace Olaf.Tests.Formatters;
 
 /// <summary>
-/// Issue #73 Step 1: engine/model 4 + render 4 (offline only — inline
+/// Issue #73 Step 1: model 2 + render 6 (offline only — inline
 /// strings + committed fixtures under Fixtures/templates, no HTTP).
 /// </summary>
 public sealed class TemplateEngineTests

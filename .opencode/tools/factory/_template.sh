@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.5"
+VERSION="0.2.6"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -148,6 +148,21 @@ KEEP_TEMP=0
 # }
 # # call site (replaces the inline for-f loop):  r1_matrix_regression
 # # narrowed call site (documents deliberate narrowing):  r1_matrix_regression json yaml
+
+# ---- Canonical scriban_inline (copy-paste skeleton; then adapt) ----
+# Inline .scriban fixtures for error/negative arms: committed *.scriban files
+#   are NEVER edited inline — write temp copies under $WORKDIR with printf and
+#   explicit \n (echo mangles backslashes; heredocs risk {{ }} review
+#   confusion). Single-line shape probes need no trailing newline; multiline
+#   blocks need \n per line so engine line numbers stay meaningful.
+# Canonical source promoted to template 0.2.6 after 3rd family use
+#   (template-probe.sh T1 holder-passthrough + T3 bad-syntax + T4
+#   unknown-field printf arms — identical printf->run_template shape).
+# printf '{{#each licenses}}{{name}}|{{copyright}};\n{{/each}}' > "$WORKDIR/holder.scriban"
+# printf 'header\n{{#each licenses}}\nno-close\n' > "$WORKDIR/bad.scriban"
+# printf 'A-{{nosuchfield}}-B' > "$WORKDIR/unk.scriban"
+# # call site (replaces ad-hoc echo/heredoc fixture synthesis):
+# #   run_template "t1-holder" "$FIXTURE" "$WORKDIR/holder.scriban"
 
 # ---- Canonical air-gap grep (copy-paste; then call) ----
 # Requires (define live alongside): air_gap_grep <file> [extra-pattern...]
