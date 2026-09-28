@@ -1,0 +1,29 @@
+# Example olaf policy file (.sbom-rules.yaml) — issue #75.
+#
+# Resolution order (no cwd search, no walk-up):
+#   1. --rules <file> (explicit; missing file exits 2)
+#   2. input-adjacent: .sbom-rules.yaml, then .olaf-rules.yaml
+#      (file input uses its directory; dir input uses itself)
+#   3. none (flag behavior unchanged)
+#
+# Precedence is per key: a present --allow/--deny flag REPLACES the file
+# list for that key; --strict forces failOnUnknown:true. Explicit allow
+# rescues: a license on `allow` never offends even if also on `deny`.
+# Unknown keys and wrong types are schema errors (exit 2, before any report).
+# Exceptions match (purl OR name, case-insensitive) AND license (exact SPDX,
+# case-insensitive); missing `expires` is perpetual; empty `reason` is a
+# schema error.
+allow:
+  - MIT
+  - Apache-2.0
+deny:
+  - GPL-3.0-only
+excludeEcosystems:
+  - apk
+failOnUnknown: false
+failOnUnresolved: false
+exceptions:
+  - name: example-vendored-dep
+    license: GPL-3.0-only
+    reason: "Vendored with written permission; re-evaluate on upgrade."
+    expires: 2099-01-01
