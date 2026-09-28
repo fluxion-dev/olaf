@@ -1,0 +1,282 @@
+[
+  {
+    "id": "0BSD",
+    "name": "BSD Zero Clause License",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "AAL",
+    "name": "Attribution Assurance License",
+    "osi": true,
+    "fsf": false,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "AGPL-1.0-only",
+    "name": "GNU Affero General Public License v1.0 only",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "AGPL-3.0-only",
+    "name": "GNU Affero General Public License v3.0 only",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "AGPL-3.0-or-later",
+    "name": "GNU Affero General Public License v3.0 or later",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "Apache-1.1",
+    "name": "Apache License 1.1",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "Apache-2.0",
+    "name": "Apache License 2.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "Artistic-2.0",
+    "name": "Artistic License 2.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "BSD-2-Clause",
+    "name": "BSD 2-Clause \"Simplified\" License",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "BSD-3-Clause",
+    "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "BSD-4-Clause",
+    "name": "BSD 4-Clause \"Original\" or \"Old\" License",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "BSL-1.0",
+    "name": "Boost Software License 1.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "CC0-1.0",
+    "name": "Creative Commons Zero v1.0 Universal",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "CDDL-1.0",
+    "name": "Common Development and Distribution License 1.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "EPL-1.0",
+    "name": "Eclipse Public License 1.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "EPL-2.0",
+    "name": "Eclipse Public License 2.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "GPL-1.0-only",
+    "name": "GNU General Public License v1.0 only",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "GPL-2.0-only",
+    "name": "GNU General Public License v2.0 only",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "GPL-2.0-or-later",
+    "name": "GNU General Public License v2.0 or later",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "GPL-3.0-only",
+    "name": "GNU General Public License v3.0 only",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "GPL-3.0-or-later",
+    "name": "GNU General Public License v3.0 or later",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "ISC",
+    "name": "ISC License",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "LGPL-2.0-only",
+    "name": "GNU Library General Public License v2 only",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "LGPL-2.1-only",
+    "name": "GNU Lesser General Public License v2.1 only",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "LGPL-2.1-or-later",
+    "name": "GNU Lesser General Public License v2.1 or later",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "LGPL-3.0-only",
+    "name": "GNU Lesser General Public License v3.0 only",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "LGPL-3.0-or-later",
+    "name": "GNU Lesser General Public License v3.0 or later",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "MIT",
+    "name": "MIT License",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "MIT-0",
+    "name": "MIT No Attribution",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "MPL-1.0",
+    "name": "Mozilla Public License 1.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "MPL-1.1",
+    "name": "Mozilla Public License 1.1",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "MPL-2.0",
+    "name": "Mozilla Public License 2.0",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "OFL-1.1",
+    "name": "SIL Open Font License 1.1",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "Unlicense",
+    "name": "The Unlicense",
+    "osi": false,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  },
+  {
+    "id": "Zlib",
+    "name": "zlib/libpng license",
+    "osi": true,
+    "fsf": true,
+    "deprecated": false,
+    "text": ""
+  }
+]

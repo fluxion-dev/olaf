@@ -66,12 +66,13 @@ internal static class LicenseTextFetcher
         string? tarballUrl,
         string? licenseUrl,
         string spdxId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool offline = false)
     {
         // Provenance-blind wrapper: existing callers keep the 2-tuple.
         // Copyright scraping (issue #72) uses the provenance overload.
         var (text, reason, _) = await TryFetchLicenseTextWithProvenanceAsync(
-            http, tarballUrl, licenseUrl, spdxId, cancellationToken).ConfigureAwait(false);
+            http, tarballUrl, licenseUrl, spdxId, cancellationToken, offline).ConfigureAwait(false);
         return (text, reason);
     }
 
@@ -86,13 +87,16 @@ internal static class LicenseTextFetcher
         string? tarballUrl,
         string? licenseUrl,
         string spdxId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool offline = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         string? firstFailure = null;
 
-        if (TryCreateHttpUri(tarballUrl, out var tarballUri) && tarballUri is not null)
+        // Issue #77: offline is DB-only — both network stages (tarball,
+        // licenseUrl) are gated here so zero HTTP is sent.
+        if (!offline && TryCreateHttpUri(tarballUrl, out var tarballUri) && tarballUri is not null)
         {
             var (tarballText, tarballReason) = await TryFetchFromTarballAsync(http, tarballUri, cancellationToken).ConfigureAwait(false);
             if (tarballText is not null)
@@ -103,7 +107,7 @@ internal static class LicenseTextFetcher
             firstFailure ??= tarballReason;
         }
 
-        if (TryCreateHttpUri(licenseUrl, out var licenseUri) && licenseUri is not null)
+        if (!offline && TryCreateHttpUri(licenseUrl, out var licenseUri) && licenseUri is not null)
         {
             var (urlText, urlReason) = await TryFetchFromLicenseUrlAsync(http, licenseUri, cancellationToken).ConfigureAwait(false);
             if (urlText is not null)
@@ -112,6 +116,13 @@ internal static class LicenseTextFetcher
             }
 
             firstFailure ??= urlReason;
+        }
+
+        // Issue #77: DB-first chain — embedded DB text, then the
+        // SpdxLicenseTexts seed fallback, then null with spdxdb-miss.
+        if (SpdxLicenseDb.TryGetText(spdxId, out var dbEntryText) && !string.IsNullOrWhiteSpace(dbEntryText))
+        {
+            return (dbEntryText, null, false);
         }
 
         if (SpdxLicenseTexts.TryGetText(spdxId, out var dbText) && !string.IsNullOrWhiteSpace(dbText))

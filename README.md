@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 795 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 815 passing (`dotnet test`).
 
 ## Usage
 
@@ -58,7 +58,7 @@ dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,A
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --rules examples/sbom-rules.example.yaml
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--offline` (embedded DB only, no network; see `### Offline / air-gap`), `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
 `generate [PATH]` inherits ALL of these flags (same spec, same behavior — see `### Generate subcommand`); `--input` is optional on `generate` (a present `--input` wins over the positional `PATH`).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate. `--rules <file>` loads a YAML policy file declaring the same gate in version control (see `### Policy file`); per key, a present `--allow`/`--deny` flag REPLACES the file list, and a present `--strict` forces `failOnUnknown: true`.
@@ -71,6 +71,7 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 --ecosystem <ecosystem>  Limit scan to ecosystem: npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm (pypi alias for pip)
 --max-image-mb <max-image-mb>  Cap container-image scan at N megabytes uncompressed handled (default: 1024; must be > 0)
 --strict                 Fail on unresolved or unknown licenses
+--offline                Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)
 --allow <allow>                Comma-separated SPDX allow-list; strict-gate fails licenses not in the list
 --deny <deny>                  Comma-separated SPDX deny-list; strict-gate fails licenses in the list
 --rules <rules>                Policy rules file (.sbom-rules.yaml)
@@ -101,7 +102,7 @@ Commands:
 - Defaults: `PATH` is `.` (current directory); `--format` is `json`; the report goes to stdout unless `--out` is given. Verified offline: `dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json` → exit `0`, stdout byte-identical to `dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json`.
 - `--out <file>`: the report goes to the file and stdout stays empty (verified: `--out` run exits `0` with `0` stdout bytes); parent directories are auto-created; fails if the file exists unless `--force` is given. Same atomic-write path as root.
 - Empty directory: `generate <empty-dir>` emits a valid empty SBOM per format and exits `0` (verified: `dotnet run --project src/Olaf.Cli -- generate <empty-dir> --format json` → `{"summary":{"total":0,"resolved":0,"unknown":0},"licenses":[]}`, exit `0`; `--format spdx-json` → empty `packages` with a single self-`DESCRIBES` relationship, exit `0`). Legacy `--input <empty-dir>` still fails with exit `2` (`No manifests found …`).
-- Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
+- Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--offline`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
 - Bare `olaf .` is NOT supported: only `olaf generate .`. A bare positional without the subcommand stays a parse error (`Unrecognized command or argument '.'`, exit `1`).
 
 Further examples (`generate .` covered in Quickstart above):
@@ -157,9 +158,35 @@ Dedup (registry): same `(ecosystem, name, version)` triple from manifest + lock 
 
 ## License Coverage
 
-This project provides SPDX license mapping for 35 ids — the authoritative subset list lives under `## License text` below (pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`).
+This project ships an embedded offline SPDX DB (`src/Olaf.Resolvers/Data/spdx-licenses.json`, loaded by `SpdxLicenseDb`) covering 35 ids — the authoritative subset list lives under `## License text` below (pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`).
 
-The SPDX IDs are available through `SpdxMapper.Normalize()`, and for text via `SpdxLicenseTexts.GetText()` (fallback stub on miss) vs `SpdxLicenseTexts.TryGetText()` (hit-miss gate used by the fetcher).
+The SPDX IDs are available through `SpdxMapper.Normalize()`, and for text via `SpdxLicenseDb.TryGetText()` (primary, embedded DB) vs `SpdxLicenseTexts.TryGetText()` (fallback seed used by the fetcher) vs `SpdxLicenseTexts.GetText()` (fallback stub on miss).
+
+### Offline / air-gap (`--offline`)
+
+`--offline` resolves licenses from the embedded DB only — zero HTTP (throwing-handler tests assert no send on every offline path). Bool flag on root + `generate` (inherited with identical behavior); a present `--offline` replaces only the `offline` key (bool-only per-key REPLACE; `allow-rescues-deny` + `strict-forces-failOnUnknown` anchors hold).
+
+- DB shape: `{id, name, osi, fsf, deprecated, text}` per entry (`text` is the full license text where hydrated, else `""`; `metadata-first` key order; ids in `LC_ALL=C` byte order). Loader is a `Lazy<IReadOnlyDictionary>` singleton, case-insensitive id key, `TryGet(id|Normalize(id))`; texts resolve at runtime via `SpdxLicenseTexts` when the checked-in row ships `""`. Size gate: `<5MB` (checked-in seed is ~6KB).
+- Pin + checksum: `tools/spdx-db.sha256` pins the checked-in JSON (`sha256sum -c tools/spdx-db.sha256`).
+- Refresh (maintainer-only): `tools/update-spdx-db.sh` (`SPDX_VERSION=v3.29.0`, `LC_ALL=C sort` + `jq -S` deterministic build, byte-identical re-emit, rewrites the JSON + `.sha256`). `MAINTAINER-NETWORK` — this script fetches from the network; CI and the test suite NEVER execute it.
+- Strict composition: `--strict` + `--offline` composes; exit matrix `0` (clean) / `1` (license violations / strict fail on `Unknown`) / `2` (usage error) holds, including the empty-input fork (`generate <empty-dir> --offline` exits `0` with a 0-dep report; legacy `--input <empty-dir>` still exits `2`).
+- Disk-cache seam: cache is in-memory only (`CachingLicenseResolver`); disk cache is owned by issue #78 — no disk code here by design.
+
+```bash
+# offline scan (verified: exit 0; npm fixture resolves Unknown offline with
+# offline-cache-miss reasons, so never golden-match reason strings)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json --offline
+# generate parity (verified: exit 0, stdout byte-identical to the --input form above)
+dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json --offline
+# strict gate offline (verified: report on stdout + exit 1)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json --offline --strict
+# usage error stays exit 2 offline (verified)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format bogus --offline
+# file output (verified: exit 0, 0 stdout bytes, report in the file)
+dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json --offline --out report.json --force
+# checksum pin (verified: exit 0)
+sha256sum -c tools/spdx-db.sha256
+```
 
 Summary shape per format:
 
@@ -519,9 +546,9 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/packa
 - Tarball shapes: tgz / zip / nupkg / wheel / crate. Content is magic-sniffed first (gzip `1F 8B` → tar, zip `PK 03 04` → zip) with a URL-extension-hint fallback (`.zip`/`.nupkg`/`.whl` → zip; `.tgz`/`.gz`/`.crate` → gzip+tar). Filename preference `LICENSE*` > `COPYING*` > `NOTICE*`, first-match-wins within a tier (`LICENSE*` returns immediately; the first `COPYING*`/`NOTICE*` hit is kept).
 - Encoding chain (never throws): UTF-8 BOM → UTF-16 BE/LE BOM → UTF-8 strict → Windows-1252 fallback, NULs stripped; whitespace-only decodes keep hunting.
 - Fallback chain (pinned): tarball-file text > `licenseUrl` fetch > embedded DB text > null. Non-`http(s)` license URLs are skipped with zero HTTP. Reason vocabulary (existing `prefix: detail` style): `tarball-miss:<detail>` (`not-found`, `status-<n>`, `transport`, `archive-error`, `no-license-file`) · `tarball-timeout` · `tarball-too-large:<bytes>` · `licenseurl-fetch-failed:<status|timeout|transport|empty>` · `spdxdb-miss:<id>`. First-failure wins: the first stage that fails pins `Reason`; later stages are still attempted for text but never overwrite it — every null-text `Resolved` carries a reason (no silent null). Caller cancellation (`OperationCanceledException` on the caller's token) is always rethrown, never swallowed.
-- Curated DB subset (35 ids, pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`, ~225KB of the ~500KB max): `MIT`, `Apache-2.0`, `Apache-1.1`, `ISC`, `BSD-2-Clause`, `BSD-3-Clause`, `BSD-4-Clause`, `GPL-1.0-only`, `GPL-2.0-only`, `GPL-3.0-only`, `GPL-2.0-or-later`, `GPL-3.0-or-later`, `LGPL-2.0-only`, `LGPL-2.1-only`, `LGPL-3.0-only`, `LGPL-2.1-or-later`, `LGPL-3.0-or-later`, `AGPL-1.0-only`, `AGPL-3.0-only`, `AGPL-3.0-or-later`, `MPL-1.0`, `MPL-1.1`, `MPL-2.0`, `CDDL-1.0`, `EPL-1.0`, `EPL-2.0`, `Unlicense`, `CC0-1.0`, `Artistic-2.0`, `AAL`, `MIT-0`, `BSL-1.0`, `Zlib`, `OFL-1.1`, `0BSD` (subset list mirrored in the `SpdxLicenseTexts.cs` comment; historical stubs kept byte-identical). The FULL offline DB + download script is owned by issue #77 — no runtime download-at-scan here. The DB path is air-gap safe: pure in-memory switch/dictionary via `SpdxLicenseTexts.TryGetText`, zero HTTP (no `HttpClient` in that file).
+- Curated DB subset (35 ids, pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`, ~225KB of the ~500KB max): `MIT`, `Apache-2.0`, `Apache-1.1`, `ISC`, `BSD-2-Clause`, `BSD-3-Clause`, `BSD-4-Clause`, `GPL-1.0-only`, `GPL-2.0-only`, `GPL-3.0-only`, `GPL-2.0-or-later`, `GPL-3.0-or-later`, `LGPL-2.0-only`, `LGPL-2.1-only`, `LGPL-3.0-only`, `LGPL-2.1-or-later`, `LGPL-3.0-or-later`, `AGPL-1.0-only`, `AGPL-3.0-only`, `AGPL-3.0-or-later`, `MPL-1.0`, `MPL-1.1`, `MPL-2.0`, `CDDL-1.0`, `EPL-1.0`, `EPL-2.0`, `Unlicense`, `CC0-1.0`, `Artistic-2.0`, `AAL`, `MIT-0`, `BSL-1.0`, `Zlib`, `OFL-1.1`, `0BSD` (subset list mirrored in the `SpdxLicenseTexts.cs` comment; historical stubs kept byte-identical). The embedded offline DB + refresh script shipped in issue #77 (see `### Offline / air-gap`) — no runtime download-at-scan here. The DB path is air-gap safe: pure in-memory dictionary via `SpdxLicenseDb.TryGetText` (primary) + `SpdxLicenseTexts.TryGetText` (seed fallback), zero HTTP (no `HttpClient` in either file).
 - Cache: in-memory only — the whole record including text rides the existing `CachingLicenseResolver`; `Unknown` (including text-stage failures) stays uncached. Disk cache is owned by issue #78: no disk code here by design.
-- No new flags, no new exit codes: text-stage failures surface as `Unknown` + reason, never throw, so `--help` is unchanged:
+- No new text-stage flags, no new text-stage exit codes: text-stage failures surface as `Unknown` + reason, never throw (the `--offline` flag itself shipped in issue #77 — see `### Offline / air-gap`):
 
 ```bash
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --format json
