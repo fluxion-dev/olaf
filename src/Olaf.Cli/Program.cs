@@ -35,6 +35,10 @@ var strictOption = new Option<bool>("--strict")
 {
     Description = "Fail on unresolved or unknown licenses",
 };
+var offlineOption = new Option<bool>("--offline")
+{
+    Description = "Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)",
+};
 var ecosystemOption = new Option<string?>("--ecosystem")
 {
     Description = $"Limit scan to ecosystem: {SupportedEcosystems} (pypi alias for pip)",
@@ -109,6 +113,7 @@ var rootCommand = new RootCommand($"""
     outOption,
     forceOption,
     strictOption,
+    offlineOption,
     allowOption,
     denyOption,
     rulesOption,
@@ -141,6 +146,8 @@ async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationTok
     var includeTransitive = o.IncludeTransitive;
     var groupByLicense = o.GroupByLicense;
     var rulesPath = o.RulesPath;
+    // Issue #77: offline resolves from the embedded DB only (no network).
+    var offline = o.Offline;
     // Issue #75: flag "presence" is token-presence (even an empty --allow ""
     // replaces the file list for that key). String options consume value
     // tokens; bool --strict takes none, so presence uses IsImplicit.
@@ -416,7 +423,7 @@ async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationTok
     {
         Timeout = TimeSpan.FromSeconds(10),
     };
-    var cacheResolver = new CachingLicenseResolver(http);
+    var cacheResolver = new CachingLicenseResolver(http, offline: offline);
     var fallbackResolver = new ClearlyDefinedFallbackResolver(http);
 
     using var concurrency = new SemaphoreSlim(8);
@@ -430,7 +437,10 @@ async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationTok
             try
             {
                 license = await cacheResolver.ResolveAsync(dep, ct).ConfigureAwait(false);
-                if (license.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+                // Issue #77: offline skips the ClearlyDefined fallback at the
+                // callsite (never inside ClearlyDefinedFallbackResolver) —
+                // offline misses stay Unknown (exit 0, or exit 1 with --strict).
+                if (!offline && license.Status.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
@@ -717,7 +727,8 @@ ScanOpts ReadScanOpts(ParseResult parseResult, string? inputOverride, bool allow
         AllowFlagPresent: parseResult.GetResult(allowOption)?.Tokens.Count > 0,
         DenyFlagPresent: parseResult.GetResult(denyOption)?.Tokens.Count > 0,
         FormatFlagPresent: parseResult.GetResult(formatOption)?.Tokens.Count > 0,
-        AllowEmpty: allowEmpty);
+        AllowEmpty: allowEmpty,
+        Offline: parseResult.GetValue(offlineOption));
 }
 
 rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancellationToken) =>
@@ -743,6 +754,7 @@ var generateCommand = new Command("generate", """
     outOption,
     forceOption,
     strictOption,
+    offlineOption,
     allowOption,
     denyOption,
     rulesOption,
@@ -798,4 +810,5 @@ internal sealed record ScanOpts(
     bool AllowFlagPresent,
     bool DenyFlagPresent,
     bool FormatFlagPresent,
-    bool AllowEmpty);
+    bool AllowEmpty,
+    bool Offline = false);

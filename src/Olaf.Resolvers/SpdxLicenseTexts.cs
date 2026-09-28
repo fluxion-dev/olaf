@@ -29,6 +29,16 @@ internal static class SpdxLicenseTexts
 
     public static bool TryGetText(string spdxId, out string? text)
     {
+        // Issue #77: embedded DB (SpdxLicenseDb) is primary; the switch
+        // below is the fallback seed (checked-in DB ships metadata-first
+        // entries with seed-text fallback until the update script hydrates
+        // full texts — signatures unchanged).
+        if (SpdxLicenseDb.TryGetText(spdxId, out var dbText) && !string.IsNullOrWhiteSpace(dbText))
+        {
+            text = dbText;
+            return true;
+        }
+
         text = spdxId switch
         {
             "MIT" => "MIT License\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.",

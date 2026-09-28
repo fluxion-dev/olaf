@@ -1,7 +1,16 @@
+using System.Text.RegularExpressions;
+
 namespace Olaf.Resolvers;
 
 internal static class SpdxMapper
 {
+    private static readonly Regex LicenseRefRegex = new(@"^LicenseRef-[A-Za-z0-9][A-Za-z0-9.\-+]*$", RegexOptions.Compiled);
+
+    // Bare family names (any case, optional single-digit version) carry no
+    // mapping — null, never an invented -only pin. Spelled to exclude the
+    // pinned forms below (gplv2, gpl-2.0, ...): no 'v', no dotted version.
+    private static readonly Regex BareFamilyRegex = new(@"^(gpl|lgpl|agpl)(-\d|\d)?$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     public static string? Normalize(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
@@ -34,6 +43,20 @@ internal static class SpdxMapper
             return trimmed;
         }
 
+        // Issue #77 (D4): LicenseRef passthrough — valid refs return as-is,
+        // bare "LicenseRef-" (or malformed refs) return null.
+        if (trimmed.StartsWith("LicenseRef-", StringComparison.Ordinal))
+        {
+            return LicenseRefRegex.IsMatch(trimmed) ? trimmed : null;
+        }
+
+        // Issue #77 (D4): bare gpl|lgpl|agpl (any case, optional version)
+        // stay null — the -only pins below are untouched.
+        if (BareFamilyRegex.IsMatch(trimmed))
+        {
+            return null;
+        }
+
         var lower = trimmed.ToLowerInvariant();
         return lower switch
         {
@@ -49,11 +72,16 @@ internal static class SpdxMapper
             "gpl-1.0-only" or "gplv1" or "gpl-1.0" => "GPL-1.0-only",
             "gpl-2.0-only" or "gplv2" or "gpl-2.0" => "GPL-2.0-only",
             "gpl-3.0-only" or "gplv3" or "gpl-3.0" => "GPL-3.0-only",
+            "gpl-2.0-or-later" => "GPL-2.0-or-later",
+            "gpl-3.0-or-later" => "GPL-3.0-or-later",
             "agpl-1.0-only" or "agplv1" or "agpl-1.0" => "AGPL-1.0-only",
             "agpl-3.0-only" or "agplv3" or "agpl-3.0" => "AGPL-3.0-only",
+            "agpl-3.0-or-later" => "AGPL-3.0-or-later",
             "lgpl-2.0-only" or "lgplv2" or "lgpl-2.0" => "LGPL-2.0-only",
             "lgpl-2.1-only" or "lgplv2.1" or "lgpl-2.1" => "LGPL-2.1-only",
+            "lgpl-2.1-or-later" => "LGPL-2.1-or-later",
             "lgpl-3.0-only" or "lgplv3" or "lgpl-3.0" => "LGPL-3.0-only",
+            "lgpl-3.0-or-later" => "LGPL-3.0-or-later",
             "mpl-1.0" or "mozilla public license 1.0" => "MPL-1.0",
             "mpl-1.1" or "mozilla public license 1.1" => "MPL-1.1",
             "mpl-2.0" or "mozilla public license 2.0" => "MPL-2.0",

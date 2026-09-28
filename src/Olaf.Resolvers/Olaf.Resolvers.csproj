@@ -15,4 +15,8 @@
     <InternalsVisibleTo Include="Olaf.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Data/spdx-licenses.json" />
+  </ItemGroup>
+
  </Project>
