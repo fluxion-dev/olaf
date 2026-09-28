@@ -14,7 +14,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 815 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 827 passing (`dotnet test`).
 
 ## Usage
 
@@ -58,7 +58,7 @@ dotnet run --project src/Olaf.Cli -- --input package.json --strict --allow MIT,A
 dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/package.json --rules examples/sbom-rules.example.yaml
 ```
 
-Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--offline` (embedded DB only, no network; see `### Offline / air-gap`), `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
+Flags: `--input <file|dir>`, `--format json|yaml|xml|html|txt|md|cyclonedx-json|cyclonedx|cyclonedx-xml|spdx-json` (default `json`; `markdown` alias for `md`, `cyclonedx` alias for `cyclonedx-json`; `cyclonedx-xml` has no alias, `spdx-json` has no alias), `--out <file>` (default stdout), `--force`, `--strict`, `--offline` (embedded DB only, no network; see `### Offline / air-gap`), `--cache-dir <dir>` (persistent cache directory, `cache.json` appended; see `### Disk cache`), `--no-cache`, `--refresh-cache`, `--cache-ttl-days <n>` (resolved-entry TTL in days; see `### Disk cache`), `--allow <csv>`, `--deny <csv>`, `--rules <file>` (policy rules file, see `### Policy file`), `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan|apk|dpkg|rpm` (`pypi` alias for `pip`), `--max-image-mb <n>` (container-image cap in MB of uncompressed bytes handled, default `1024`; must be `> 0`, missing/invalid → exit `2`), `--verbose`, `--quiet`, `--template <file>` (custom attribution template; overrides `--format`, see `### Custom attribution templates`), `--help`, `--version` (built-in).
 `generate [PATH]` inherits ALL of these flags (same spec, same behavior — see `### Generate subcommand`); `--input` is optional on `generate` (a present `--input` wins over the positional `PATH`).
 `--out` parent directories are auto-created; `--out` fails if the file exists unless `--force` is given.
 `--allow` is a comma-separated SPDX allow-list (fail licenses not in the list); `--deny` is a comma-separated SPDX deny-list (fail licenses in the list). `--allow`/`--deny` without `--strict` warns on stderr but still enforces the policy gate. `--rules <file>` loads a YAML policy file declaring the same gate in version control (see `### Policy file`); per key, a present `--allow`/`--deny` flag REPLACES the file list, and a present `--strict` forces `failOnUnknown: true`.
@@ -72,6 +72,10 @@ Transitive filter: neither flag (default) reports all dependencies; `--direct-on
 --max-image-mb <max-image-mb>  Cap container-image scan at N megabytes uncompressed handled (default: 1024; must be > 0)
 --strict                 Fail on unresolved or unknown licenses
 --offline                Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)
+--cache-dir <cache-dir>            Directory for the persistent license-resolution cache (cache.json is appended; overrides OLAF_CACHE_DIR, XDG_CACHE_HOME, and the OS default)
+--no-cache                         Bypass the persistent license cache (no reads, no writes)
+--refresh-cache                    Skip cache reads and force fresh writes (wins over --no-cache)
+--cache-ttl-days <cache-ttl-days>  Resolved-entry TTL in days (default: 30; must be a positive integer; scales Resolved only, not-found stays 1 day)
 --allow <allow>                Comma-separated SPDX allow-list; strict-gate fails licenses not in the list
 --deny <deny>                  Comma-separated SPDX deny-list; strict-gate fails licenses in the list
 --rules <rules>                Policy rules file (.sbom-rules.yaml)
@@ -102,7 +106,7 @@ Commands:
 - Defaults: `PATH` is `.` (current directory); `--format` is `json`; the report goes to stdout unless `--out` is given. Verified offline: `dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json` → exit `0`, stdout byte-identical to `dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --format json`.
 - `--out <file>`: the report goes to the file and stdout stays empty (verified: `--out` run exits `0` with `0` stdout bytes); parent directories are auto-created; fails if the file exists unless `--force` is given. Same atomic-write path as root.
 - Empty directory: `generate <empty-dir>` emits a valid empty SBOM per format and exits `0` (verified: `dotnet run --project src/Olaf.Cli -- generate <empty-dir> --format json` → `{"summary":{"total":0,"resolved":0,"unknown":0},"licenses":[]}`, exit `0`; `--format spdx-json` → empty `packages` with a single self-`DESCRIBES` relationship, exit `0`). Legacy `--input <empty-dir>` still fails with exit `2` (`No manifests found …`).
-- Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--offline`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
+- Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--offline`, `--cache-dir`, `--no-cache`, `--refresh-cache`, `--cache-ttl-days`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
 - Bare `olaf .` is NOT supported: only `olaf generate .`. A bare positional without the subcommand stays a parse error (`Unrecognized command or argument '.'`, exit `1`).
 
 Further examples (`generate .` covered in Quickstart above):
@@ -170,7 +174,7 @@ The SPDX IDs are available through `SpdxMapper.Normalize()`, and for text via `S
 - Pin + checksum: `tools/spdx-db.sha256` pins the checked-in JSON (`sha256sum -c tools/spdx-db.sha256`).
 - Refresh (maintainer-only): `tools/update-spdx-db.sh` (`SPDX_VERSION=v3.29.0`, `LC_ALL=C sort` + `jq -S` deterministic build, byte-identical re-emit, rewrites the JSON + `.sha256`). `MAINTAINER-NETWORK` — this script fetches from the network; CI and the test suite NEVER execute it.
 - Strict composition: `--strict` + `--offline` composes; exit matrix `0` (clean) / `1` (license violations / strict fail on `Unknown`) / `2` (usage error) holds, including the empty-input fork (`generate <empty-dir> --offline` exits `0` with a 0-dep report; legacy `--input <empty-dir>` still exits `2`).
-- Disk-cache seam: cache is in-memory only (`CachingLicenseResolver`); disk cache is owned by issue #78 — no disk code here by design.
+- Disk-cache seam: `--offline` reads the persistent disk cache first (memory → disk → `offline-cache-miss`); a disk hit resolves with zero HTTP, so a seeded cache makes offline scans deterministic. See `### Disk cache`.
 
 ```bash
 # offline scan (verified: exit 0; npm fixture resolves Unknown offline with
@@ -187,6 +191,50 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm --for
 # checksum pin (verified: exit 0)
 sha256sum -c tools/spdx-db.sha256
 ```
+
+### Disk cache (`--cache-dir` / `--no-cache` / `--refresh-cache` / `--cache-ttl-days`)
+
+License resolutions persist across runs in a JSON disk cache (`cache.json`), so a repeat scan skips HTTP for entries still within TTL. Within a run the in-memory L1 still serves first; disk is the L2 (lookup order memory → disk → resolve). Root + `generate` both accept all four flags with identical behavior.
+
+- Location: `--cache-dir <dir>` names a directory; the implementation appends `cache.json` (`<dir>/cache.json`). Precedence is flag > `OLAF_CACHE_DIR` > `XDG_CACHE_HOME` > OS fallback:
+
+| Source | Directory |
+|---|---|
+| `--cache-dir <dir>` | `<dir>/cache.json` (a present flag wins over everything) |
+| `OLAF_CACHE_DIR` | `$OLAF_CACHE_DIR/cache.json` |
+| `XDG_CACHE_HOME` | `$XDG_CACHE_HOME/olaf/cache.json` — when set and non-empty it wins on ALL OSes (not Linux-only) |
+| OS fallback | Linux `~/.cache/olaf/cache.json`; Windows `%LOCALAPPDATA%/olaf/cache.json`; macOS `~/Library/Caches/olaf/cache.json` |
+
+- TTL / store rules: `Resolved` entries live `--cache-ttl-days` (default `30`; must be a positive integer — missing/invalid → exit `2`); the flag scales ONLY `Resolved` entries, `Unknown`/not-found stays `1` day. Expiry is `age >= ttl`, so an entry exactly at TTL counts as expired (expiry evicts L1+L2). Transport/timeout/resolver-error results are never cached (reason prefixes `timeout:` / `transport-error:` / `offline-cache-miss` / `resolver-error:`). Keys normalize `Trim` + lowercase with `pypi`→`pip` unification (`CacheKey.Of`, e.g. `npm:lodash@4.17.21`). Entries with more than `1 MiB` of license text skip persist; `Enrichment` persists whole-or-null (omit-null, never re-scraped); `etag` is stored-but-unused.
+- Bypass / refresh: `--no-cache` skips reads AND writes; `--refresh-cache` skips reads but still writes. Both together → refresh wins (reads skipped, writes on).
+- Corrupt / concurrency: a corrupt or unreadable cache file warns on stderr (`Warning: corrupt license cache '<path>': …; starting empty.`) and the scan continues — never exit `2`. A malformed `fetchedAt` evicts that entry only (the rest load). Writes are atomic (temp file + rename) and thread-safe, one store per resolution, so there is no save-at-end loss window.
+- Offline composition: `--offline` reads the disk first — a disk hit resolves with zero HTTP (order memory → disk → `offline-cache-miss`); a miss stays `Unknown` (exit `0`, or exit `1` with `--strict`). Online, a disk hit skips HTTP; a miss resolves over HTTP then stores. The cache sits OUTSIDE the `LicenseTextFetcher` chain, so fetch ordering is unchanged (the #77 chain-head rule holds).
+
+Example shape (synthetic illustration — the `olaf-seeded-pkg-78@1.2.3` seed rows below use an illustrative package name, not a real registry package; `…` below abbreviates the JSON-parser detail in the quoted warning):
+
+```bash
+# seed a cache entry (lowercase on-disk schema), then scan offline against it
+# (verified: exit 0, summary total=1 resolved=1 unknown=0, spdx MIT;
+# a second identical run is stdout byte-identical)
+printf '{"entries":{"npm:olaf-seeded-pkg-78@1.2.3":{"spdx":"MIT","licenseText":null,"sourceUrl":null,"status":"Resolved","reason":null,"fetchedAt":"<utc-stamp>","etag":null}}}' > "$CACHEDIR/cache.json" # synthetic seed row (package name illustrative)
+dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR"
+# same via env (verified: exit 0, resolved=1) or XDG (verified: exit 0, resolved=1)
+OLAF_CACHE_DIR="$CACHEDIR" dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline
+XDG_CACHE_HOME="$XDG" dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline
+# bypass reads+writes (verified: seeded MIT ignored, exit 1 with --strict, cache bytes untouched)
+dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR" --no-cache --strict
+# skip reads, force writes (verified: seeded MIT ignored, exit 0, Unknown)
+dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR" --refresh-cache
+# corrupt cache warns and continues (verified: exit 0, `Warning: corrupt license cache …` on stderr)
+printf 'NOT-JSON' > "$CACHEDIR/cache.json"
+dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --offline --cache-dir "$CACHEDIR"
+# bad TTL is a usage error (verified: exit 2, `Invalid --cache-ttl-days 'bogus': must be a positive integer number of days.`)
+dotnet run --project src/Olaf.Cli -- --input <fixture-dir> --format json --cache-ttl-days bogus
+# generate parity (verified: exit + stdout equal to the --input form)
+dotnet run --project src/Olaf.Cli -- generate <fixture-dir> --format json --offline --cache-dir "$CACHEDIR"
+```
+
+(`<fixture-dir>` is a temp dir holding a `package.json` that depends on the seeded package, `$CACHEDIR` a temp dir holding the seeded `cache.json`, `<utc-stamp>` a UTC timestamp e.g. `date -u +%Y-%m-%dT%H:%M:%SZ`; online second-run reuse — first run stores, second run skips HTTP — is pinned by unit tests with a throwing handler asserting zero sends, since live-network runs are not byte-stable.)
 
 Summary shape per format:
 
@@ -529,7 +577,7 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/packa
 |---|---|
 | `0` | Success (including non-`--strict` runs with `Unknown` licenses; `--help`/`--version` also `0`) |
 | `1` | `--strict` found unresolved/`Unknown` licenses, `--allow`/`--deny` policy-gate offenders, or `--rules` policy-file offenders (allow/deny/`failOnUnknown`/`failOnUnresolved` gates, expired exceptions; excludes-filtered list) |
-| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive`, missing `--template` file, template syntax error (`template error line <N>` on stderr), template render-cap exceeded, missing `--rules` file (`Rules file not found: '<path>'.`), rules YAML syntax error or schema error (`{file}:{line}:{col}` on stderr, before any report write) |
+| `2` | Usage/IO error: missing `--input`, input not found, unsupported `--format`/`--ecosystem`, `--out` exists without `--force`, invalid/missing `--max-image-mb`, invalid `--cache-ttl-days` (`Invalid --cache-ttl-days '<v>': must be a positive integer number of days.`), corrupt/truncated or non-image container tarball, scan/write failure, conflicting `--direct-only` + `--include-transitive`, missing `--template` file, template syntax error (`template error line <N>` on stderr), template render-cap exceeded, missing `--rules` file (`Rules file not found: '<path>'.`), rules YAML syntax error or schema error (`{file}:{line}:{col}` on stderr, before any report write) |
 
 ## Output contract
 
@@ -547,7 +595,7 @@ dotnet run --project src/Olaf.Cli -- --input tests/Olaf.Tests/Fixtures/npm/packa
 - Encoding chain (never throws): UTF-8 BOM → UTF-16 BE/LE BOM → UTF-8 strict → Windows-1252 fallback, NULs stripped; whitespace-only decodes keep hunting.
 - Fallback chain (pinned): tarball-file text > `licenseUrl` fetch > embedded DB text > null. Non-`http(s)` license URLs are skipped with zero HTTP. Reason vocabulary (existing `prefix: detail` style): `tarball-miss:<detail>` (`not-found`, `status-<n>`, `transport`, `archive-error`, `no-license-file`) · `tarball-timeout` · `tarball-too-large:<bytes>` · `licenseurl-fetch-failed:<status|timeout|transport|empty>` · `spdxdb-miss:<id>`. First-failure wins: the first stage that fails pins `Reason`; later stages are still attempted for text but never overwrite it — every null-text `Resolved` carries a reason (no silent null). Caller cancellation (`OperationCanceledException` on the caller's token) is always rethrown, never swallowed.
 - Curated DB subset (35 ids, pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`, ~225KB of the ~500KB max): `MIT`, `Apache-2.0`, `Apache-1.1`, `ISC`, `BSD-2-Clause`, `BSD-3-Clause`, `BSD-4-Clause`, `GPL-1.0-only`, `GPL-2.0-only`, `GPL-3.0-only`, `GPL-2.0-or-later`, `GPL-3.0-or-later`, `LGPL-2.0-only`, `LGPL-2.1-only`, `LGPL-3.0-only`, `LGPL-2.1-or-later`, `LGPL-3.0-or-later`, `AGPL-1.0-only`, `AGPL-3.0-only`, `AGPL-3.0-or-later`, `MPL-1.0`, `MPL-1.1`, `MPL-2.0`, `CDDL-1.0`, `EPL-1.0`, `EPL-2.0`, `Unlicense`, `CC0-1.0`, `Artistic-2.0`, `AAL`, `MIT-0`, `BSL-1.0`, `Zlib`, `OFL-1.1`, `0BSD` (subset list mirrored in the `SpdxLicenseTexts.cs` comment; historical stubs kept byte-identical). The embedded offline DB + refresh script shipped in issue #77 (see `### Offline / air-gap`) — no runtime download-at-scan here. The DB path is air-gap safe: pure in-memory dictionary via `SpdxLicenseDb.TryGetText` (primary) + `SpdxLicenseTexts.TryGetText` (seed fallback), zero HTTP (no `HttpClient` in either file).
-- Cache: in-memory only — the whole record including text rides the existing `CachingLicenseResolver`; `Unknown` (including text-stage failures) stays uncached. Disk cache is owned by issue #78: no disk code here by design.
+- Cache: the whole record including text rides `CachingLicenseResolver` (in-memory L1 + disk L2 — see `### Disk cache`); `Unknown` (including text-stage failures) stays uncached in L1, and transport/timeout/resolver-error results never reach disk.
 - No new text-stage flags, no new text-stage exit codes: text-stage failures surface as `Unknown` + reason, never throw (the `--offline` flag itself shipped in issue #77 — see `### Offline / air-gap`):
 
 ```bash

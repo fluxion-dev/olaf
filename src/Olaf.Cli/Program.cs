@@ -39,6 +39,22 @@ var offlineOption = new Option<bool>("--offline")
 {
     Description = "Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)",
 };
+var cacheDirOption = new Option<string?>("--cache-dir")
+{
+    Description = "Directory for the persistent license-resolution cache (cache.json is appended; overrides OLAF_CACHE_DIR, XDG_CACHE_HOME, and the OS default)",
+};
+var noCacheOption = new Option<bool>("--no-cache")
+{
+    Description = "Bypass the persistent license cache (no reads, no writes)",
+};
+var refreshCacheOption = new Option<bool>("--refresh-cache")
+{
+    Description = "Skip cache reads and force fresh writes (wins over --no-cache)",
+};
+var cacheTtlDaysOption = new Option<string?>("--cache-ttl-days")
+{
+    Description = "Resolved-entry TTL in days (default: 30; must be a positive integer; scales Resolved only, not-found stays 1 day)",
+};
 var ecosystemOption = new Option<string?>("--ecosystem")
 {
     Description = $"Limit scan to ecosystem: {SupportedEcosystems} (pypi alias for pip)",
@@ -114,6 +130,10 @@ var rootCommand = new RootCommand($"""
     forceOption,
     strictOption,
     offlineOption,
+    cacheDirOption,
+    noCacheOption,
+    refreshCacheOption,
+    cacheTtlDaysOption,
     allowOption,
     denyOption,
     rulesOption,
@@ -148,6 +168,11 @@ async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationTok
     var rulesPath = o.RulesPath;
     // Issue #77: offline resolves from the embedded DB only (no network).
     var offline = o.Offline;
+    // Issue #78: cache controls (B2/B3).
+    var cacheDir = o.CacheDir;
+    var noCache = o.NoCache;
+    var refreshCache = o.RefreshCache;
+    var cacheTtlDaysRaw = o.CacheTtlDaysRaw;
     // Issue #75: flag "presence" is token-presence (even an empty --allow ""
     // replaces the file list for that key). String options consume value
     // tokens; bool --strict takes none, so presence uses IsImplicit.
@@ -248,6 +273,23 @@ async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationTok
     {
         Console.Error.WriteLine("Conflicting flags: --direct-only and --include-transitive cannot be used together.");
         return 2;
+    }
+
+    // Issue #78 (B2): --cache-ttl-days scales ONLY Resolved entries
+    // (not-found stays 1d). Invalid values are usage/config errors (exit 2).
+    var resolvedTtlDays = 30;
+    if (cacheTtlDaysRaw is not null)
+    {
+        if (!int.TryParse(
+                cacheTtlDaysRaw,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out resolvedTtlDays)
+            || resolvedTtlDays <= 0)
+        {
+            Console.Error.WriteLine($"Invalid --cache-ttl-days '{cacheTtlDaysRaw}': must be a positive integer number of days.");
+            return 2;
+        }
     }
 
     if (maxImageMbRaw is not null)
@@ -423,7 +465,24 @@ async Task<int> ScanAndReportAsync(ScanOpts o, CancellationToken cancellationTok
     {
         Timeout = TimeSpan.FromSeconds(10),
     };
-    var cacheResolver = new CachingLicenseResolver(http, offline: offline);
+    // Issue #78 (B3/B5): persistent L2 disk cache. Precedence for the cache
+    // directory: --cache-dir > OLAF_CACHE_DIR > XDG_CACHE_HOME > OS fallback
+    // (see DiskLicenseCache.ResolveFilePath). --no-cache bypasses reads AND
+    // writes; --refresh-cache skips reads but forces writes. Both flags
+    // together: refresh wins (the cache stays enabled, reads skipped).
+    var effectiveNoCache = noCache && !refreshCache;
+    DiskLicenseCache? disk = null;
+    if (!effectiveNoCache)
+    {
+        disk = new DiskLicenseCache(DiskLicenseCache.ResolveFilePath(cacheDir));
+    }
+
+    var cacheResolver = new CachingLicenseResolver(
+        http,
+        offline: offline,
+        disk: disk,
+        resolvedTtl: TimeSpan.FromDays(resolvedTtlDays),
+        refreshCache: refreshCache);
     var fallbackResolver = new ClearlyDefinedFallbackResolver(http);
 
     using var concurrency = new SemaphoreSlim(8);
@@ -728,7 +787,11 @@ ScanOpts ReadScanOpts(ParseResult parseResult, string? inputOverride, bool allow
         DenyFlagPresent: parseResult.GetResult(denyOption)?.Tokens.Count > 0,
         FormatFlagPresent: parseResult.GetResult(formatOption)?.Tokens.Count > 0,
         AllowEmpty: allowEmpty,
-        Offline: parseResult.GetValue(offlineOption));
+        Offline: parseResult.GetValue(offlineOption),
+        CacheDir: parseResult.GetValue(cacheDirOption),
+        NoCache: parseResult.GetValue(noCacheOption),
+        RefreshCache: parseResult.GetValue(refreshCacheOption),
+        CacheTtlDaysRaw: parseResult.GetValue(cacheTtlDaysOption));
 }
 
 rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancellationToken) =>
@@ -755,6 +818,10 @@ var generateCommand = new Command("generate", """
     forceOption,
     strictOption,
     offlineOption,
+    cacheDirOption,
+    noCacheOption,
+    refreshCacheOption,
+    cacheTtlDaysOption,
     allowOption,
     denyOption,
     rulesOption,
@@ -811,4 +878,8 @@ internal sealed record ScanOpts(
     bool DenyFlagPresent,
     bool FormatFlagPresent,
     bool AllowEmpty,
-    bool Offline = false);
+    bool Offline = false,
+    string? CacheDir = null,
+    bool NoCache = false,
+    bool RefreshCache = false,
+    string? CacheTtlDaysRaw = null);
