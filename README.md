@@ -101,36 +101,9 @@ Dedup (registry): same `(ecosystem, name, version)` triple from manifest + lock 
 
 ## License Coverage
 
-This project provides SPDX license mapping for the following licenses:
+This project provides SPDX license mapping for 35 ids — the authoritative subset list lives under `## License text` below (pinned to `SPDX License List 3.29`, `license-list-data` tag `v3.29.0`).
 
-| License | SPDX ID | Description |
-|---------|----------|-------------|
-| MIT | MIT | MIT License |
-| Apache License 2.0 | Apache-2.0 | Apache License Version 2.0 |
-| Apache License 1.1 | Apache-1.1 | Apache License Version 1.1 |
-| ISC | ISC | ISC License |
-| BSD 2-Clause | BSD-2-Clause | BSD 2-Clause License |
-| BSD 3-Clause | BSD-3-Clause | BSD 3-Clause License |
-| BSD 4-Clause | BSD-4-Clause | Original BSD License |
-| GNU General Public License v1.0 | GPL-1.0-only | GNU General Public License Version 1.0 |
-| GNU General Public License v2.0 | GPL-2.0-only | GNU General Public License Version 2.0 |
-| GNU General Public License v3.0 | GPL-3.0-only | GNU General Public License Version 3.0 |
-| GNU Lesser General Public License v2.0 | LGPL-2.0-only | GNU Lesser General Public License Version 2.0 |
-| GNU Lesser General Public License v2.1 | LGPL-2.1-only | GNU Lesser General Public License Version 2.1 |
-| GNU Lesser General Public License v3.0 | LGPL-3.0-only | GNU Lesser General Public License Version 3.0 |
-| GNU Affero General Public License v1.0 | AGPL-1.0-only | GNU AFFERO General Public License Version 1.0 |
-| GNU Affero General Public License v3.0 | AGPL-3.0-only | GNU AFFERO General Public License Version 3.0 |
-| Mozilla Public License v1.0 | MPL-1.0 | Mozilla Public License Version 1.0 |
-| Mozilla Public License v1.1 | MPL-1.1 | Mozilla Public License Version 1.1 |
-| Mozilla Public License v2.0 | MPL-2.0 | Mozilla Public License Version 2.0 |
-| CDDL License v1.0 | CDDL-1.0 | Common Development and Distribution License |
-| Eclipse Public License v1.0 | EPL-1.0 | Eclipse Public License v1.0 |
-| Unlicense | Unlicense | Unlicense |
-| CC0 1.0 Universal | CC0-1.0 | CC0 1.0 Universal |
-| Artistic License 2.0 | Artistic-2.0 | Artistic License 2.0 |
-| Attribution Assurance License | AAL | Attribution Assurance License |
-
-The SPDX IDs are available through `SpdxMapper.Normalize()` and `SpdxLicenseTexts.GetText()` for license text retrieval.
+The SPDX IDs are available through `SpdxMapper.Normalize()`, and for text via `SpdxLicenseTexts.GetText()` (fallback stub on miss) vs `SpdxLicenseTexts.TryGetText()` (hit-miss gate used by the fetcher).
 
 Summary shape per format:
 

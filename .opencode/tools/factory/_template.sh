@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.3"
+VERSION="0.2.4"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -148,6 +148,34 @@ KEEP_TEMP=0
 # }
 # # call site (replaces the inline for-f loop):  r1_matrix_regression
 # # narrowed call site (documents deliberate narrowing):  r1_matrix_regression json yaml
+
+# ---- Canonical air-gap grep (copy-paste; then call) ----
+# Requires (define live alongside): air_gap_grep <file> [extra-pattern...]
+#   writing nothing; exit 0 = clean (air-gap holds), 1 = HTTP surface found,
+#   2 = missing file. Strips //-comment lines before matching so
+#   doc-only mentions (e.g. "// no HttpClient here") never trip the arm.
+#   Default vocab: HttpClient|GetAsync|System\.Net|HttpRequest|GetByteArray|SendAsync.
+#   Extra args are OR-ed into the vocab (BRE-escaped by caller if needed).
+# Canonical source promoted to template 0.2.4 after 2nd family use
+#   (license-text-probe.sh L3 air-gap arm — hand-rolled grep -v + grep -q
+#   pair refactored to call this function live; default vocab widened with
+#   GetByteArray|SendAsync for forward coverage, behavior identical on old hits).
+#   Back-ported: license-text-probe.sh now calls this exact function live.
+# air_gap_grep() {
+#   local file="$1"; shift
+#   [[ -f "$file" ]] || return 2
+#   local vocab='HttpClient|GetAsync|System\.Net|HttpRequest|GetByteArray|SendAsync'
+#   local p
+#   for p in "$@"; do vocab="$vocab|$p"; done
+#   if grep -v '^[[:space:]]*//' "$file" | grep -qE -- "$vocab"; then
+#     return 1
+#   fi
+#   return 0
+# }
+# # call site (replaces the inline grep-v | grep-q pair):
+# #   if air_gap_grep "$DB"; then pass "air-gap safe (pure in-memory, zero HTTP)"; else fail_msg "HTTP surface found (air-gap broken)"; fi
+# # widened call site (documents deliberate widening):
+# #   if air_gap_grep "$DB" 'MyCustomSender'; then pass "..."; else fail_msg "..."; fi
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"

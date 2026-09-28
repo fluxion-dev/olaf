@@ -6,10 +6,10 @@
 # Check 2 WARN (exit 0): `catch ... when ... FileNotFound` without a trailing
 #   `// allowlist:` comment on the same line.
 # Check 3 FAIL (exit 1): every `catch (IOException)` in src/Olaf.Parsers +
-#   src/Olaf.Cli (*.cs, obj/bin excluded) not followed within 3 lines by a
-#   CS0160 covering comment (grep for 0160|inheritance|never catch).
+#   src/Olaf.Cli + src/Olaf.Resolvers (*.cs, obj/bin excluded) not followed
+#   within 3 lines by a CS0160 covering comment (grep for 0160|inheritance|never catch).
 #   `when`-guarded catches are exempt from check 3 — audited by check 2 instead.
-VERSION="0.1.0"
+VERSION="0.1.1"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -42,7 +42,7 @@ if [[ "${1:-}" == "--help" ]]; then
   echo "or DirectoryNotFoundException (CS0160 re-introduction); WARNs on"
   echo "\`catch ... when ... FileNotFound\` guards lacking a trailing"
   echo "\`// allowlist:\` comment; FAILs per \`catch (IOException)\` in"
-  echo "src/Olaf.Parsers + src/Olaf.Cli not followed within 3 lines by a"
+  echo "src/Olaf.Parsers + src/Olaf.Cli + src/Olaf.Resolvers not followed within 3 lines by a"
   echo "CS0160 covering comment (0160|inheritance|never catch)."
   echo "Exit 0 = OK (or WARN-only); 1 = guard violation; 2 = usage/IO error."
   echo "Example: ./.opencode/tools/factory/catch-guard-probe.sh"
@@ -91,7 +91,7 @@ fi
 
 echo "--- Check 3 (FAIL): catch (IOException) sites need CS0160 covering comment ---"
 PAT3='catch\s*\(\s*IOException'
-C3="$("${GREP_BASE[@]}" "$PAT3" "$ROOT/src/Olaf.Parsers" "$ROOT/src/Olaf.Cli" || true)"
+C3="$("${GREP_BASE[@]}" "$PAT3" "$ROOT/src/Olaf.Parsers" "$ROOT/src/Olaf.Cli" "$ROOT/src/Olaf.Resolvers" || true)"
 if [[ -z "$C3" ]]; then
   pass "no catch (IOException) sites found (unexpected — check scope)"
 else
