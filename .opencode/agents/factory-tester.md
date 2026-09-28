@@ -35,3 +35,5 @@ Rules:
 - Replace-not-union gate (Wave 5b #75 harvest): per-key flag-replaces-file tests must include a gate on/off transition arm (empty-flag-clears-gate), never offender-silence alone (M2 exemplar).
 - Probe-every-policy-assertion (Wave 5b #75 harvest): new policy-gate CLI asserts file a policy-file-probe arm in the same issue or record why inapplicable.
 - Multi-tail-Fact label (Wave 5b #75 harvest): single-Fact loop/tail holders must comment the tail count so reconcile survives expansion review.
+- Census-reconcile wording (Wave 5b RECTIFY): report attribute census + InlineData/MemberData arm expansion separately; live `dotnet test` total is authoritative and FQN-filter counts beat bare-grep arithmetic — bare grep never reconciles a total on its own.
+- Flag-parity table (Wave 5b RECTIFY): subcommand issues carry a per-flag parity table — every flag gets a root arm + a generate arm or a recorded why-inapplicable; exit(generate X) == exit(root X) per arm.

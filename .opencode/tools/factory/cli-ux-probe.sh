@@ -14,12 +14,13 @@
 #   rules-missing (--rules nofile)        -> 2 + Rules-file-not-found stderr
 #   generate-default (empty dir)          -> 0 + empty SBOM (total 0)
 #   generate-fixture (fixture parity)     -> exit + total match legacy --input
+#   generate-cdx-parity (cdx parity)      -> normalized byte-identical vs legacy --input
 #   generate-bad-format (--format bogus)  -> 2
 #   generate-missing (nonexistent path)   -> 2 + Input-not-found stderr
 # Split: successful --out run must have empty stdout (report -> file only).
 # Help: --help output mentions --template, --rules, generate + olaf-generate examples (additive, --input check untouched).
 # Rules: repo-relative, idempotent (temp files cleaned), no secrets.
-VERSION="0.5.0"
+VERSION="0.5.1"
 set -euo pipefail
 
 TIMEOUT_SECS=60
@@ -53,6 +54,7 @@ Checks:
   template-badsyntax->2 (+ line-N stderr)
   rules-missing->2 (+ Rules-file-not-found stderr)
   generate-default->0 (+ empty SBOM total 0) | generate-fixture parity (exit + total)
+  generate-cdx-parity (normalized byte-identical vs legacy --input)
   generate-bad-format->2 | generate-missing->2 (+ Input-not-found stderr)
   help mentions generate + olaf-generate examples
   split: --out run has empty stdout
@@ -144,6 +146,17 @@ mkphantom() {
   local d="$1"
   mkdir -p "$d"
   printf '{\n  "name": "olaf-ux-strict-probe",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$PHANTOM_VER" > "$d/package.json"
+}
+
+# ---- Canonical cdx_normalize (from _template.sh 0.2.8; live) ----
+cdx_normalize() {
+  local f="$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq 'del(.serialNumber, .metadata.timestamp)' "$f"
+  else
+    sed -e 's/"serialNumber"[[:space:]]*:[[:space:]]*"[^"]*"/"serialNumber":"NORMALIZED"/g' \
+        -e 's/"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"/"timestamp":"NORMALIZED"/g' "$f"
+  fi
 }
 
 echo "== cli-ux-probe v$VERSION =="
@@ -300,6 +313,21 @@ if [[ -n "$GEN_TOTAL" && "$GEN_TOTAL" == "$LEG_TOTAL" ]]; then
   pass "generate-fixture" "parity total $GEN_TOTAL"
 else
   fail "generate-fixture" "total mismatch generate=${GEN_TOTAL:-?} legacy=${LEG_TOTAL:-?}"
+fi
+
+# generate-cdx-parity: same fixture via generate vs legacy --input in
+# cyclonedx-json -> normalized byte-compare (serialNumber Guid.NewGuid() +
+# metadata timestamp DateTime.UtcNow are per-run; cdx_normalize strips both
+# via jq del, sed NORMALIZED-rewrite fallback). Mirrors unit
+# Should_MatchRootStdout_When_GenerateVsInputCycloneDxJson.
+run_cli "generate-cdx" 0 generate "$FIXTURE" --format cyclonedx-json || true
+run_cli "parity-cdx" 0 --input "$FIXTURE" --format cyclonedx-json || true
+cdx_normalize "$WORKDIR/generate-cdx.stdout" > "$WORKDIR/generate-cdx.normalized"
+cdx_normalize "$WORKDIR/parity-cdx.stdout" > "$WORKDIR/parity-cdx.normalized"
+if cmp -s "$WORKDIR/generate-cdx.normalized" "$WORKDIR/parity-cdx.normalized"; then
+  pass "generate-cdx-parity" "normalized byte-identical"
+else
+  fail "generate-cdx-parity" "normalized mismatch (diff head: $(diff "$WORKDIR/generate-cdx.normalized" "$WORKDIR/parity-cdx.normalized" | head -c 200 | tr '\n' ' '))"
 fi
 
 # generate-bad-format: bogus format -> 2 + Unsupported-format stderr

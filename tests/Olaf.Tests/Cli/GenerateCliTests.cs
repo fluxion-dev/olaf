@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -15,63 +14,6 @@ namespace Olaf.Tests.Cli;
 /// </summary>
 public sealed class GenerateCliTests
 {
-    private static CliResult RunCliInDir(string workDir, params string[] args)
-    {
-        var dll = CliTestHelpers.GetCliDllPath();
-        var psi = new ProcessStartInfo
-        {
-            FileName = "dotnet",
-            WorkingDirectory = workDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
-        psi.ArgumentList.Add(dll);
-        foreach (var a in args)
-        {
-            psi.ArgumentList.Add(a);
-        }
-
-        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start CLI process.");
-        var stdout = proc.StandardOutput.ReadToEnd();
-        var stderr = proc.StandardError.ReadToEnd();
-        if (!proc.WaitForExit(120_000))
-        {
-            try
-            {
-                proc.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-            }
-
-            throw new TimeoutException("CLI did not exit within 120s.");
-        }
-
-        return new CliResult(proc.ExitCode, stdout ?? string.Empty, stderr ?? string.Empty);
-    }
-
-    private static int JsonTotal(string stdout)
-    {
-        using var doc = JsonDocument.Parse(stdout);
-        return doc.RootElement.GetProperty("summary").GetProperty("total").GetInt32();
-    }
-
-    private static string CreateMonorepoFixture()
-    {
-        // Exact CanHandle filenames: package.json (npm), requirements.txt (pip).
-        // Caller owns cleanup via DeleteTempDir (try/finally).
-        var root = CliTestHelpers.CreateTempDir();
-        var svcA = Path.Combine(root, "svc-a");
-        var svcB = Path.Combine(root, "svc-b");
-        Directory.CreateDirectory(svcA);
-        Directory.CreateDirectory(svcB);
-        File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
-        File.Copy(CliTestHelpers.FixturePath("pip", "requirements.txt"), Path.Combine(svcB, "requirements.txt"));
-        return root;
-    }
-
     private static string NormalizedCycloneDx(string stdout)
     {
         var node = JsonNode.Parse(stdout) ?? throw new InvalidOperationException("Empty CycloneDX output.");
@@ -144,7 +86,7 @@ public sealed class GenerateCliTests
         {
             File.Copy(CliTestHelpers.FixturePath("npm", "package.json"), Path.Combine(tempDir, "package.json"));
 
-            var result = RunCliInDir(tempDir, "generate", "--format", "json");
+            var result = CliTestHelpers.RunCli(workDir: tempDir, args: ["generate", "--format", "json"]);
 
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
@@ -192,7 +134,7 @@ public sealed class GenerateCliTests
 
             Assert.Equal(0, result.ExitCode);
             using var doc = JsonDocument.Parse(result.Stdout); // valid envelope
-            Assert.Equal(0, JsonTotal(result.Stdout));
+            Assert.Equal(0, CliTestHelpers.JsonTotal(result.Stdout));
         }
         finally
         {
@@ -287,7 +229,7 @@ public sealed class GenerateCliTests
     [Fact]
     public void Should_ReportSumOfParts_When_GenerateMonorepoRoot()
     {
-        var root = CreateMonorepoFixture();
+        var root = CliTestHelpers.CreateMixedNpmPipFixtureDir();
         try
         {
             var svcA = Path.Combine(root, "svc-a");
@@ -300,7 +242,7 @@ public sealed class GenerateCliTests
             Assert.Equal(0, whole.ExitCode);
             Assert.Equal(0, partA.ExitCode);
             Assert.Equal(0, partB.ExitCode);
-            Assert.Equal(JsonTotal(partA.Stdout) + JsonTotal(partB.Stdout), JsonTotal(whole.Stdout));
+            Assert.Equal(CliTestHelpers.JsonTotal(partA.Stdout) + CliTestHelpers.JsonTotal(partB.Stdout), CliTestHelpers.JsonTotal(whole.Stdout));
         }
         finally
         {
@@ -428,7 +370,7 @@ public sealed class GenerateCliTests
 
             Assert.Equal(0, result.ExitCode);
             Assert.Contains("express", result.Stdout, StringComparison.Ordinal);
-            Assert.NotEqual(0, JsonTotal(result.Stdout)); // fixture won, not the empty PATH
+            Assert.NotEqual(0, CliTestHelpers.JsonTotal(result.Stdout)); // fixture won, not the empty PATH
         }
         finally
         {
@@ -441,7 +383,7 @@ public sealed class GenerateCliTests
     {
         // Strengthens the sum-of-parts pin: the whole-tree report must name
         // deps from EACH subtree ecosystem (npm express + pip requests).
-        var root = CreateMonorepoFixture();
+        var root = CliTestHelpers.CreateMixedNpmPipFixtureDir();
         try
         {
             var whole = CliTestHelpers.RunCli("generate", root, "--format", "json");
@@ -478,5 +420,18 @@ public sealed class GenerateCliTests
         {
             CliTestHelpers.DeleteTempDir(tempDir);
         }
+    }
+
+    [Fact]
+    public void Should_Exit1_When_BarePositionalWithoutSubcommand()
+    {
+        // Bare-positional rejection pin (mirrors cli-ux-probe.sh bare-path
+        // arm): a positional path with no subcommand is not routed to
+        // generate — root rejects it with exit 1 + Unrecognized command.
+        // Users must spell `generate .` explicitly. Offline, no fixture.
+        var result = CliTestHelpers.RunCli(".");
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("Unrecognized command", result.Stderr, StringComparison.Ordinal);
     }
 }

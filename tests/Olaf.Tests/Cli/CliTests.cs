@@ -58,7 +58,15 @@ internal static class CliTestHelpers
         throw new NotImplementedException("Olaf.Cli.dll not built (missing CLI implementation).");
     }
 
-    internal static CliResult RunCli(params string[] args)
+    // Params-only overload preserves every existing call site unchanged: a
+    // single string argument never converts to string[] and longer argument
+    // lists exceed the workDir overload's arity, so none of those calls can
+    // bind to it. Directory-scoped runs pass args as an array (named).
+    internal static CliResult RunCli(params string[] args) => RunCliCore(null, args);
+
+    internal static CliResult RunCli(string? workDir, string[] args) => RunCliCore(workDir, args);
+
+    private static CliResult RunCliCore(string? workDir, string[] args)
     {
         var dll = GetCliDllPath();
         var psi = new ProcessStartInfo
@@ -69,6 +77,11 @@ internal static class CliTestHelpers
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        if (workDir is not null)
+        {
+            psi.WorkingDirectory = workDir;
+        }
+
         psi.ArgumentList.Add(dll);
         foreach (var a in args)
         {
@@ -145,6 +158,48 @@ internal static class CliTestHelpers
         File.Copy(FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
         File.Copy(FixturePath("npm", "package-lock.json"), Path.Combine(svcB, "package-lock.json"));
         return root;
+    }
+
+    /// <summary>
+    /// Mixed npm+pip monorepo fixture shared by the generate CLI tests and
+    /// the cross-ecosystem CLI test: svc-a/package.json + svc-b/requirements.txt
+    /// (exact CanHandle filenames). Null contents copy the committed fixtures
+    /// (offline); callers may pass phantom contents for deterministic
+    /// Unknown-tolerant asserts. Caller owns cleanup via DeleteTempDir
+    /// (try/finally). (The npm+lock variant CreateMixedNpmFixtureDir stays distinct.)
+    /// </summary>
+    internal static string CreateMixedNpmPipFixtureDir(string? packageJsonContent = null, string? requirementsContent = null)
+    {
+        var root = CreateTempDir();
+        var svcA = Path.Combine(root, "svc-a");
+        var svcB = Path.Combine(root, "svc-b");
+        Directory.CreateDirectory(svcA);
+        Directory.CreateDirectory(svcB);
+        if (packageJsonContent is null)
+        {
+            File.Copy(FixturePath("npm", "package.json"), Path.Combine(svcA, "package.json"));
+        }
+        else
+        {
+            File.WriteAllText(Path.Combine(svcA, "package.json"), packageJsonContent);
+        }
+
+        if (requirementsContent is null)
+        {
+            File.Copy(FixturePath("pip", "requirements.txt"), Path.Combine(svcB, "requirements.txt"));
+        }
+        else
+        {
+            File.WriteAllText(Path.Combine(svcB, "requirements.txt"), requirementsContent);
+        }
+
+        return root;
+    }
+
+    internal static int JsonTotal(string stdout)
+    {
+        using var doc = JsonDocument.Parse(stdout);
+        return doc.RootElement.GetProperty("summary").GetProperty("total").GetInt32();
     }
 }
 

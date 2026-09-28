@@ -103,8 +103,7 @@ public sealed class PolicyFileCliTests
             Assert.Contains("1 offender(s) found", result.Stderr, StringComparison.Ordinal);
             // Report-write-first: the JSON report is still written on exit 1.
             Assert.False(string.IsNullOrWhiteSpace(result.Stdout));
-            using var doc = JsonDocument.Parse(result.Stdout);
-            Assert.Equal(1, doc.RootElement.GetProperty("summary").GetProperty("total").GetInt32());
+            Assert.Equal(1, CliTestHelpers.JsonTotal(result.Stdout));
         }
         finally
         {
@@ -405,14 +404,13 @@ public sealed class PolicyFileCliTests
             // set, exit 0, total 0 in the written report.
             Assert.Equal(0, result.ExitCode);
             using var doc = JsonDocument.Parse(result.Stdout);
-            Assert.Equal(0, doc.RootElement.GetProperty("summary").GetProperty("total").GetInt32());
+            Assert.Equal(0, CliTestHelpers.JsonTotal(result.Stdout));
             Assert.Equal(0, doc.RootElement.GetProperty("licenses").GetArrayLength());
 
             // Intersect tail: --ecosystem npm + file exclude npm -> empty set.
             var scoped = CliTestHelpers.RunCli("--input", dir, "--format", "json", "--rules", rules, "--ecosystem", "npm");
             Assert.Equal(0, scoped.ExitCode);
-            using var scopedDoc = JsonDocument.Parse(scoped.Stdout);
-            Assert.Equal(0, scopedDoc.RootElement.GetProperty("summary").GetProperty("total").GetInt32());
+            Assert.Equal(0, CliTestHelpers.JsonTotal(scoped.Stdout));
         }
         finally
         {

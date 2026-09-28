@@ -10,13 +10,6 @@ namespace Olaf.Tests.Cli;
 /// </summary>
 public sealed class TransitiveFilterMarginCliTests
 {
-    private static int TotalOf(CliResult result)
-    {
-        Assert.Equal(0, result.ExitCode);
-        using var doc = JsonDocument.Parse(result.Stdout);
-        return doc.RootElement.GetProperty("summary").GetProperty("total").GetInt32();
-    }
-
     [Fact]
     public void Should_ReportZeroTotal_When_DirectOnlyOnAllTransitiveInput()
     {
@@ -40,7 +33,8 @@ public sealed class TransitiveFilterMarginCliTests
 
         var result = CliTestHelpers.RunCli("--input", input, "--format", "json", "--direct-only");
 
-        Assert.Equal(4, TotalOf(result));
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(4, CliTestHelpers.JsonTotal(result.Stdout));
     }
 
     [Fact]
@@ -88,9 +82,12 @@ public sealed class TransitiveFilterMarginCliTests
             var directOnly = CliTestHelpers.RunCli("--input", root, "--format", "json", "--direct-only");
             var includeTransitive = CliTestHelpers.RunCli("--input", root, "--format", "json", "--include-transitive");
 
-            Assert.Equal(6, TotalOf(@default));
-            Assert.Equal(4, TotalOf(directOnly));
-            Assert.Equal(6, TotalOf(includeTransitive));
+            Assert.Equal(0, @default.ExitCode);
+            Assert.Equal(0, directOnly.ExitCode);
+            Assert.Equal(0, includeTransitive.ExitCode);
+            Assert.Equal(6, CliTestHelpers.JsonTotal(@default.Stdout));
+            Assert.Equal(4, CliTestHelpers.JsonTotal(directOnly.Stdout));
+            Assert.Equal(6, CliTestHelpers.JsonTotal(includeTransitive.Stdout));
 
             // The direct-only set is exactly the direct subset of the default set.
             static HashSet<string> DirectKeys(string stdout)

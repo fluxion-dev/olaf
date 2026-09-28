@@ -14,20 +14,20 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 794 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.1` is required — unpinned install fails for prerelease versions. Tests: 795 passing (`dotnet test`).
 
 ## Usage
 
 Quickstart (zero-config; both verified offline — exit `0`):
 
 ```bash
-# default PATH `.`, json report to stdout
-dotnet run --project src/Olaf.Cli -- generate .
-# same, pinned to the offline npm fixture (reason strings vary with network, so never golden-match them)
+# pinned to the offline npm fixture (reason strings vary with network, so never golden-match them)
 dotnet run --project src/Olaf.Cli -- generate tests/Olaf.Tests/Fixtures/npm --format json
+# default PATH `.` scans cwd, json report to stdout (output varies per project)
+dotnet run --project src/Olaf.Cli -- generate .
 ```
 
-Legacy `--input` form is preserved (same scanner, same flags):
+File/dir `--input` form (canonical file-input, same scanner, same flags):
 
 ```bash
 # stdout (default json)
@@ -104,8 +104,9 @@ Commands:
 - Flags: all root flags are inherited with identical behavior (`--format`, `--template`, `--out`, `--force`, `--strict`, `--allow`, `--deny`, `--rules`, `--direct-only`, `--include-transitive`, `--group-by-license`, `--ecosystem`, `--max-image-mb`, `--verbose`, `--quiet`). `--strict`/`--allow`/`--deny`/`--rules` gates see the same filtered set on both paths; a bad `--format` on `generate` exits `2` with no partial write, like root.
 - Bare `olaf .` is NOT supported: only `olaf generate .`. A bare positional without the subcommand stays a parse error (`Unrecognized command or argument '.'`, exit `1`).
 
+Further examples (`generate .` covered in Quickstart above):
+
 ```bash
-dotnet run --project src/Olaf.Cli -- generate .
 dotnet run --project src/Olaf.Cli -- generate ./svc --format cyclonedx-json
 dotnet run --project src/Olaf.Cli -- generate . --out sbom
 dotnet run --project src/Olaf.Cli -- generate --help

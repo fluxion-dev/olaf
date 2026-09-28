@@ -28,3 +28,4 @@ Wave 5b hardening (binding, threshold-HIT):
 - SBOM hash lexical pins: SBOM stories must pre-declare hash `algorithm`/`hashes[]` lexical form (e.g. SHA-512 vs SHA512 vs sha512) + stored-vs-emit normalization point — deviations get plan bindings, not post-hoc improvisation.
 - No vacuous secondary sorts: secondary sort keys on distinct-key groupings must be struck or justified at plan time (never carried as dead text).
 - Flag-overrides-file granularity: plan must state per-key REPLACE (present flag replaces that key only) vs UNION, plus allow-rescues-deny + strict-forces-failOnUnknown anchors (M3 pattern).
+- Subcommand-plan checklist (#76 harvest): for subcommand-inheriting-flags stories, plan requires (a) full exit-matrix rows (0/1/2 incl. empty-input fork), (b) input-precedence rule, (c) recursive/monorepo naming test, (d) --out file-bytes + stdout-empty asserts, (e) Theory-expansion count note.

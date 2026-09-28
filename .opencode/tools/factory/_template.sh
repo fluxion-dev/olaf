@@ -7,7 +7,7 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.7"
+VERSION="0.2.8"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -262,6 +262,39 @@ KEEP_TEMP=0
 # }
 # # call site (replaces the inline cat-heredoc package.json block):
 # #   PHANTOM="$WORKDIR/phantom"; mkphantom "$PHANTOM"
+
+# ---- Canonical cdx_normalize (copy-paste; then call) ----
+# cdx_normalize <file>: print CycloneDX JSON with per-run fields neutralized
+#   so generate-vs---input outputs byte-compare. jq path deletes
+#   .serialNumber + .metadata.timestamp (mirrors unit NormalizedCycloneDx in
+#   tests/Olaf.Tests/Cli/GenerateCliTests.cs, which pins both to NORMALIZED
+#   before Assert.Equal); sed fallback rewrites both values to NORMALIZED
+#   when jq is absent (CycloneDxFormatter emits single-line JSON so the
+#   line-oriented substitution holds; keep the g flag — envelope may repeat
+#   keys in nested components). Either path neutralizes per-run variance;
+#   byte-compare is valid as long as both sides use the same function.
+# Canonical source promoted to template 0.2.8 after 3rd family use
+#   (unit NormalizedCycloneDx + cli-ux-probe.sh generate-cdx-parity arm +
+#   future SBOM diffs — CycloneDxFormatter serialNumber Guid.NewGuid() +
+#   metadata timestamp DateTime.UtcNow make raw byte-compare flaky).
+#   Back-ported: cli-ux-probe.sh now carries this exact function live.
+# cdx_normalize() {
+#   local f="$1"
+#   if command -v jq >/dev/null 2>&1; then
+#     jq 'del(.serialNumber, .metadata.timestamp)' "$f"
+#   else
+#     sed -e 's/"serialNumber"[[:space:]]*:[[:space:]]*"[^"]*"/"serialNumber":"NORMALIZED"/g' \
+#         -e 's/"timestamp"[[:space:]]*:[[:space:]]*"[^"]*"/"timestamp":"NORMALIZED"/g' "$f"
+#   fi
+# }
+# # call site (replaces raw cmp of cyclonedx-json outputs):
+# #   cdx_normalize "$WORKDIR/generate-cdx.stdout" > "$WORKDIR/generate-cdx.normalized"
+# #   cdx_normalize "$WORKDIR/parity-cdx.stdout" > "$WORKDIR/parity-cdx.normalized"
+# #   if cmp -s "$WORKDIR/generate-cdx.normalized" "$WORKDIR/parity-cdx.normalized"; then
+# #     pass "generate-cdx-parity: normalized byte-identical"
+# #   else
+# #     fail_msg "generate-cdx-parity: normalized mismatch"
+# #   fi
 
 if [[ "${1:-}" == "--help" ]]; then
   echo "Usage: $(basename "$0") [options]"

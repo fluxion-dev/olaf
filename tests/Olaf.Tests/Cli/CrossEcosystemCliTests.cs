@@ -11,18 +11,6 @@ namespace Olaf.Tests.Cli;
 /// </summary>
 public sealed class CrossEcosystemCliTests
 {
-    private static string CreateMixedNpmPipFixtureDir()
-    {
-        var dir = CliTestHelpers.CreateTempDir();
-        File.WriteAllText(
-            Path.Combine(dir, "package.json"),
-            """{"name":"olaf-mixed-fixture","version":"1.0.0","dependencies":{"aaa-npm-phantom-olaf-xyz":"9.9.9","mmm-npm-phantom-olaf-xyz":"9.9.8"}}""");
-        File.WriteAllText(
-            Path.Combine(dir, "requirements.txt"),
-            "aaa-pip-phantom-olaf-xyz==9.9.7\nmmm-pip-phantom-olaf-xyz==9.9.6\n");
-        return dir;
-    }
-
     private static string? GetEcosystem(JsonElement entry) => entry.GetProperty("ecosystem").GetString();
 
     private static string? GetName(JsonElement entry) => entry.GetProperty("name").GetString();
@@ -48,7 +36,9 @@ public sealed class CrossEcosystemCliTests
     [Fact]
     public void Should_IdentifySortAndCount_When_MixedNpmPipDir()
     {
-        var fixtureDir = CreateMixedNpmPipFixtureDir();
+        var fixtureDir = CliTestHelpers.CreateMixedNpmPipFixtureDir(
+            """{"name":"olaf-mixed-fixture","version":"1.0.0","dependencies":{"aaa-npm-phantom-olaf-xyz":"9.9.9","mmm-npm-phantom-olaf-xyz":"9.9.8"}}""",
+            "aaa-pip-phantom-olaf-xyz==9.9.7\nmmm-pip-phantom-olaf-xyz==9.9.6\n");
         try
         {
             var result = CliTestHelpers.RunCli("--input", fixtureDir, "--format", "json");
