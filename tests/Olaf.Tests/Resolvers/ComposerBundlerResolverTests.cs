@@ -290,6 +290,95 @@ public sealed class BundlerResolverTests
     }
 
     [Fact]
+    public async Task Should_NameLockedVersionInDownloadUrl_When_GemUriNamesLatestRelease()
+    {
+        // Issue #167: stub gem_uri names the LATEST release (8.1.4) while the
+        // locked dep is 7.0.8 -> DownloadUrl must name the locked version.
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new
+            {
+                name = "rails",
+                licenses = new[] { "MIT" },
+                authors = "David Heinemeier Hansson",
+                gem_uri = "https://rubygems.org/downloads/rails-8.1.4.gem",
+            }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new BundlerLicenseResolver(http);
+        var dep = new Dependency("bundler", "rails", "7.0.8", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://rubygems.org/downloads/rails-7.0.8.gem", result.Enrichment.DownloadUrl);
+        Assert.Equal(1, handler.CallCount); // NO-NEW-HTTP: no verifying fetch (rejected option A).
+        Assert.Single(handler.RequestedUrls);
+    }
+
+    [Fact]
+    public async Task Should_NameLockedVersionInDownloadUrl_When_GemUriMatchesLockedVersion()
+    {
+        // Issue #167: locked==latest -> canonical URL unchanged (no regression
+        // from the verbatim-lift removal); still a single metadata GET.
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new
+            {
+                name = "rake",
+                licenses = new[] { "MIT" },
+                authors = "Jim Weirich",
+                gem_uri = "https://rubygems.org/gems/rake-13.0.0.gem",
+            }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new BundlerLicenseResolver(http);
+        var dep = new Dependency("bundler", "rake", "13.0.0", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://rubygems.org/downloads/rake-13.0.0.gem", result.Enrichment.DownloadUrl);
+        Assert.Equal(1, handler.CallCount);
+        Assert.Single(handler.RequestedUrls);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknownWithoutThrow_When_RubyGemsNotFoundOrTransportFails()
+    {
+        // Issue #167 companion (2 tails): failure arms stay Unknown without
+        // throwing and never consult DownloadUrl enrichment.
+        // Tail 1 of 2: 404 -> not-found, single GET (no retry).
+        var notFoundHandler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.NotFound());
+        using (var http = ResolverTestHelpers.CreateClient(notFoundHandler))
+        {
+            var result = await new BundlerLicenseResolver(http)
+                .ResolveAsync(new Dependency("bundler", "this-gem-definitely-does-not-exist-olaf-xyz", "9.9.9", false));
+
+            Assert.Equal("Unknown", result.Status);
+            Assert.Null(result.SpdxId);
+            Assert.NotNull(result.Reason);
+            Assert.Contains("not-found", result.Reason, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(result.Enrichment);
+            Assert.Equal(1, notFoundHandler.CallCount);
+        }
+
+        // Tail 2 of 2: transport throw -> transport-error, retried exactly once.
+        var offlineHandler = new StubHttpMessageHandler((req, _) =>
+            throw new HttpRequestException("offline mode: no network"));
+        using (var http = ResolverTestHelpers.CreateClient(offlineHandler))
+        {
+            var result = await new BundlerLicenseResolver(http)
+                .ResolveAsync(new Dependency("bundler", "this-gem-definitely-does-not-exist-olaf-xyz", "9.9.9", false));
+
+            Assert.Equal("Unknown", result.Status);
+            Assert.Null(result.SpdxId);
+            Assert.NotNull(result.Reason);
+            Assert.Contains("transport-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(result.Enrichment);
+            Assert.Equal(2, offlineHandler.CallCount); // retried exactly once
+        }
+    }
+
+    [Fact]
     public async Task Should_ReturnUnknown_When_EcosystemMismatch()
     {
         var handler = new StubHttpMessageHandler((req, _) =>

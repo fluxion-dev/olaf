@@ -218,6 +218,8 @@ public sealed class EnrichmentResolverTests
     public async Task Should_HarvestSupplierDownloadWithoutHashes_When_RubyGemsJson()
     {
         // PARTIAL: versioned sha lives on an unfetched endpoint -> Hashes null.
+        // Issue #167 (B): DownloadUrl is constructed canonical from the LOCKED
+        // dependency, never lifted verbatim from gem_uri (which names latest).
         var handler = new StubHttpMessageHandler((req, _) =>
             StubHttpMessageHandler.Json(new
             {
@@ -233,12 +235,13 @@ public sealed class EnrichmentResolverTests
         var result = await resolver.ResolveAsync(dep);
 
         Assert.Equal("MIT", result.SpdxId);
-        Assert.Equal(1, handler.CallCount);
+        Assert.Equal(1, handler.CallCount); // NO-NEW-HTTP: enrichment adds zero GETs.
+        Assert.Single(handler.RequestedUrls); // single metadata GET, never a download-URL fetch.
         Assert.NotNull(result.Enrichment);
         Assert.Equal("pkg:gem/rails@7.0.8", result.Enrichment.Purl);
         Assert.Null(result.Enrichment.Hashes);
         Assert.Equal("David Heinemeier Hansson", result.Enrichment.Supplier);
-        Assert.Equal("https://rubygems.org/gems/rails-7.0.8.gem", result.Enrichment.DownloadUrl);
+        Assert.Equal("https://rubygems.org/downloads/rails-7.0.8.gem", result.Enrichment.DownloadUrl);
     }
 
     [Fact]
