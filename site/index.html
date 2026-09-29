@@ -75,6 +75,19 @@ chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
 <span class="text-[#9d94c7]"># 0.1.0-preview.3+...</span>
 </code></pre>
+  <!-- No download attribute on the buttons below: the cross-origin redirect to objects.githubusercontent.com ignores it, and GitHub already sends an attachment disposition. -->
+  <div class="my-4 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+    <a class="inline-block rounded-xl bg-[#512bd4] px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-[#3f22a8]" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64">Download for Linux (x64)</a>
+    <a class="inline-block rounded-xl bg-[#512bd4] px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-[#3f22a8]" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-osx-arm64">Download for macOS (arm64)</a>
+    <a class="inline-block rounded-xl bg-[#512bd4] px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-[#3f22a8]" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-win-x64.exe">Download for Windows (x64)</a>
+  </div>
+  <p class="text-[0.95rem] text-[#5a6376]">Prefer to browse? <a class="text-[#512bd4] hover:underline" href="https://github.com/fluxion-dev/olaf/releases">All releases on GitHub</a> (current: <a class="text-[#512bd4] hover:underline" href="https://github.com/fluxion-dev/olaf/releases/tag/v0.1.0-preview.3">v0.1.0-preview.3</a>).</p>
+  <ul class="list-disc pl-6 text-[0.95rem] text-[#5a6376]">
+    <li class="mb-1.5">Linux and macOS: <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">chmod +x</code> the binary after downloading, then run <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--version</code> to verify.</li>
+    <li class="mb-1.5">Windows: download the <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">.exe</code> and run it directly — no <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">chmod</code> needed.</li>
+    <li class="mb-1.5">macOS builds are arm64 (Apple silicon) only — on Intel Macs, publish from source with <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">dotnet publish src/Olaf.Cli -c Release</code> instead.</li>
+    <li class="mb-1.5">Each binary is self-contained and roughly 75 MB, so expect a large download.</li>
+  </ul>
   <table class="w-full border-collapse text-[0.95rem]">
     <tr><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">RID</th><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Binary</th><th class="border-b border-[#e2ddf3] bg-[#f4f2fb] px-3 py-2 text-left">Size (attached asset)</th></tr>
     <tr><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">linux-x64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left"><code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">olaf-linux-x64</code></td><td class="border-b border-[#e2ddf3] px-3 py-2 text-left">75,007,663 bytes (~71.5 MiB)</td></tr>
@@ -85,6 +98,18 @@ chmod +x /tmp/olaf-dl/olaf-linux-x64
 <pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">dotnet pack src/Olaf.Cli -c Release
 dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.3
 olaf --help
+</code></pre>
+  <h3 class="mb-2 mt-5 text-xl font-semibold">Install from NuGet (.NET tool)</h3>
+  <p>olaf on NuGet is a .NET CLI tool, not a library — you install it with <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">dotnet tool install</code> and run it as <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">olaf</code>, you never reference it from a project. A .NET runtime is required to run it, and the <code class="rounded bg-[#f4f2fb] px-1.5 py-0.5 font-mono text-[0.9em]">--version 0.1.0-preview.3</code> pin is required — unpinned installs fail for prerelease versions. Global install:</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">dotnet tool install -g olaf --version 0.1.0-preview.3
+olaf --version
+<span class="text-[#9d94c7]"># 0.1.0-preview.3+...</span>
+</code></pre>
+  <p>Repo-pinned local install for solutions and CI (restores the pinned version per repo via a tool manifest):</p>
+<pre class="overflow-x-auto rounded-xl bg-[#1c2333] p-4 text-[0.88rem] leading-relaxed text-[#e8e4f7]"><code class="bg-transparent p-0 font-mono">dotnet new tool-manifest
+dotnet tool install olaf --version 0.1.0-preview.3
+dotnet tool run olaf --version
+<span class="text-[#9d94c7]"># 0.1.0-preview.3+...</span>
 </code></pre>
 </section>
 
