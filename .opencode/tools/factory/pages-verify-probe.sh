@@ -5,10 +5,10 @@
 #   (issue #149: first-party src-less inline vanilla JS — tabs + copy button —
 #   ALLOWED, each body extracted via python3 to $WORKDIR and gated with
 #   `node --check`, failure → FAIL; any <script with src= — external or local
-#   .js — FAILs with hit-listing); no local src/href EXCEPT hashed Vite CSS
+#   .js — FAILs with hit-listing); no local src/href EXCEPT hashed Vite assets
 #   ((src|href)="(/olaf/|./|/)?
-#   assets/[^"]*\.css" allowlisted — CSS-only because the #135 homepage is a
-#   CSS-entry Vite build; any *.js ref stays banned = defense in depth paired
+#   assets/[^"]*\.(css|png|jpe?g|svg|webp|woff2?)" allowlisted — CSS + image + font because the #135 homepage is a Vite build and brand-kit #153 self-hosts woff2 + mascot jpg hashed to assets/;
+#   any *.js ref stays banned = defense in depth paired
 #   with the P1/P3 src= arms, since a script asset would violate the inline-
 #   only guarantee those arms enforce);
 #   invented-surface gate (16 removed flags + `olaf scan` +
@@ -25,7 +25,7 @@
 # happens post-enable (plan Step 6). Shell MUST be bash. No pipestatus reads
 # (fqn-lint pipefail arm). $TIMEOUT_BIN captured before any PATH use.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.3.0"
+VERSION="0.4.0"
 set -euo pipefail
 shopt -s nullglob
 
@@ -50,8 +50,10 @@ P1 script arm is inline-allow (issue #149): first-party src-less inline
 <script> (tabs + copy-button vanilla JS) is ALLOWED — each body is extracted
 to \$WORKDIR and gated with \`node --check\` (failure FAILs); any <script>
 carrying src= (external CDN or local .js) FAILs with hit-listing.
-P1 local-ref arm is deny-all EXCEPT hashed Vite CSS link(s) matching
-(src|href)="(/olaf/|./|/)?assets/[^"]*\.css"; every other local src/href —
+P1 local-ref arm is deny-all EXCEPT hashed Vite asset(s) matching
+(src|href)="(/olaf/|./|/)?assets/[^"]*\.(css|png|jpe?g|svg|webp|woff2?)" (brand-kit #153:
+self-hosted woff2 fonts + mascot jpg hash into assets/ at build time); every other
+local src/href —
 especially any *.js — FAILs (js stays banned: a script asset would break
 the inline-only guarantee the P1/P3 src= arms enforce — defense in depth).
 P3 mirrors P1 in served bytes (same src-vs-inline distinction + node
@@ -247,16 +249,17 @@ PY
   else
     pass "P1: no <script element"
   fi
-  # Deny-all with CSS-only allowlist (issue #135): hashed Vite stylesheet
-  # link(s) (src|href)="(/olaf/|./|/)?assets/[^"]*\.css" are legal/skipped;
-  # every other local ref — especially any *.js, which would break the
+  # Deny-all with Vite-asset allowlist (issue #135 CSS, extended issue #153
+  # brand-kit: self-hosted woff2 + mascot jpg hash into assets/): hashed Vite
+  # asset(s) (src|href)="(/olaf/|./|/)?assets/[^"]*\.(css|png|jpe?g|svg|webp|woff2?)"
+  # are legal/skipped; every other local ref — especially any *.js, which would break the
   # inline-only guarantee — still FAILs. UNCHANGED by issue #149 (defense in
   # depth paired with the P1 src= arm above).
-  LOCALREFS="$(grep -oE -- '(src|href)="[^"]*"' "$PAGE" | grep -vE -- '(src|href)="(https?://|#|mailto:)' | grep -vE -- '(src|href)="(/olaf/|./|/)?assets/[^"]*\.css"' || true)"
+  LOCALREFS="$(grep -oE -- '(src|href)="[^"]*"' "$PAGE" | grep -vE -- '(src|href)="(https?://|#|mailto:)' | grep -vE -- '(src|href)="(/olaf/|./|/)?assets/[^"]*\.(css|png|jpe?g|svg|webp|woff2?)"' || true)"
   if [[ -n "$LOCALREFS" ]]; then
     fail_msg "P1: local src/href refs: $(printf '%s' "$LOCALREFS" | head -3 | tr '\n' ' ')"
   else
-    pass "P1: no local src/href refs (outside hashed-CSS allowlist)"
+    pass "P1: no local src/href refs (outside hashed-asset allowlist)"
   fi
   # Invented-surface gate: 16 removed flags + `olaf scan` + txt/html code-span
   # formats + --reason must be absent (bare `html` matches markup, so the
