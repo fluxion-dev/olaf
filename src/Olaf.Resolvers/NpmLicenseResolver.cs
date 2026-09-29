@@ -8,6 +8,15 @@ public sealed class NpmLicenseResolver : ILicenseResolver
 {
     private readonly HttpClient _http;
 
+    // Issue #166 L1 packument cache: one packument GET per resolver-instance per
+    // package name. Single-flight choice: plain Dictionary, no SemaphoreSlim.
+    // Rationale: ResolveAsync awaits the fetch before any second use, so two
+    // fetches on the SAME instance cannot overlap; cross-instance duplicates under
+    // SemaphoreSlim(8) fan-out stay possible (CachingLicenseResolver.CreatePrimary
+    // news one NpmLicenseResolver per dependency) but each is one idempotent GET.
+    // A shared static cache was rejected (stale-packument risk across scans).
+    private readonly Dictionary<string, string> _packuments = new(StringComparer.Ordinal);
+
     public NpmLicenseResolver(HttpClient httpClient)
     {
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -22,42 +31,24 @@ public sealed class NpmLicenseResolver : ILicenseResolver
 
         try
         {
-            var url = $"https://registry.npmjs.org/{Uri.EscapeDataString(dependency.Name)}/{Uri.EscapeDataString(dependency.Version)}";
-            using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            // Issue #166: npm:alias declares "npm:<target>@<range>"; resolution runs
+            // against the TARGET name + range, attribution stays on the alias dep.
+            var lookupName = dependency.Name;
+            var rawSpec = dependency.Version;
+            if (NpmSemverRange.TrySplitAlias(rawSpec, out var aliasTarget, out var aliasRange))
             {
-                return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: npm package '{dependency.Name} {dependency.Version}' not found.");
+                lookupName = aliasTarget;
+                rawSpec = aliasRange;
             }
 
-            if (!response.IsSuccessStatusCode)
+            // Exact X.Y.Z[-prerelease] keeps the CURRENT path byte-identical (same
+            // URL shape, same errors); only ranges/dist-tags/aliases detour below.
+            if (NpmSemverRange.IsExactVersion(rawSpec, out var exact) && exact is not null)
             {
-                return new ResolvedLicense(dependency, null, null, null, "Unknown", $"registry-error: npm returned {(int)response.StatusCode}.");
+                return await ResolveVersionDocAsync(dependency, lookupName, exact, rangeNote: null, cancellationToken).ConfigureAwait(false);
             }
 
-            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            var (rawLicense, licenseUrl) = ParseNpmJson(body);
-            var spdx = SpdxMapper.Normalize(rawLicense)
-                ?? SpdxMapper.FromLicenseUrl(licenseUrl);
-
-            if (spdx is null)
-            {
-                return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
-            }
-
-            var source = $"https://www.npmjs.com/package/{dependency.Name}/v/{dependency.Version}";
-            // Enrichment reads the same already-fetched versioned registry JSON
-            // (NO-NEW-HTTP): dist.integrity -> Hashes, author/maintainers ->
-            // Supplier, dist.tarball -> DownloadUrl. Never copies SourceUrl.
-            var enrichment = ParseNpmEnrichment(body, dependency);
-            // License text fills LicenseText ONLY (no id re-resolution):
-            // tarball (dist.tarball via Enrichment) > licenseUrl > DB > null.
-            var (text, textReason, isPerPackage) = await LicenseTextFetcher.TryFetchLicenseTextWithProvenanceAsync(
-                _http, enrichment?.DownloadUrl, licenseUrl, spdx, cancellationToken).ConfigureAwait(false);
-            // Issue #72: holders from per-package texts only (tarball/
-            // licenseUrl provenance — never DB subset text); metadata-author
-            // fallback when zero; bare emails never promoted.
-            enrichment = CopyrightScraper.AttachHolders(dependency, enrichment, isPerPackage ? text : null, enrichment?.Supplier);
-            return new ResolvedLicense(dependency, spdx, text, source, "Resolved", textReason, enrichment);
+            return await ResolveRangeAsync(dependency, lookupName, rawSpec, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -71,6 +62,11 @@ public sealed class NpmLicenseResolver : ILicenseResolver
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"transport-error: {ex.Message}");
         }
+        catch (IOException ex)
+        {
+            // Covers FileNotFound/DirectoryNotFound by inheritance (CS0160) — never catch them separately.
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"transport-error: {ex.Message}");
+        }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
@@ -79,6 +75,126 @@ public sealed class NpmLicenseResolver : ILicenseResolver
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
+    }
+
+    // Issue #166 range arm: packument GET /{name} (L1 per instance) -> max-satisfying
+    // exact -> existing version-doc path. The raw range is NEVER interpolated into a
+    // URL by construction: ResolveVersionDocAsync only ever receives validated-exact.
+    private async Task<ResolvedLicense> ResolveRangeAsync(
+        Dependency dependency,
+        string lookupName,
+        string rawSpec,
+        CancellationToken cancellationToken)
+    {
+        if (!_packuments.TryGetValue(lookupName, out var packumentBody))
+        {
+            var packumentUrl = $"https://registry.npmjs.org/{Uri.EscapeDataString(lookupName)}";
+            using var packumentResponse = await ResolverHttpRetry.GetAsync(_http, packumentUrl, cancellationToken).ConfigureAwait(false);
+            if (packumentResponse.StatusCode == HttpStatusCode.NotFound)
+            {
+                return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: npm package '{dependency.Name} {dependency.Version}' not found.");
+            }
+
+            if (!packumentResponse.IsSuccessStatusCode)
+            {
+                return new ResolvedLicense(dependency, null, null, null, "Unknown", $"registry-error: npm returned {(int)packumentResponse.StatusCode}.");
+            }
+
+            packumentBody = await packumentResponse.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            _packuments[lookupName] = packumentBody;
+        }
+
+        if (!NpmSemverRange.TryParsePackument(packumentBody, out var versionKeys, out var distTags))
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", "parse-error: npm packument returned unusable JSON.");
+        }
+
+        var spec = rawSpec.Trim();
+        string? resolved = null;
+        var supported = NpmSemverRange.IsSupportedRange(spec);
+        if (distTags.TryGetValue(spec, out var tagged)
+            && NpmSemverRange.IsExactVersion(tagged, out var tagExact)
+            && tagExact is not null)
+        {
+            resolved = tagExact;
+        }
+        else if (supported
+            && NpmSemverRange.TryResolve(versionKeys, spec, out var best)
+            && best is not null
+            && NpmSemverRange.IsExactVersion(best, out var bestExact)
+            && bestExact is not null)
+        {
+            resolved = bestExact;
+        }
+        else if (!supported
+            && distTags.TryGetValue("latest", out var latest)
+            && NpmSemverRange.IsExactVersion(latest, out var latestExact)
+            && latestExact is not null)
+        {
+            // Unparseable spec (incl. unknown dist-tags) falls back to latest.
+            resolved = latestExact;
+        }
+
+        if (resolved is null)
+        {
+            // Unsatisfiable range (or no usable latest): not-found Unknown — never
+            // registry-error, and never cached as such (caller owns caching).
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: npm package '{dependency.Name} {dependency.Version}' has no registry version satisfying range '{rawSpec}'.");
+        }
+
+        // Fidelity contract: Dependency keeps the DECLARED range; the concrete version
+        // rides in the version-doc/source URL and in this reason suffix.
+        var rangeNote = $"range '{rawSpec}' resolved to {resolved}";
+        return await ResolveVersionDocAsync(dependency, lookupName, resolved, rangeNote, cancellationToken).ConfigureAwait(false);
+    }
+
+    // The single version-doc lookup. Exact path callers pass the declared name/version
+    // (byte-identical URL/errors to the pre-#166 code); range callers pass the resolved
+    // target name + validated-exact version plus a reason suffix naming both.
+    private async Task<ResolvedLicense> ResolveVersionDocAsync(
+        Dependency dependency,
+        string lookupName,
+        string exactVersion,
+        string? rangeNote,
+        CancellationToken cancellationToken)
+    {
+        var url = $"https://registry.npmjs.org/{Uri.EscapeDataString(lookupName)}/{Uri.EscapeDataString(exactVersion)}";
+        using var response = await ResolverHttpRetry.GetAsync(_http, url, cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: npm package '{lookupName} {exactVersion}' not found.");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"registry-error: npm returned {(int)response.StatusCode}.");
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var (rawLicense, licenseUrl) = ParseNpmJson(body);
+        var spdx = SpdxMapper.Normalize(rawLicense)
+            ?? SpdxMapper.FromLicenseUrl(licenseUrl);
+
+        if (spdx is null)
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: registry returned no usable license.");
+        }
+
+        var source = $"https://www.npmjs.com/package/{lookupName}/v/{exactVersion}";
+        // Enrichment reads the same already-fetched versioned registry JSON
+        // (NO-NEW-HTTP): dist.integrity -> Hashes, author/maintainers ->
+        // Supplier, dist.tarball -> DownloadUrl. Never copies SourceUrl.
+        var enrichment = ParseNpmEnrichment(body, dependency);
+        // License text fills LicenseText ONLY (no id re-resolution):
+        // tarball (dist.tarball via Enrichment) > licenseUrl > DB > null.
+        var (text, textReason, isPerPackage) = await LicenseTextFetcher.TryFetchLicenseTextWithProvenanceAsync(
+            _http, enrichment?.DownloadUrl, licenseUrl, spdx, cancellationToken).ConfigureAwait(false);
+        // Issue #72: holders from per-package texts only (tarball/
+        // licenseUrl provenance — never DB subset text); metadata-author
+        // fallback when zero; bare emails never promoted.
+        enrichment = CopyrightScraper.AttachHolders(dependency, enrichment, isPerPackage ? text : null, enrichment?.Supplier);
+        var reason = rangeNote is null ? textReason : $"{textReason} ({rangeNote})";
+        return new ResolvedLicense(dependency, spdx, text, source, "Resolved", reason, enrichment);
     }
 
     internal static Enrichment? ParseNpmEnrichment(string body, Dependency dependency)
