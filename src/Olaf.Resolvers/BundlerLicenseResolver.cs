@@ -47,8 +47,10 @@ public sealed class BundlerLicenseResolver : ILicenseResolver
 
             var text = SpdxLicenseTexts.GetText(spdx);
             var source = $"https://rubygems.org/gems/{dependency.Name}";
-            // PARTIAL enrichment from the same already-fetched rubygems JSON
-            // (NO-NEW-HTTP): authors -> Supplier, gem_uri -> DownloadUrl.
+            // PARTIAL enrichment (NO-NEW-HTTP): authors -> Supplier from the
+            // same already-fetched rubygems JSON; DownloadUrl is constructed
+            // canonical from the LOCKED dependency (never gem_uri verbatim).
+            // Yanked-link tradeoff: names locked version always, never verified.
             // Versioned sha lives on an unfetched endpoint -> Hashes null.
             var enrichment = ParseBundlerEnrichment(body, dependency);
             return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
@@ -108,13 +110,17 @@ public sealed class BundlerLicenseResolver : ILicenseResolver
                 }
             }
 
-            EnrichmentHelpers.TryGetString(root, "gem_uri", out var gemUri);
+            // Canonical locked-version DownloadUrl (issue #167, decision B;
+            // Go precedent GoLicenseResolver.cs:51-58): built from the LOCKED
+            // dependency, never gem_uri verbatim (names latest). Never
+            // verified — no verifying fetch (rejected option A). NO-NEW-HTTP.
+            var downloadUrl = $"https://rubygems.org/downloads/{Uri.EscapeDataString(dependency.Name)}-{Uri.EscapeDataString(dependency.Version)}.gem";
 
             return EnrichmentHelpers.Create(
                 dependency,
                 hashes: null,
                 supplier,
-                gemUri);
+                downloadUrl);
         }
         catch (JsonException)
         {
