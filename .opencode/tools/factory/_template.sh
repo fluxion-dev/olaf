@@ -10,7 +10,7 @@
 # usage() heredoc idiom (#149 harvest, 2nd backtick-expansion sighting):
 # prefer quoted <<'EOF' + hardcoded name; if unquoted, escape every $/`
 # in the body or --help executes it (docs-drift 0.3.0 + pages-verify 0.3.0).
-VERSION="0.2.12"
+VERSION="0.2.13"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -124,9 +124,9 @@ KEEP_TEMP=0
 #   on back-port since `direct` spans all 9 matrix formats).
 #   Back-ported: all four probes now call this exact function live.
 # r1_matrix_regression() {
-#   # r1_matrix_regression [formats...]; default: json yaml xml html.
+#   # r1_matrix_regression [formats...]; default: json yaml xml md (html deleted #123 — narrowed call sites carry the one-line justification + md marker from format-matrix-dump 0.3.0).
 #   local formats=("$@")
-#   (( ${#formats[@]} )) || formats=(json yaml xml html)
+#   (( ${#formats[@]} )) || formats=(json yaml xml md)
 #   local R1FAIL=0 f pat
 #   echo "-- R1 format-matrix regression --"
 #   for f in "${formats[@]}"; do
@@ -229,10 +229,12 @@ KEEP_TEMP=0
 # if [[ "$ANCHOR_RC" -eq 0 ]]; then pass "<label>: anchor order ok"; else fail_msg "<label>: anchor/pinning wrong"; fi
 
 # ---- Canonical mkphantom fixture (copy-paste; then call) ----
-# mkphantom <dir>: synth phantom package.json carrying the never-resolvable
-#   dep this-package-definitely-does-not-exist-olaf-xyz@9.9.9 (404 online /
-#   transport-error offline, both Unknown with a pinned unresolved-prefix
-#   reason). Requires PHANTOM_PKG/PHANTOM_VER vars (older probes use
+# mkphantom <dir> [version]: synth phantom package.json carrying the never-resolvable
+#   dep this-package-definitely-does-not-exist-olaf-xyz (default 9.9.9; pass a
+#   range like ^9.9.9 as 2nd arg to hit packument/range paths instead of exact 404)
+#   (404 online / transport-error offline, both Unknown with a pinned unresolved-prefix
+#   reason). Requires PHANTOM_PKG var (+ PHANTOM_VER default when the version
+#   arg is omitted; older probes use
 #   PKG_NAME/PKG_VERSION — adapt the two variable refs) + pass()/fail_msg()
 #   only when the optional python guard is kept (keep it when the probe
 #   already depends on python3; drop it for guard-free minimal back-ports —
@@ -253,9 +255,9 @@ KEEP_TEMP=0
 #   replaced by calls, policy-file header cites canonical; behavior
 #   identical, probe versions unchanged).
 # mkphantom() {
-#   local d="$1"
+#   local d="$1" ver="${2:-$PHANTOM_VER}"
 #   mkdir -p "$d"
-#   printf '{\n  "name": "olaf-phantom-fixture",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$PHANTOM_VER" > "$d/package.json"
+#   printf '{\n  "name": "olaf-phantom-fixture",\n  "version": "1.0.0",\n  "dependencies": {\n    "%s": "%s"\n  }\n}\n' "$PHANTOM_PKG" "$ver" > "$d/package.json"
 #   # optional guard (keep only when probe already depends on python3):
 #   # if command -v python3 >/dev/null 2>&1; then
 #   #   if ! python3 -c "import json,sys;json.load(open(sys.argv[1]))" "$d/package.json" 2>/dev/null; then
