@@ -55,7 +55,14 @@ src/Olaf.Cli/bin/Release/net10.0/<rid>/publish/Olaf.Cli --version
 on `PATH`; `win-x64`/`osx-arm64` bundles are existence+size verified here,
 runtime covered by CI.)
 
-Alternative — .NET tool (needs a .NET runtime to run):
+Alternative — .NET tool (needs a .NET runtime to run; install from nuget.org):
+
+```bash
+dotnet tool install --global olaf --version 0.1.0-preview.3
+olaf --help
+```
+
+Or from a local pack (same version, no feed needed):
 
 ```bash
 dotnet pack src/Olaf.Cli -c Release
