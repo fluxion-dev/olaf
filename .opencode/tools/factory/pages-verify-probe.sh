@@ -25,7 +25,7 @@
 # happens post-enable (plan Step 6). Shell MUST be bash. No pipestatus reads
 # (fqn-lint pipefail arm). $TIMEOUT_BIN captured before any PATH use.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.4.0"
+VERSION="0.4.1"
 set -euo pipefail
 shopt -s nullglob
 
@@ -391,7 +391,7 @@ if [[ -f "$PAGE" ]]; then
     while IFS= read -r url; do
       [[ -z "$url" ]] && continue
       i=$((i + 1))
-      run_gate "$WORKDIR/badge-$i.log" -- "$TIMEOUT_BIN" "$CURL_MAX" curl -fSL --max-time "$CURL_MAX" -o /dev/null "$url"
+      run_gate "$WORKDIR/badge-$i.log" -- "$TIMEOUT_BIN" "$CURL_MAX" curl -sS -fSL --max-time "$CURL_MAX" -o /dev/null "$url"
       if [[ "$RC" -eq 0 ]]; then
         pass "P2: badge 200: $url"
       elif [[ "$url" == *"license"* ]] && [[ ! -f "$REPO_ROOT/LICENSE" ]]; then
@@ -407,7 +407,7 @@ fi
 
 # ---- P3 (3): live 200 + hero marker + no script ----
 echo "-- P3: live page --"
-run_gate "$WORKDIR/live.html" -- "$TIMEOUT_BIN" "$CURL_MAX" curl -fSL --max-time "$CURL_MAX" "$LIVE_URL"
+run_gate "$WORKDIR/live.html" -- "$TIMEOUT_BIN" "$CURL_MAX" curl -sS -fSL --max-time "$CURL_MAX" "$LIVE_URL"
 if [[ "$RC" -ne 0 ]]; then
   fail_msg "P3: live URL fetch exited $RC (pre-deploy: Pages not enabled yet): $LIVE_URL"
   fail_msg "P3: hero marker check skipped (no served bytes)"
