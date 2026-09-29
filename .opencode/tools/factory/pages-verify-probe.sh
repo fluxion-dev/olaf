@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 # pages-verify-probe.sh — Pages home-page verification probe for issue #131.
 # P1 (6): page exists (auto-detect: site/dist/index.html when site/ exists,
-#   else docs/index.html); HERO_MARKER greppable; no <script element;
-#   no local src/href EXCEPT hashed Vite CSS ((src|href)="(/olaf/|./|/)?
+#   else docs/index.html); HERO_MARKER greppable; inline-allow script arm
+#   (issue #149: first-party src-less inline vanilla JS — tabs + copy button —
+#   ALLOWED, each body extracted via python3 to $WORKDIR and gated with
+#   `node --check`, failure → FAIL; any <script with src= — external or local
+#   .js — FAILs with hit-listing); no local src/href EXCEPT hashed Vite CSS
+#   ((src|href)="(/olaf/|./|/)?
 #   assets/[^"]*\.css" allowlisted — CSS-only because the #135 homepage is a
-#   CSS-entry Vite build; any *.js ref stays banned since a script asset
-#   would violate the no-script guarantee enforced by the P1-3 <script arm);
+#   CSS-entry Vite build; any *.js ref stays banned = defense in depth paired
+#   with the P1/P3 src= arms, since a script asset would violate the inline-
+#   only guarantee those arms enforce);
 #   invented-surface gate (16 removed flags + `olaf scan` +
 #   txt/html code-span formats + --reason); every concrete `olaf ...` command
 #   line pasted in the page re-executed DLL-direct via run_gate (exit + token).
 # P2 (4): all badge img-src URLs curl -fSL 200 (license badge 404 allowed ONLY
 #   when LICENSE is absent — advisory WARN, never forced green).
-# P3 (3): live URL 200 + HERO_MARKER in served bytes + no <script in served.
+# P3 (3): live URL 200 + HERO_MARKER in served bytes + inline-allow script arm
+#   in served bytes (mirrors P1: src= FAILs, inline bodies node --check gated).
 # P4 (2): pages.yml run poll (gh run list workflow=pages.yml lookup + timeout
 #   gh run watch --exit-status; timeout FAILs, never infinite sleep).
 # Pre-deploy (Pages not enabled — gh api pages -> 404): P3/P4 FAIL cleanly
@@ -19,7 +25,7 @@
 # happens post-enable (plan Step 6). Shell MUST be bash. No pipestatus reads
 # (fqn-lint pipefail arm). $TIMEOUT_BIN captured before any PATH use.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.2.0"
+VERSION="0.3.0"
 set -euo pipefail
 shopt -s nullglob
 
@@ -40,10 +46,16 @@ hero marker + P4 pages.yml workflow poll.
 
 Page auto-detect: site/dist/index.html when site/ exists under --repo-root
 (Vite build, issue #135), else docs/index.html. No --page flag by design.
+P1 script arm is inline-allow (issue #149): first-party src-less inline
+<script> (tabs + copy-button vanilla JS) is ALLOWED — each body is extracted
+to \$WORKDIR and gated with \`node --check\` (failure FAILs); any <script>
+carrying src= (external CDN or local .js) FAILs with hit-listing.
 P1 local-ref arm is deny-all EXCEPT hashed Vite CSS link(s) matching
 (src|href)="(/olaf/|./|/)?assets/[^"]*\.css"; every other local src/href —
 especially any *.js — FAILs (js stays banned: a script asset would break
-the no-script guarantee the P1/P3 <script arms enforce).
+the inline-only guarantee the P1/P3 src= arms enforce — defense in depth).
+P3 mirrors P1 in served bytes (same src-vs-inline distinction + node
+--check on served inline bodies).
 
 Options:
   --url <live-url>      Pages URL (default: $LIVE_URL)
@@ -114,7 +126,7 @@ if [[ ! -f "$REPO_ROOT/olaf.slnx" ]]; then
   exit 2
 fi
 
-for cmd in gh curl timeout python3 dotnet; do
+for cmd in gh curl timeout python3 node dotnet; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "Missing required command: $cmd" >&2
     exit 2
@@ -192,15 +204,54 @@ if [[ -f "$PAGE" ]]; then
   else
     fail_msg "P1: hero marker '$HERO_MARKER' absent"
   fi
-  if grep -q -- '<script' "$PAGE"; then
-    fail_msg "P1: <script element found: $(grep -n -- '<script' "$PAGE" | head -3 | tr '\n' ' ')"
+  # Inline-allow policy (issue #149): first-party src-less inline <script>
+  # (tabs + copy-button vanilla JS) is ALLOWED — each body is extracted via
+  # python3 to $WORKDIR and gated with `node --check` (failure → FAIL). Any
+  # <script> carrying src= (external CDN or local .js) FAILs with
+  # hit-listing. Pairs with the local-ref arm below: *.js refs still FAIL
+  # there (defense in depth — a script asset would break the inline-only
+  # guarantee this arm enforces).
+  if grep -qE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$PAGE"; then
+    fail_msg "P1: <script src= found (external/local banned): $(grep -nE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$PAGE" | head -3 | tr '\n' ' ')"
+  elif grep -q -- '<script' "$PAGE"; then
+    rm -f "$WORKDIR"/p1-inline-*.js "$WORKDIR"/p1-inline-*.log
+    python3 - "$PAGE" "$WORKDIR/p1-inline-count.txt" <<'PY' 2>/dev/null
+import os, re, sys
+src = open(sys.argv[1]).read()
+wd = os.path.dirname(sys.argv[2])
+bodies = []
+for m in re.finditer(r'<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>', src, re.DOTALL | re.IGNORECASE):
+    body = m.group(1).strip()
+    if body:
+        bodies.append(body)
+for i, body in enumerate(bodies):
+    open(os.path.join(wd, "p1-inline-%d.js" % i), 'w').write(body + '\n')
+open(sys.argv[2], 'w').write(str(len(bodies)) + '\n')
+PY
+    NINLINE="$(cat "$WORKDIR/p1-inline-count.txt" 2>/dev/null || echo 0)"
+    if [[ -z "$NINLINE" ]]; then NINLINE=0; fi
+    INLINE_FAIL=0
+    for inline_js in "$WORKDIR"/p1-inline-*.js; do
+      [[ -e "$inline_js" ]] || continue
+      run_gate "$inline_js.check.log" -- node --check "$inline_js"
+      if [[ "$RC" -ne 0 ]]; then
+        echo "  info: inline FAIL node --check: $inline_js (log: $inline_js.check.log)"
+        INLINE_FAIL=1
+      fi
+    done
+    if (( INLINE_FAIL )); then
+      fail_msg "P1: $NINLINE inline <script> body(ies) with node --check failure(s) (see info lines above)"
+    else
+      pass "P1: $NINLINE inline <script> body(ies) node --check clean (no src=)"
+    fi
   else
     pass "P1: no <script element"
   fi
   # Deny-all with CSS-only allowlist (issue #135): hashed Vite stylesheet
   # link(s) (src|href)="(/olaf/|./|/)?assets/[^"]*\.css" are legal/skipped;
   # every other local ref — especially any *.js, which would break the
-  # no-script guarantee — still FAILs.
+  # inline-only guarantee — still FAILs. UNCHANGED by issue #149 (defense in
+  # depth paired with the P1 src= arm above).
   LOCALREFS="$(grep -oE -- '(src|href)="[^"]*"' "$PAGE" | grep -vE -- '(src|href)="(https?://|#|mailto:)' | grep -vE -- '(src|href)="(/olaf/|./|/)?assets/[^"]*\.css"' || true)"
   if [[ -n "$LOCALREFS" ]]; then
     fail_msg "P1: local src/href refs: $(printf '%s' "$LOCALREFS" | head -3 | tr '\n' ' ')"
@@ -318,7 +369,7 @@ PY
   fi
 else
   fail_msg "P1: hero marker check skipped (no page)"
-  fail_msg "P1: no-<script check skipped (no page)"
+  fail_msg "P1: script src/inline check skipped (no page)"
   fail_msg "P1: local-ref check skipped (no page)"
   fail_msg "P1: invented-surface gate skipped (no page)"
   fail_msg "P1: command re-exec skipped (no page)"
@@ -357,7 +408,7 @@ run_gate "$WORKDIR/live.html" -- "$TIMEOUT_BIN" "$CURL_MAX" curl -fSL --max-time
 if [[ "$RC" -ne 0 ]]; then
   fail_msg "P3: live URL fetch exited $RC (pre-deploy: Pages not enabled yet): $LIVE_URL"
   fail_msg "P3: hero marker check skipped (no served bytes)"
-  fail_msg "P3: no-<script check skipped (no served bytes)"
+  fail_msg "P3: script src/inline check skipped (no served bytes)"
 else
   pass "P3: live URL 200: $LIVE_URL"
   if grep -qF -- "$HERO_MARKER" "$WORKDIR/live.html"; then
@@ -365,8 +416,41 @@ else
   else
     fail_msg "P3: hero marker '$HERO_MARKER' absent from served bytes"
   fi
-  if grep -q -- '<script' "$WORKDIR/live.html"; then
-    fail_msg "P3: <script element in served bytes"
+  # Served-bytes arm mirrors P1 (issue #149): src= FAILs, src-less inline
+  # bodies extracted via python3 to $WORKDIR and gated with `node --check`.
+  if grep -qE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$WORKDIR/live.html"; then
+    fail_msg "P3: <script src= in served bytes (external/local banned): $(grep -nE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$WORKDIR/live.html" | head -3 | tr '\n' ' ')"
+  elif grep -q -- '<script' "$WORKDIR/live.html"; then
+    rm -f "$WORKDIR"/p3-inline-*.js "$WORKDIR"/p3-inline-*.log
+    python3 - "$WORKDIR/live.html" "$WORKDIR/p3-inline-count.txt" <<'PY' 2>/dev/null
+import os, re, sys
+src = open(sys.argv[1]).read()
+wd = os.path.dirname(sys.argv[2])
+bodies = []
+for m in re.finditer(r'<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>', src, re.DOTALL | re.IGNORECASE):
+    body = m.group(1).strip()
+    if body:
+        bodies.append(body)
+for i, body in enumerate(bodies):
+    open(os.path.join(wd, "p3-inline-%d.js" % i), 'w').write(body + '\n')
+open(sys.argv[2], 'w').write(str(len(bodies)) + '\n')
+PY
+    NINLINE_SERVED="$(cat "$WORKDIR/p3-inline-count.txt" 2>/dev/null || echo 0)"
+    if [[ -z "$NINLINE_SERVED" ]]; then NINLINE_SERVED=0; fi
+    INLINE_FAIL_SERVED=0
+    for inline_js in "$WORKDIR"/p3-inline-*.js; do
+      [[ -e "$inline_js" ]] || continue
+      run_gate "$inline_js.check.log" -- node --check "$inline_js"
+      if [[ "$RC" -ne 0 ]]; then
+        echo "  info: served-inline FAIL node --check: $inline_js (log: $inline_js.check.log)"
+        INLINE_FAIL_SERVED=1
+      fi
+    done
+    if (( INLINE_FAIL_SERVED )); then
+      fail_msg "P3: $NINLINE_SERVED served inline <script> body(ies) with node --check failure(s) (see info lines above)"
+    else
+      pass "P3: $NINLINE_SERVED served inline <script> body(ies) node --check clean (no src=)"
+    fi
   else
     pass "P3: no <script element in served bytes"
   fi
