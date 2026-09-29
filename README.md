@@ -70,7 +70,7 @@ dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --vers
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.3` is required — unpinned install fails for prerelease versions. Tests: 664 passing (`dotnet test`).
+Version is pinned: `--version 0.1.0-preview.3` is required — unpinned install fails for prerelease versions. Tests: 678 passing (`dotnet test`).
 
 ## Usage
 
