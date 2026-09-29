@@ -11,8 +11,11 @@ namespace Olaf.Tests.Resolvers;
 /// Packages are pinned versions with stable, well-known licenses.
 /// Shared client E2ETestHelpers.CreateRealClient (no User-Agent needed).
 /// The shared BundlerLicenseResolver serves both "bundler" and "gem" labels.
-/// NOTE: both resolvers ignore Dependency.Version (URLs are built from the
-/// name only), so not-found tests use phantom NAMES, not bad versions.
+/// NOTE: the Composer resolver ignores Dependency.Version (URLs are built from the
+/// name only), so its not-found tests use phantom NAMES, not bad versions. The
+/// Bundler resolver honors the locked version in DownloadUrl (canonical
+/// https://rubygems.org/downloads/{name}-{version}.gem, issue #167); its
+/// license ID still comes from latest metadata (R4 follow-up).
 /// </summary>
 public sealed class ComposerBundlerResolverE2ETests
 {
