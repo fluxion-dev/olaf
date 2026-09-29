@@ -1,9 +1,48 @@
 @import "tailwindcss";
 
+/* Brand fonts — self-hosted variable woff2, latin subsets only, committed
+   under site/src/assets/fonts/. Google Fonts serves a single variable file
+   per family covering all requested weights, so one file per family is
+   committed (no per-weight duplicates). Never a Google CDN runtime fetch. */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./src/assets/fonts/plus-jakarta-sans-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./src/assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+}
+
+@theme {
+  --color-olaf-canvas: #09090B;
+  --color-olaf-surface: #18181B;
+  --color-olaf-border: #27272A;
+  --color-viking-gold: #F59E0B;
+  --color-scanner-green: #10B981;
+  --color-viking-blue: #3B82F6;
+  --color-cyber-cyan: #06B6D4;
+  --color-strict-red: #EF4444;
+  --color-olaf-text-primary: #FAFAFA;
+  --color-olaf-text-secondary: #A1A1AA;
+
+  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --shadow-terminal: 0 0 48px rgb(16 185 129 / 0.14), 0 25px 50px -12px rgb(0 0 0 / 0.55);
+  --shadow-card: 0 0 28px rgb(245 158 11 / 0.08), 0 10px 30px -12px rgb(0 0 0 / 0.55);
+}
+
 @layer base {
   ::selection {
-    background: #6366f1;
-    color: #fff;
+    background: var(--color-viking-gold);
+    color: var(--color-olaf-canvas);
   }
 
   html {
@@ -11,11 +50,11 @@
   }
 
   body {
-    background-color: #09090b;
+    background-color: var(--color-olaf-canvas);
   }
 
   :where(a, button, [role="tab"]):focus-visible {
-    outline: 2px solid #22d3ee;
+    outline: 2px solid var(--color-cyber-cyan);
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -36,6 +75,19 @@
   }
 }
 
+/* Radial-gradient brand glows (hero-glow replacements land in Step 3). */
+@utility glow-gold {
+  background: radial-gradient(closest-side, rgb(245 158 11 / 0.25), transparent);
+}
+
+@utility glow-green {
+  background: radial-gradient(closest-side, rgb(16 185 129 / 0.22), transparent);
+}
+
+@utility glow-cyan {
+  background: radial-gradient(closest-side, rgb(6 182 212 / 0.2), transparent);
+}
+
 @layer components {
   .skip-link {
     position: absolute;
@@ -43,7 +95,8 @@
     top: 0;
     z-index: 50;
     border-radius: 8px;
-    background: #312e81;
+    border: 1px solid var(--color-olaf-border);
+    background: var(--color-olaf-surface);
     color: #fff;
     padding: 0.5rem 1rem;
     font-weight: 600;
@@ -53,5 +106,59 @@
   .skip-link:focus {
     left: 1rem;
     top: 1rem;
+  }
+
+  /* Dark terminal panel: surface + border + scanner glow shadow. */
+  .terminal-window {
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-olaf-border);
+    background-color: var(--color-olaf-surface);
+    box-shadow: var(--shadow-terminal);
+  }
+
+  /* Ecosystem pill: license resolved. */
+  .badge-resolved {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(16 185 129 / 0.4);
+    background-color: rgb(16 185 129 / 0.12);
+    color: var(--color-scanner-green);
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  /* Ecosystem pill: license unknown / needs review. */
+  .badge-unknown {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid rgb(239 68 68 / 0.4);
+    background-color: rgb(239 68 68 / 0.12);
+    color: var(--color-strict-red);
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  /* Solid gold accent badge (calls to action, NEW markers). */
+  .badge-gold {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    background-color: var(--color-viking-gold);
+    color: var(--color-olaf-canvas);
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+  }
+
+  /* Scanner-green outer glow for accent elements. */
+  .scanner-glow {
+    box-shadow: 0 0 24px rgb(16 185 129 / 0.35), 0 0 64px rgb(16 185 129 / 0.12);
   }
 }
