@@ -7,13 +7,13 @@
 <meta name="description" content="One command covers 13 ecosystems: olaf resolves licenses and writes json, SBOM, or attribution reports.">
 <link rel="stylesheet" href="./style.css">
 </head>
-<body id="top" class="bg-[#09090b] text-zinc-200 antialiased">
+<body id="top" class="bg-olaf-canvas text-zinc-200 antialiased">
 
 <a class="skip-link" href="#main">Skip to content</a>
 
-<nav aria-label="Primary" class="sticky top-0 z-40 border-b border-[#27272a]/80 bg-[#09090b]/85 backdrop-blur-md">
+<nav aria-label="Primary" class="sticky top-0 z-40 border-b border-olaf-border/80 bg-olaf-canvas/85 backdrop-blur-md">
   <div class="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3">
-    <a href="#top" class="mr-auto text-xl font-extrabold tracking-wide text-white no-underline">olaf<span class="text-cyan-400">.</span></a>
+    <a href="#top" class="mr-auto text-xl font-extrabold tracking-wide text-white no-underline">olaf<span class="text-viking-gold">.</span></a>
     <a class="text-sm text-zinc-300 no-underline hover:text-white hover:underline" href="#problems">Problems</a>
     <a class="text-sm text-zinc-300 no-underline hover:text-white hover:underline" href="#ecosystems">Ecosystems</a>
     <a class="text-sm text-zinc-300 no-underline hover:text-white hover:underline" href="#quickstart">Quickstart</a>
@@ -24,41 +24,42 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
       GitHub
     </a>
-    <a class="rounded-lg bg-indigo-500 px-3.5 py-1.5 text-sm font-semibold text-white no-underline transition hover:bg-indigo-400" href="#install">Quick Install</a>
+    <a class="rounded-lg bg-viking-blue px-3.5 py-1.5 text-sm font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="#install">Quick Install</a>
   </div>
 </nav>
 
 <header class="relative overflow-hidden px-5 pb-14 pt-14 text-center">
   <div aria-hidden="true" class="pointer-events-none absolute inset-0">
-    <div class="absolute -top-32 left-1/2 h-80 w-[42rem] -translate-x-1/2 rounded-full bg-indigo-600/25 blur-3xl"></div>
-    <div class="absolute top-20 -left-24 h-64 w-64 rounded-full bg-cyan-500/15 blur-3xl"></div>
-    <div class="absolute top-24 -right-24 h-64 w-64 rounded-full bg-purple-600/20 blur-3xl"></div>
+    <div class="absolute -top-32 left-1/2 h-80 w-[42rem] -translate-x-1/2 rounded-full bg-viking-blue/25 blur-3xl"></div>
+    <div class="absolute top-20 -left-24 h-64 w-64 rounded-full bg-cyber-cyan/15 blur-3xl"></div>
+    <div class="absolute top-24 -right-24 h-64 w-64 rounded-full bg-viking-gold/20 blur-3xl"></div>
   </div>
   <div class="relative mx-auto max-w-4xl">
-    <h1 class="m-0 text-6xl font-extrabold tracking-tight text-white">olaf<span class="text-cyan-400">.</span></h1>
+    <img src="./logo.jpg" alt="Olaf, the viking license scanner mascot" width="1408" height="768" class="mx-auto w-28 rounded-2xl md:w-36">
+    <h1 class="m-0 text-6xl font-extrabold tracking-tight text-white">olaf<span class="text-viking-gold">.</span></h1>
     <p class="mx-auto mt-4 max-w-3xl text-lg text-zinc-300">License scanner: <code class="whitespace-nowrap rounded bg-white/10 px-2 py-0.5 font-mono text-[0.9em] text-white">olaf generate &lt;DIR&gt;</code> scans a project directory, resolves licenses, writes a report to stdout or a file.</p>
     <p class="mx-auto mt-2 max-w-3xl text-2xl font-bold tracking-tight text-white">One Command. 13 Ecosystems. Zero Setup.</p>
     <p class="mx-auto mt-2 max-w-3xl text-base text-zinc-400">Fun at parties, serious in CI.</p>
 
-    <div class="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-xl border border-[#27272a] bg-[#0f172a]/80 p-2 pl-4 text-left shadow-lg shadow-indigo-950/40 backdrop-blur">
+    <div class="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-xl border border-olaf-border bg-olaf-surface/80 p-2 pl-4 text-left shadow-lg shadow-viking-blue/25 backdrop-blur">
       <!-- lucide:terminal -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m4 17 6-6-6-6"/><path d="M12 19h8"/></svg>
       <code id="hero-cmd" class="min-w-0 flex-1 truncate font-mono text-sm text-zinc-100">olaf generate . --format json</code>
-      <button id="hero-copy" type="button" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-500 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-indigo-400">
+      <button id="hero-copy" type="button" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-viking-blue px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-viking-blue/80">
         <!-- lucide:copy -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
         Copy
       </button>
     </div>
-    <span id="copy-status" role="status" aria-live="polite" class="mt-2 block min-h-5 text-sm text-cyan-300"></span>
+    <span id="copy-status" role="status" aria-live="polite" class="mt-2 block min-h-5 text-sm text-cyber-cyan"></span>
 
     <div class="mt-4 flex flex-col items-center justify-center gap-2.5 sm:flex-row sm:flex-wrap">
-      <a class="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 font-semibold text-white no-underline transition hover:bg-indigo-400" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64">
+      <a class="inline-flex items-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64">
         <!-- lucide:download -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
         Download
       </a>
-      <a class="inline-flex items-center gap-2 rounded-xl border border-[#27272a] bg-white/5 px-5 py-2.5 font-semibold text-white no-underline backdrop-blur transition hover:border-zinc-500 hover:bg-white/10" href="https://github.com/fluxion-dev/olaf/releases">
+      <a class="inline-flex items-center gap-2 rounded-xl border border-olaf-border bg-white/5 px-5 py-2.5 font-semibold text-white no-underline backdrop-blur transition hover:border-zinc-500 hover:bg-white/10" href="https://github.com/fluxion-dev/olaf/releases">
         <!-- lucide:tags -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
         View releases
@@ -73,20 +74,20 @@
     </div>
 
     <figure class="mx-auto mt-8 max-w-2xl text-left">
-      <div class="overflow-hidden rounded-xl border border-[#27272a] bg-[#0f172a]/90 shadow-2xl shadow-indigo-950/50 backdrop-blur">
-        <div class="flex items-center gap-1.5 border-b border-[#27272a] px-4 py-2.5" aria-hidden="true">
+      <div class="terminal-window overflow-hidden backdrop-blur">
+        <div class="flex items-center gap-1.5 border-b border-olaf-border px-4 py-2.5" aria-hidden="true">
           <span class="h-3 w-3 rounded-full bg-[#ff5f57]"></span>
           <span class="h-3 w-3 rounded-full bg-[#febc2e]"></span>
           <span class="h-3 w-3 rounded-full bg-[#28c840]"></span>
           <span class="ml-2 font-mono text-xs text-zinc-500">olaf — json report</span>
         </div>
         <div class="space-y-2 p-4 font-mono text-[0.85rem] leading-relaxed">
-          <p class="m-0 text-zinc-400"><span class="mr-2 text-cyan-300">$</span>olaf generate . --format json --offline</p>
+          <p class="m-0 text-zinc-400"><span class="mr-2 text-cyber-cyan">$</span>olaf generate . --format json --offline</p>
           <p class="m-0 break-all text-zinc-200">{"summary":{"total":3,"resolved":2,"unknown":1},…}</p>
           <ul class="m-0 flex list-none flex-wrap gap-2 p-0">
-            <li class="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 text-xs text-emerald-300">resolved</li>
-            <li class="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 text-xs text-emerald-300">resolved</li>
-            <li class="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-0.5 text-xs text-amber-300">unknown</li>
+            <li class="badge-resolved">resolved</li>
+            <li class="badge-resolved">resolved</li>
+            <li class="badge-unknown">unknown</li>
           </ul>
         </div>
       </div>
@@ -101,39 +102,39 @@
   <h2 class="mb-2 text-2xl font-bold text-white"><span class="mr-1.5" aria-hidden="true">🧭</span>Problems olaf solves</h2>
   <p class="mb-6 text-lg text-zinc-400">Dependency sprawl is a license-sprawl problem. olaf answers “what licenses ship with my build?” with a single sweep.</p>
   <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
-    <div class="rounded-xl border border-[#27272a] bg-[#0f172a]/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-indigo-500/50 sm:col-span-2 lg:col-span-2">
+    <div class="rounded-xl border border-olaf-border bg-olaf-surface/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-viking-blue/50 sm:col-span-2 lg:col-span-2">
       <!-- lucide:globe -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-cyan-300"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-cyber-cyan"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white">🗺️ 13-ecosystem sprawl</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400">One sweep covers <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">npm|nuget|pip|go|cargo|maven|gradle|composer|bundler|swift|cocoapods|vcpkg|conan</code> (<code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">pypi</code> alias for <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">pip</code>). Polyglot repo? Still one command.</p>
     </div>
-    <div class="rounded-xl border border-[#27272a] bg-[#0f172a]/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-indigo-500/50">
+    <div class="rounded-xl border border-olaf-border bg-olaf-surface/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-viking-blue/50">
       <!-- lucide:file-text -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-indigo-300"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-viking-blue"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white">📋 Audit &amp; SBOM pressure</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400">Emit CycloneDX 1.5 (<code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">cyclonedx-json</code>, <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">cyclonedx-xml</code>) or SPDX 2.3 (<code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">spdx-json</code>) straight from the same run auditors already trust.</p>
     </div>
-    <div class="rounded-xl border border-[#27272a] bg-[#0f172a]/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-indigo-500/50">
+    <div class="rounded-xl border border-olaf-border bg-olaf-surface/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-viking-blue/50">
       <!-- lucide:wifi-off -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-cyan-300"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-cyber-cyan"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white">✈️ Air-gap friendly</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--offline</code> resolves licenses from the embedded SPDX DB only — zero HTTP. Perfect for locked-down runners and planes.</p>
     </div>
-    <div class="rounded-xl border border-[#27272a] bg-[#0f172a]/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-indigo-500/50">
+    <div class="rounded-xl border border-olaf-border bg-olaf-surface/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-viking-blue/50">
       <!-- lucide:shield-check -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-emerald-300"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-scanner-green"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white">🚦 CI license gates</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--strict</code> fails the build (exit 1) when any license comes back <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">Unknown</code>. Unknowns never slip into a release unnoticed.</p>
     </div>
-    <div class="rounded-xl border border-[#27272a] bg-[#0f172a]/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-indigo-500/50">
+    <div class="rounded-xl border border-olaf-border bg-olaf-surface/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-viking-blue/50">
       <!-- lucide:scroll-text -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-purple-300"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 0 1-2 2Z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-viking-gold"><path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 0 1-2 2Z"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white">💌 Attribution without tears</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400">The <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">md</code> report is a human-readable attribution page: header counts plus a section per package. Paste it into your docs and done.</p>
     </div>
-    <div class="rounded-xl border border-[#27272a] bg-[#0f172a]/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-indigo-500/50">
+    <div class="rounded-xl border border-olaf-border bg-olaf-surface/70 p-5 shadow-lg shadow-black/30 backdrop-blur transition hover:border-viking-blue/50">
       <!-- lucide:zap -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-amber-300"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-viking-gold"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white">⚡ Zero-config + always-on cache</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">generate</code> is the only command and it just works — defaults point at the current directory and print <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code> to stdout. The license cache is internal and always on, so repeat runs stay fast.</p>
     </div>
@@ -144,19 +145,19 @@
   <h2 class="mb-2 text-2xl font-bold text-white"><span class="mr-1.5" aria-hidden="true">🗺️</span>Ecosystems</h2>
   <p class="mb-6 text-lg text-zinc-400">Thirteen lockfiles, one sweep. If your repo mixes runtimes, olaf still answers with a single command.</p>
   <ul class="grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4">
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">npm</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">nuget</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">pip</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">go</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">cargo</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">maven</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">gradle</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">composer</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">bundler</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">swift</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">cocoapods</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">vcpkg</code></li>
-    <li class="flex items-center gap-2.5 rounded-xl border border-[#27272a] bg-[#0f172a]/70 px-4 py-3 backdrop-blur transition hover:border-cyan-400/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyan-300"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="font-mono text-sm text-zinc-100">conan</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">npm</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">nuget</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">pip</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">go</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">cargo</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">maven</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">gradle</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">composer</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">bundler</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">swift</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">cocoapods</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">vcpkg</code></li>
+    <li class="flex items-center gap-2.5 rounded-xl border border-olaf-border bg-olaf-surface/70 px-4 py-3 backdrop-blur transition hover:border-cyber-cyan/50"><!-- lucide:package --><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-5 w-5 shrink-0 text-cyber-cyan"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><code class="badge-gold font-mono">conan</code></li>
   </ul>
   <p class="mt-4 text-[0.95rem] text-zinc-400">Bonus: <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">pypi</code> works as an alias for <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">pip</code>.</p>
 </section>
@@ -165,26 +166,26 @@
   <h2 class="mb-2 text-2xl font-bold text-white"><span class="mr-1.5" aria-hidden="true">🚀</span>Quickstart</h2>
   <p class="text-zinc-300">Full command shape — <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">generate [PATH]</code> is the only command (<code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">PATH</code> defaults to <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">.</code>, the report goes to stdout unless <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--out</code> is given):</p>
 <!-- exact-shape: olaf generate <DIR> [FLAGS] -->
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate &lt;DIR&gt; [FLAGS]
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate &lt;DIR&gt; [FLAGS]
 olaf generate &lt;DIR&gt; [--format &lt;fmt&gt;] [--out &lt;file&gt;] [--force] [--strict] [--offline]
 </code></pre>
   <p class="text-zinc-300">Exactly five flags, nothing else:</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">--format &lt;format&gt;  Output format: json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json (default: json)
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">--format &lt;format&gt;  Output format: json|yaml|xml|md|cyclonedx-json|cyclonedx-xml|spdx-json (default: json)
 --out &lt;out&gt;        Output file path (default: stdout; parent directories are created)
 --force            Overwrite output file if it exists
 --strict           Fail (exit 1) on unknown licenses
 --offline          Resolve licenses from the embedded offline DB only (no network; unknown licenses stay Unknown)
 </code></pre>
   <p class="text-zinc-300">Quickstart (exits <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">0</code>, summary <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">total 3, resolved 2, unknown 1</code> on the bundled fixture):</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate tests/Olaf.Tests/Fixtures/npm --format json --offline
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate tests/Olaf.Tests/Fixtures/npm --format json --offline
 <span class="text-zinc-500"># {"summary":{"total":3,"resolved":2,"unknown":1},...} (exit 0)</span>
 </code></pre>
   <p class="text-zinc-300">Gate it in CI — the same run exits <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">1</code> because one license is <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">Unknown</code> (the report is still written first):</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate tests/Olaf.Tests/Fixtures/npm --format json --offline --strict
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate tests/Olaf.Tests/Fixtures/npm --format json --offline --strict
 <span class="text-zinc-500"># report written, then exit 1 on the Unknown row</span>
 </code></pre>
   <p class="text-zinc-300">Help and version both exit <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">0</code>:</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate --help
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate --help
 olaf --version
 <span class="text-zinc-500"># 0.1.0-preview.3+...</span>
 </code></pre>
@@ -194,39 +195,39 @@ olaf --version
   <h2 class="mb-2 text-2xl font-bold text-white"><span class="mr-1.5" aria-hidden="true">📦</span>Install</h2>
   <p class="text-zinc-300">No .NET install required: each <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">v*</code> tag ships self-contained single-file binaries. Grab one with <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">curl</code> (or <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">gh</code>), make it executable, check the version:</p>
 
-  <div role="tablist" aria-label="Install methods" class="mb-0 flex flex-wrap gap-2 border-b border-[#27272a] pb-0">
-    <button id="tab-binary" type="button" role="tab" aria-selected="true" aria-controls="panel-binary" class="rounded-t-lg border border-b-0 border-[#27272a] bg-[#0f172a] px-4 py-2 text-sm font-semibold text-white aria-selected:border-indigo-500/60 aria-selected:bg-indigo-500/15 aria-selected:text-white">Binary</button>
-    <button id="tab-global" type="button" role="tab" aria-selected="false" aria-controls="panel-global" tabindex="-1" class="rounded-t-lg border border-b-0 border-[#27272a] bg-transparent px-4 py-2 text-sm font-semibold text-zinc-400 aria-selected:border-indigo-500/60 aria-selected:bg-indigo-500/15 aria-selected:text-white">
+  <div role="tablist" aria-label="Install methods" class="mb-0 flex flex-wrap gap-2 border-b border-olaf-border pb-0">
+    <button id="tab-binary" type="button" role="tab" aria-selected="true" aria-controls="panel-binary" class="rounded-t-lg border border-b-0 border-olaf-border bg-olaf-surface px-4 py-2 text-sm font-semibold text-white aria-selected:border-viking-blue/60 aria-selected:bg-viking-blue/15 aria-selected:text-white">Binary</button>
+    <button id="tab-global" type="button" role="tab" aria-selected="false" aria-controls="panel-global" tabindex="-1" class="rounded-t-lg border border-b-0 border-olaf-border bg-transparent px-4 py-2 text-sm font-semibold text-zinc-400 aria-selected:border-viking-blue/60 aria-selected:bg-viking-blue/15 aria-selected:text-white">
       Global tool
     </button>
-    <button id="tab-local" type="button" role="tab" aria-selected="false" aria-controls="panel-local" tabindex="-1" class="rounded-t-lg border border-b-0 border-[#27272a] bg-transparent px-4 py-2 text-sm font-semibold text-zinc-400 aria-selected:border-indigo-500/60 aria-selected:bg-indigo-500/15 aria-selected:text-white">
+    <button id="tab-local" type="button" role="tab" aria-selected="false" aria-controls="panel-local" tabindex="-1" class="rounded-t-lg border border-b-0 border-olaf-border bg-transparent px-4 py-2 text-sm font-semibold text-zinc-400 aria-selected:border-viking-blue/60 aria-selected:bg-viking-blue/15 aria-selected:text-white">
       Local manifest
     </button>
   </div>
 
-  <div id="panel-binary" role="tabpanel" aria-labelledby="tab-binary" class="rounded-b-xl rounded-tr-xl border border-[#27272a] bg-[#0f172a]/70 p-4 backdrop-blur">
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#09090b] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
+  <div id="panel-binary" role="tabpanel" aria-labelledby="tab-binary" class="rounded-b-xl rounded-tr-xl border border-olaf-border bg-olaf-surface/70 p-4 backdrop-blur">
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
 chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
 <span class="text-zinc-500"># 0.1.0-preview.3+...</span>
 </code></pre>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#09090b] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">gh release download v0.1.0-preview.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">gh release download v0.1.0-preview.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
 chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
 <span class="text-zinc-500"># 0.1.0-preview.3+...</span>
 </code></pre>
   </div>
-  <div id="panel-global" role="tabpanel" aria-labelledby="tab-global" hidden class="rounded-b-xl rounded-tr-xl border border-[#27272a] bg-[#0f172a]/70 p-4 backdrop-blur">
+  <div id="panel-global" role="tabpanel" aria-labelledby="tab-global" hidden class="rounded-b-xl rounded-tr-xl border border-olaf-border bg-olaf-surface/70 p-4 backdrop-blur">
     <h3 class="mb-2 mt-1 text-xl font-semibold text-white">Install from NuGet (.NET tool)</h3>
     <p class="text-zinc-300">olaf on NuGet is a .NET CLI tool, not a library — you install it with <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">dotnet tool install</code> and run it as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf</code>, you never reference it from a project. A .NET runtime is required to run it, and the <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--version 0.1.0-preview.3</code> pin is required — unpinned installs fail for prerelease versions. Global install:</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#09090b] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet tool install -g olaf --version 0.1.0-preview.3
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet tool install -g olaf --version 0.1.0-preview.3
 olaf --version
 <span class="text-zinc-500"># 0.1.0-preview.3+...</span>
 </code></pre>
   </div>
-  <div id="panel-local" role="tabpanel" aria-labelledby="tab-local" hidden class="rounded-b-xl rounded-tr-xl border border-[#27272a] bg-[#0f172a]/70 p-4 backdrop-blur">
+  <div id="panel-local" role="tabpanel" aria-labelledby="tab-local" hidden class="rounded-b-xl rounded-tr-xl border border-olaf-border bg-olaf-surface/70 p-4 backdrop-blur">
     <p class="text-zinc-300">Repo-pinned local install for solutions and CI (restores the pinned version per repo via a tool manifest):</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#09090b] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet new tool-manifest
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet new tool-manifest
 dotnet tool install olaf --version 0.1.0-preview.3
 dotnet tool run olaf --version
 <span class="text-zinc-500"># 0.1.0-preview.3+...</span>
@@ -235,23 +236,23 @@ dotnet tool run olaf --version
 
   <!-- No download attribute on the buttons below: the cross-origin redirect to objects.githubusercontent.com ignores it, and GitHub already sends an attachment disposition. -->
   <div class="my-4 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-indigo-400" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64">
+    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64">
       <!-- lucide:download -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
       Download for Linux (x64)
     </a>
-    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-indigo-400" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-osx-arm64">
+    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-osx-arm64">
       <!-- lucide:download -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
       Download for macOS (arm64)
     </a>
-    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-indigo-400" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-win-x64.exe">
+    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-win-x64.exe">
       <!-- lucide:download -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
       Download for Windows (x64)
     </a>
   </div>
-  <p class="text-[0.95rem] text-zinc-400">Prefer to browse? <a class="text-cyan-300 hover:underline" href="https://github.com/fluxion-dev/olaf/releases">All releases on GitHub</a> (current: <a class="text-cyan-300 hover:underline" href="https://github.com/fluxion-dev/olaf/releases/tag/v0.1.0-preview.3">v0.1.0-preview.3</a>).</p>
+  <p class="text-[0.95rem] text-zinc-400">Prefer to browse? <a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf/releases">All releases on GitHub</a> (current: <a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf/releases/tag/v0.1.0-preview.3">v0.1.0-preview.3</a>).</p>
   <ul class="list-disc pl-6 text-[0.95rem] text-zinc-400">
     <li class="mb-1.5">Linux and macOS: <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">chmod +x</code> the binary after downloading, then run <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--version</code> to verify.</li>
     <li class="mb-1.5">Windows: download the <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">.exe</code> and run it directly — no <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">chmod</code> needed.</li>
@@ -259,13 +260,13 @@ dotnet tool run olaf --version
     <li class="mb-1.5">Each binary is self-contained and roughly 75 MB, so expect a large download.</li>
   </ul>
   <table class="w-full border-collapse text-[0.95rem]">
-    <tr><th class="border-b border-[#27272a] bg-white/5 px-3 py-2 text-left text-zinc-200">RID</th><th class="border-b border-[#27272a] bg-white/5 px-3 py-2 text-left text-zinc-200">Binary</th><th class="border-b border-[#27272a] bg-white/5 px-3 py-2 text-left text-zinc-200">Size (attached asset)</th></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">linux-x64</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-linux-x64</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">75,007,663 bytes (~71.5 MiB)</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">osx-arm64</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-osx-arm64</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">81,467,641 bytes (~77.7 MiB)</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">win-x64</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-win-x64.exe</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">74,966,246 bytes (~71.5 MiB)</td></tr>
+    <tr><th class="border-b border-olaf-border bg-white/5 px-3 py-2 text-left text-zinc-200">RID</th><th class="border-b border-olaf-border bg-white/5 px-3 py-2 text-left text-zinc-200">Binary</th><th class="border-b border-olaf-border bg-white/5 px-3 py-2 text-left text-zinc-200">Size (attached asset)</th></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">linux-x64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-linux-x64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">75,007,663 bytes (~71.5 MiB)</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">osx-arm64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-osx-arm64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">81,467,641 bytes (~77.7 MiB)</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">win-x64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-win-x64.exe</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">74,966,246 bytes (~71.5 MiB)</td></tr>
   </table>
   <p class="text-zinc-300">Prefer the .NET toolchain? Install the pinned prerelease as a global tool (the pin is required — unpinned installs fail for prereleases):</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet pack src/Olaf.Cli -c Release
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet pack src/Olaf.Cli -c Release
 dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.3
 olaf --help
 </code></pre>
@@ -275,17 +276,17 @@ olaf --help
   <h2 class="mb-2 text-2xl font-bold text-white"><span class="mr-1.5" aria-hidden="true">🎨</span>Formats</h2>
   <p class="text-zinc-300">Seven formats, zero aliases. One sweep, whichever shape your pipeline wants:</p>
   <table class="w-full border-collapse text-[0.95rem]">
-    <tr><th class="border-b border-[#27272a] bg-white/5 px-3 py-2 text-left text-zinc-200">Format</th><th class="border-b border-[#27272a] bg-white/5 px-3 py-2 text-left text-zinc-200">Output</th></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">Summary counts plus per-package rows, sorted <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">ecosystem → name → version</code></td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">yaml</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">Same shape as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code>, YAML-encoded</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">xml</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">Same fields as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code>, XML-encoded</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">md</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">Human-readable attribution report (header counts + per-package sections)</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">cyclonedx-json</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">CycloneDX 1.5 SBOM</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">cyclonedx-xml</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">Same CycloneDX 1.5 data as JSON, XML-encoded</td></tr>
-    <tr><td class="border-b border-[#27272a] px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">spdx-json</code></td><td class="border-b border-[#27272a] px-3 py-2 text-left text-zinc-300">SPDX 2.3 SBOM</td></tr>
+    <tr><th class="border-b border-olaf-border bg-white/5 px-3 py-2 text-left text-zinc-200">Format</th><th class="border-b border-olaf-border bg-white/5 px-3 py-2 text-left text-zinc-200">Output</th></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">Summary counts plus per-package rows, sorted <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">ecosystem → name → version</code></td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">yaml</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">Same shape as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code>, YAML-encoded</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">xml</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">Same fields as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">json</code>, XML-encoded</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">md</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">Human-readable attribution report (header counts + per-package sections)</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">cyclonedx-json</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">CycloneDX 1.5 SBOM</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">cyclonedx-xml</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">Same CycloneDX 1.5 data as JSON, XML-encoded</td></tr>
+    <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">spdx-json</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">SPDX 2.3 SBOM</td></tr>
   </table>
   <p class="text-zinc-300">Same command, different shape — swap the format, keep the sweep:</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate &lt;DIR&gt; --format cyclonedx-json --out sbom.json
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate &lt;DIR&gt; --format cyclonedx-json --out sbom.json
 </code></pre>
 </section>
 
@@ -293,28 +294,28 @@ olaf --help
   <h2 class="mb-2 text-2xl font-bold text-white"><span class="mr-1.5" aria-hidden="true">🔢</span>Exit codes &amp; CI gate</h2>
   <p class="mb-6 text-lg text-zinc-400">Three codes, no surprises — scripts and CI steps can branch on them with confidence.</p>
   <div class="mb-6 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
-    <div class="rounded-xl border border-emerald-400/30 bg-emerald-400/5 p-5 backdrop-blur">
+    <div class="rounded-xl border border-scanner-green/30 bg-scanner-green/5 p-5 backdrop-blur">
       <!-- lucide:circle-check -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-emerald-300"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-scanner-green"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em]">0</code> Success</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400">Success — including runs with <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">Unknown</code> licenses (without <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--strict</code>), empty-directory empty reports, <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--help</code>/<code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--version</code></p>
     </div>
-    <div class="rounded-xl border border-red-400/30 bg-red-400/5 p-5 backdrop-blur">
+    <div class="rounded-xl border border-strict-red/30 bg-strict-red/5 p-5 backdrop-blur">
       <!-- lucide:circle-x -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-red-300"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-strict-red"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em]">1</code> Strict gate</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--strict</code> found <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">Unknown</code> licenses (report is still written first)</p>
     </div>
-    <div class="rounded-xl border border-amber-400/30 bg-amber-400/5 p-5 backdrop-blur">
+    <div class="rounded-xl border border-viking-gold/30 bg-viking-gold/5 p-5 backdrop-blur">
       <!-- lucide:triangle-alert -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-amber-300"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="mb-2 h-6 w-6 text-viking-gold"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
       <h3 class="mb-1.5 text-lg font-semibold text-white"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em]">2</code> Usage/IO error</h3>
       <p class="m-0 text-[0.95rem] text-zinc-400">Usage/IO error: path not found, single-file input, unsupported <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--format</code>, unknown option, <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--out</code> exists without <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--force</code>, write failure</p>
     </div>
   </div>
   <h3 class="mb-2 text-xl font-semibold text-white">GitHub Action step</h3>
   <p class="text-sm text-zinc-400">Example config — not executed. Paste it into a workflow to gate merges on unknown licenses:</p>
-<pre class="overflow-x-auto rounded-xl border border-[#27272a] bg-[#0f172a] p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono"><span class="text-zinc-500"># example config — not executed</span>
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono"><span class="text-zinc-500"># example config — not executed</span>
 steps:
   - name: Scan licenses
     run: olaf generate . --format json --offline --strict
@@ -323,8 +324,8 @@ steps:
 
 </main>
 
-<footer class="border-t border-[#27272a] bg-[#0f172a]/60 px-5 pb-8 pt-6 text-center text-[0.92rem] text-zinc-400 backdrop-blur">
-  <p class="m-0"><a class="text-cyan-300 hover:underline" href="https://github.com/fluxion-dev/olaf">olaf</a> — a license scanner that takes Docs Day seriously, and itself lightly. Reports issues upstream.</p>
+<footer class="border-t border-olaf-border bg-olaf-surface/60 px-5 pb-8 pt-6 text-center text-[0.92rem] text-zinc-400 backdrop-blur">
+  <p class="m-0"><a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf">olaf</a> — a license scanner that takes Docs Day seriously, and itself lightly. Reports issues upstream.</p>
   <ul class="mt-3 flex list-none flex-wrap items-center justify-center gap-x-5 gap-y-1 p-0">
     <li><a class="text-zinc-300 no-underline hover:text-white hover:underline" href="https://github.com/fluxion-dev/olaf">Repository</a></li>
     <li><a class="text-zinc-300 no-underline hover:text-white hover:underline" href="https://github.com/fluxion-dev/olaf/issues">Issues</a></li>
