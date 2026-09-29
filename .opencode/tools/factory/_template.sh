@@ -10,7 +10,7 @@
 # usage() heredoc idiom (#149 harvest, 2nd backtick-expansion sighting):
 # prefer quoted <<'EOF' + hardcoded name; if unquoted, escape every $/`
 # in the body or --help executes it (docs-drift 0.3.0 + pages-verify 0.3.0).
-VERSION="0.2.13"
+VERSION="0.2.14"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -333,6 +333,9 @@ KEEP_TEMP=0
 #   (last summary wins; `|| true` keeps empty logs from aborting) — never
 #   `grep "Total tests"` (build-plan lines also mention totals; only the
 #   Passed!/Failed! summary line carries the authoritative counts).
+# run_gate tags must be filesystem-safe: sanitize labels with
+#   tag=$(echo "$label" | tr -c '[:alnum:]' '-' | tr -s '-') — a `/` in a
+#   label breaks `>"$log"` with a phantom-subdir error (#167 harvest).
 # Canonical source promoted to template 0.2.11 after 2nd family use
 #   (test-count-probe.sh live gate + LAST extraction; cyclonedx-family
 #   run_scan RC shape — same set+e/capture/set-e skeleton).
