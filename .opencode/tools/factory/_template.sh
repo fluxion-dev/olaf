@@ -7,7 +7,10 @@
 # repo-relative — NEVER write those outside the repo.
 # --workdir standard: every probe accepts [--workdir <dir>] [--keep-temp]
 # wired to WORKDIR/KEEP_TEMP below so runs are reproducible and debuggable.
-VERSION="0.2.11"
+# usage() heredoc idiom (#149 harvest, 2nd backtick-expansion sighting):
+# prefer quoted <<'EOF' + hardcoded name; if unquoted, escape every $/`
+# in the body or --help executes it (docs-drift 0.3.0 + pages-verify 0.3.0).
+VERSION="0.2.12"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
