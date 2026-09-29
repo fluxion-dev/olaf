@@ -14,11 +14,13 @@
 #     existence+order still asserted), never FAIL.
 #   no-tagged-release — contradiction gate: FAIL if case-insensitive
 #     `no tagged release yet` coexists with the `v* tag builds` paragraph.
-#   pin-consistency — all `v*`/--version pins in README resolve to a single
-#     tag and equal src/Olaf.Cli/Olaf.Cli.csproj <Version> (normalized
-#     leading-v stripped; FAIL lists the distinct set).
-#   asset-URL identity — README `releases/download/<tag>/…` URLs
-#     byte-identical to `gh release view <tag> --json assets` names+URLs
+#   pin-consistency — all `v*`/--version pins in README + site/index.html
+#     resolve to a single tag and equal src/Olaf.Cli/Olaf.Cli.csproj
+#     <Version> (normalized leading-v stripped; FAIL lists the distinct
+#     set). `-g` vs `--global` install-flag spelling is INFO-only, never
+#     FAIL (version pins only, never command-string compare).
+#   asset-URL identity — README + site hrefs `releases/download/<tag>/…`
+#     URLs byte-identical to `gh release view <tag> --json assets` names+URLs
 #     (tag derived from pin-consistency); FAIL on bare `Olaf.Cli[.exe]`
 #     asset names. Identity is always asserted via the `gh` API path
 #     (anonymous curl 404s on private repos, so `gh` is required there;
@@ -36,7 +38,7 @@
 #     `curl -fSL .../releases/download/...` example; gh-download and
 #     private-404 notes become SKIP-with-INFO (never FAIL).
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.3.0"
+VERSION="0.4.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -57,11 +59,12 @@ Usage: $(basename "$0") [options]
 README docs-drift asserts for the single-file publish surface (ASSERTS ONLY,
 never rewrites): Tests:N vs live dotnet test, 3-RID size-table rows
 (existence+order+MiB +-5, missing publish dirs SKIP), no-tagged-release
-contradiction gate, pin-consistency (README v*/--version pins == csproj
-<Version>), asset-URL identity (README download URLs == gh release assets),
-private-note (visibility-aware: PRIVATE-mode gh-download + private-404
-adjacency; PUBLIC-mode public-anonymous note + curl -fSL example, private
-notes SKIP-with-INFO never FAIL).
+contradiction gate, pin-consistency (README plus site-index pins == csproj
+<Version>), asset-URL identity (README plus site href download URLs == gh
+release assets), private-note (visibility-aware: PRIVATE-mode gh-download +
+private-404 adjacency; PUBLIC-mode public-anonymous note + curl -fSL example,
+private notes SKIP-with-INFO never FAIL). Site source is site/index.html
+and site/dist is never asserted as it is a gitignored build artifact.
 
 Options:
   --repo-root <dir>     Repo root (default: git top-level or script-relative fallback)
@@ -136,6 +139,21 @@ if [[ ! -f "$README" ]]; then
   echo "Missing README: $README" >&2
   exit 2
 fi
+# ---- Canonical pass/fail (copy-paste) ----
+fail=0
+npass=0
+pass() { echo "PASS: $*"; npass=$((npass + 1)); }
+fail_msg() { echo "FAIL: $*"; fail=1; }
+warn() { echo "WARN: $*"; }
+
+# Asserted site source only; site/dist/ is a gitignored build artifact and is
+# never asserted.
+SITE="$REPO_ROOT/site/index.html"
+HAVE_SITE=1
+if [[ ! -f "$SITE" ]]; then
+  warn "pin-consistency: missing site/index.html at $SITE — SKIP site arms"
+  HAVE_SITE=0
+fi
 
 for cmd in dotnet timeout python3; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -157,13 +175,6 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
-
-# ---- Canonical pass/fail (copy-paste) ----
-fail=0
-npass=0
-pass() { echo "PASS: $*"; npass=$((npass + 1)); }
-fail_msg() { echo "FAIL: $*"; fail=1; }
-warn() { echo "WARN: $*"; }
 
 # ---- Canonical run_gate (from _template.sh 0.2.11; RC carries the verdict) ----
 RC=0
@@ -303,22 +314,30 @@ if [[ -z "$CSPROJ_VER" ]]; then
 else
   TAG="v$CSPROJ_VER"
   PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
-  if [[ -z "$PINS" ]]; then
-    fail_msg "pin-consistency: no v*/--version pins in README.md (csproj $CSPROJ_VER)"
+  README_PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
+  SITE_PINS=""
+  SITE_PIN_LINES=0
+  if (( HAVE_SITE )); then
+    SITE_PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$SITE" || true)"
+    SITE_PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$SITE" || true)"
+  fi
+  ALL_PINS="$(printf '%s\n%s\n' "$PINS" "$SITE_PINS" | grep -E '.+' || true)"
+  if [[ -z "$ALL_PINS" ]]; then
+    fail_msg "pin-consistency: no v*/--version pins in README.md + site/index.html (csproj $CSPROJ_VER)"
   else
-    PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
-    UNIQUES="$(printf '%s\n' "$PINS" | sed -E 's/^v//' | sort -u | tr '\n' ' ')"
-    NUNIQ="$(printf '%s\n' "$PINS" | sed -E 's/^v//' | sort -u | wc -l | tr -d ' ')"
+    UNIQUES="$(printf '%s\n' "$ALL_PINS" | sed -E 's/^v//' | sort -u | tr '\n' ' ')"
+    NUNIQ="$(printf '%s\n' "$ALL_PINS" | sed -E 's/^v//' | sort -u | wc -l | tr -d ' ')"
     if [[ "$NUNIQ" -ne 1 ]]; then
-      fail_msg "pin-consistency: README pins resolve to $NUNIQ distinct versions ($UNIQUES), want exactly 1"
+      fail_msg "pin-consistency: README+site pins resolve to $NUNIQ distinct versions ($UNIQUES), want exactly 1 (README lines $README_PIN_LINES, site lines $SITE_PIN_LINES)"
       TAG=""
     elif [[ "${UNIQUES% }" != "$CSPROJ_VER" ]]; then
-      fail_msg "pin-consistency: README pin ${UNIQUES% } != csproj $CSPROJ_VER"
+      fail_msg "pin-consistency: README+site pin ${UNIQUES% } != csproj $CSPROJ_VER (README lines $README_PIN_LINES, site lines $SITE_PIN_LINES)"
       TAG=""
     else
-      pass "pin-consistency: $PIN_LINES README pin lines resolve to single tag $TAG == csproj $CSPROJ_VER"
+      pass "pin-consistency: $README_PIN_LINES README + $SITE_PIN_LINES site pin lines resolve to single tag $TAG == csproj $CSPROJ_VER"
     fi
   fi
+  echo "INFO: install-flag spelling -g vs --global equivalent (version pins only, never command-string compare)"
 fi
 
 # ---- Visibility resolution (auto-detect, explicit override wins) ----
@@ -421,6 +440,61 @@ PY
       fi
     fi
   fi
+    # Site hrefs: HTML-safe delimiters (double-quote + angle brackets excluded
+    # so href="…"> never over-captures). releases/tag/ links are NOT download
+    # URLs (require releases/download/). Reuses release-view-assets.json above
+    # (no second gh call); site/dist/ never asserted.
+    if (( ! HAVE_SITE )); then
+      warn "asset-URL identity: no site/index.html — SKIP site hrefs"
+    else
+      SITE_URLS="$(grep -oE 'https://github\.com/[^ '"'"'"` )<>]*releases/download/[^ '"'"'"` )<>]+' "$SITE" || true)"
+      if [[ -z "$SITE_URLS" ]]; then
+        pass "asset-URL identity: no direct download URLs in site/index.html — nothing to check"
+      else
+        SITE_BADTAG="$(printf '%s\n' "$SITE_URLS" | grep -vF "/$TAG/" || true)"
+        if [[ -n "$SITE_BADTAG" ]]; then
+          fail_msg "asset-URL identity: site/index.html URLs not under $TAG: $(printf '%s' "$SITE_BADTAG" | tr '\n' ' ')"
+        else
+          pass "asset-URL identity: all site/index.html download URLs carry $TAG"
+        fi
+        SITE_NAMES="$(printf '%s\n' "$SITE_URLS" | sed -E 's|.*/||')"
+        SITE_BARE="$(printf '%s\n' "$SITE_NAMES" | grep -xE 'Olaf\.Cli(\.exe)?' || true)"
+        if [[ -n "$SITE_BARE" ]]; then
+          fail_msg "asset-URL identity: bare apphost asset name(s) in site/index.html: $(printf '%s' "$SITE_BARE" | tr '\n' ' ')"
+        else
+          pass "asset-URL identity: no bare Olaf.Cli[.exe] names in site/index.html URLs"
+        fi
+        printf '%s\n' "$SITE_URLS" | sort -u >"$WORKDIR/site-urls.txt"
+        if [[ ! -f "$WORKDIR/release-view-assets.json" ]]; then
+          run_gate "$WORKDIR/release-view-assets.json" -- gh release view "$TAG" --json assets
+          if [[ "$RC" -ne 0 ]]; then
+            fail_msg "asset-URL identity: gh release view $TAG exited $RC (use gh API path — anonymous curl 404s on private repos)"
+          fi
+        fi
+        if [[ -f "$WORKDIR/release-view-assets.json" ]]; then
+          site_rc=0
+          site_out="$(python3 - "$WORKDIR/site-urls.txt" "$WORKDIR/release-view-assets.json" <<'PY' 2>/dev/null
+import json, sys
+doc = sorted(set(l.strip() for l in open(sys.argv[1]) if l.strip()))
+data = json.load(open(sys.argv[2]))
+live_urls = sorted(set(a.get("url", "") for a in data.get("assets", []) if isinstance(a, dict) and a.get("url")))
+live_names = sorted(set(a.get("name", "") for a in data.get("assets", []) if isinstance(a, dict) and a.get("name")))
+doc_names = sorted(set(u.rstrip("/").split("/")[-1] for u in doc))
+print("DOC_URLS=" + " ".join(doc))
+print("LIVE_URLS=" + " ".join(live_urls))
+print("DOC_NAMES=" + " ".join(doc_names))
+print("LIVE_NAMES=" + " ".join(live_names))
+sys.exit(0 if (doc == live_urls and doc_names == live_names) else 1)
+PY
+)" || site_rc=$?
+          if (( site_rc != 0 )); then
+            fail_msg "asset-URL identity: site/index.html URLs/names != release $TAG assets — $site_out"
+          else
+            pass "asset-URL identity: site/index.html URLs byte-identical to gh release view $TAG names+URLs"
+          fi
+        fi
+      fi
+    fi
 fi
 
 # ---- Arm 6: install note (visibility-aware) ----
