@@ -2,7 +2,56 @@
 
 @layer base {
   ::selection {
-    background: #512bd4;
+    background: #6366f1;
     color: #fff;
+  }
+
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #09090b;
+  }
+
+  :where(a, button, [role="tab"]):focus-visible {
+    outline: 2px solid #22d3ee;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+}
+
+@layer components {
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 50;
+    border-radius: 8px;
+    background: #312e81;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
   }
 }
