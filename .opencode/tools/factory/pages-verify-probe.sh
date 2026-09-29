@@ -5,7 +5,9 @@
 #   (issue #149: first-party src-less inline vanilla JS — tabs + copy button —
 #   ALLOWED, each body extracted via python3 to $WORKDIR and gated with
 #   `node --check`, failure → FAIL; any <script with src= — external or local
-#   .js — FAILs with hit-listing); no local src/href EXCEPT hashed Vite assets
+#   .js — FAILs with hit-listing); type="application/ld+json" bodies are NOT
+#   node-gated — validated with python3 json.load instead (issue #161: valid PASSes,
+#   malformed FAILs); no local src/href EXCEPT hashed Vite assets
 #   ((src|href)="(/olaf/|./|/)?
 #   assets/[^"]*\.(css|png|jpe?g|svg|webp|woff2?)" allowlisted — CSS + image + font because the #135 homepage is a Vite build and brand-kit #153 self-hosts woff2 + mascot jpg hashed to assets/;
 #   any *.js ref stays banned = defense in depth paired
@@ -17,7 +19,8 @@
 # P2 (4): all badge img-src URLs curl -fSL 200 (license badge 404 allowed ONLY
 #   when LICENSE is absent — advisory WARN, never forced green).
 # P3 (3): live URL 200 + HERO_MARKER in served bytes + inline-allow script arm
-#   in served bytes (mirrors P1: src= FAILs, inline bodies node --check gated).
+#   in served bytes (mirrors P1: src= FAILs, inline bodies node --check gated,
+#   ld+json bodies json.load validated).
 # P4 (2): pages.yml run poll (gh run list workflow=pages.yml lookup + timeout
 #   gh run watch --exit-status; timeout FAILs, never infinite sleep).
 # Pre-deploy (Pages not enabled — gh api pages -> 404): P3/P4 FAIL cleanly
@@ -25,7 +28,7 @@
 # happens post-enable (plan Step 6). Shell MUST be bash. No pipestatus reads
 # (fqn-lint pipefail arm). $TIMEOUT_BIN captured before any PATH use.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.4.1"
+VERSION="0.4.2"
 set -euo pipefail
 shopt -s nullglob
 
@@ -50,6 +53,8 @@ P1 script arm is inline-allow (issue #149): first-party src-less inline
 <script> (tabs + copy-button vanilla JS) is ALLOWED — each body is extracted
 to \$WORKDIR and gated with \`node --check\` (failure FAILs); any <script>
 carrying src= (external CDN or local .js) FAILs with hit-listing.
+type="application/ld+json" bodies are excluded from node --check and validated
+with python3 json.load instead (issue #161: valid JSON PASSes, malformed FAILs).
 P1 local-ref arm is deny-all EXCEPT hashed Vite asset(s) matching
 (src|href)="(/olaf/|./|/)?assets/[^"]*\.(css|png|jpe?g|svg|webp|woff2?)" (brand-kit #153:
 self-hosted woff2 fonts + mascot jpg hash into assets/ at build time); every other
@@ -57,7 +62,7 @@ local src/href —
 especially any *.js — FAILs (js stays banned: a script asset would break
 the inline-only guarantee the P1/P3 src= arms enforce — defense in depth).
 P3 mirrors P1 in served bytes (same src-vs-inline distinction + node
---check on served inline bodies).
+--check on served inline bodies + ld+json json.load validation).
 
 Options:
   --url <live-url>      Pages URL (default: $LIVE_URL)
@@ -216,22 +221,33 @@ if [[ -f "$PAGE" ]]; then
   if grep -qE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$PAGE"; then
     fail_msg "P1: <script src= found (external/local banned): $(grep -nE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$PAGE" | head -3 | tr '\n' ' ')"
   elif grep -q -- '<script' "$PAGE"; then
-    rm -f "$WORKDIR"/p1-inline-*.js "$WORKDIR"/p1-inline-*.log
-    python3 - "$PAGE" "$WORKDIR/p1-inline-count.txt" <<'PY' 2>/dev/null
+    rm -f "$WORKDIR"/p1-inline-*.js "$WORKDIR"/p1-inline-*.log "$WORKDIR"/p1-ldjson-*.json "$WORKDIR"/p1-ldjson-*.log
+    python3 - "$PAGE" "$WORKDIR/p1-inline-count.txt" "$WORKDIR/p1-ldjson-count.txt" <<'PY' 2>/dev/null
 import os, re, sys
 src = open(sys.argv[1]).read()
 wd = os.path.dirname(sys.argv[2])
 bodies = []
+ld = []
 for m in re.finditer(r'<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>', src, re.DOTALL | re.IGNORECASE):
+    tag = m.group(0)[:m.group(0).find('>') + 1]
     body = m.group(1).strip()
-    if body:
+    if not body:
+        continue
+    if re.search(r'ld\+json', tag, re.IGNORECASE):
+        ld.append(body)
+    else:
         bodies.append(body)
 for i, body in enumerate(bodies):
     open(os.path.join(wd, "p1-inline-%d.js" % i), 'w').write(body + '\n')
+for i, body in enumerate(ld):
+    open(os.path.join(wd, "p1-ldjson-%d.json" % i), 'w').write(body + '\n')
 open(sys.argv[2], 'w').write(str(len(bodies)) + '\n')
+open(sys.argv[3], 'w').write(str(len(ld)) + '\n')
 PY
     NINLINE="$(cat "$WORKDIR/p1-inline-count.txt" 2>/dev/null || echo 0)"
     if [[ -z "$NINLINE" ]]; then NINLINE=0; fi
+    NLDJSON="$(cat "$WORKDIR/p1-ldjson-count.txt" 2>/dev/null || echo 0)"
+    if [[ -z "$NLDJSON" ]]; then NLDJSON=0; fi
     INLINE_FAIL=0
     for inline_js in "$WORKDIR"/p1-inline-*.js; do
       [[ -e "$inline_js" ]] || continue
@@ -241,10 +257,19 @@ PY
         INLINE_FAIL=1
       fi
     done
-    if (( INLINE_FAIL )); then
-      fail_msg "P1: $NINLINE inline <script> body(ies) with node --check failure(s) (see info lines above)"
+    LDJSON_FAIL=0
+    for ld_json in "$WORKDIR"/p1-ldjson-*.json; do
+      [[ -e "$ld_json" ]] || continue
+      run_gate "$ld_json.check.log" -- python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$ld_json"
+      if [[ "$RC" -ne 0 ]]; then
+        echo "  info: ld+json FAIL json parse: $ld_json (log: $ld_json.check.log)"
+        LDJSON_FAIL=1
+      fi
+    done
+    if (( INLINE_FAIL )) || (( LDJSON_FAIL )); then
+      fail_msg "P1: script gate failed ($NINLINE inline node --check failure(s)=$INLINE_FAIL, $NLDJSON ld+json json-parse failure(s)=$LDJSON_FAIL; see info lines above)"
     else
-      pass "P1: $NINLINE inline <script> body(ies) node --check clean (no src=)"
+      pass "P1: $NINLINE inline <script> body(ies) node --check clean + $NLDJSON ld+json JSON-valid (no src=)"
     fi
   else
     pass "P1: no <script element"
@@ -424,22 +449,33 @@ else
   if grep -qE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$WORKDIR/live.html"; then
     fail_msg "P3: <script src= in served bytes (external/local banned): $(grep -nE -- '<script[^>]*[[:space:]]src[[:space:]]*=' "$WORKDIR/live.html" | head -3 | tr '\n' ' ')"
   elif grep -q -- '<script' "$WORKDIR/live.html"; then
-    rm -f "$WORKDIR"/p3-inline-*.js "$WORKDIR"/p3-inline-*.log
-    python3 - "$WORKDIR/live.html" "$WORKDIR/p3-inline-count.txt" <<'PY' 2>/dev/null
+    rm -f "$WORKDIR"/p3-inline-*.js "$WORKDIR"/p3-inline-*.log "$WORKDIR"/p3-ldjson-*.json "$WORKDIR"/p3-ldjson-*.log
+    python3 - "$WORKDIR/live.html" "$WORKDIR/p3-inline-count.txt" "$WORKDIR/p3-ldjson-count.txt" <<'PY' 2>/dev/null
 import os, re, sys
 src = open(sys.argv[1]).read()
 wd = os.path.dirname(sys.argv[2])
 bodies = []
+ld = []
 for m in re.finditer(r'<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>', src, re.DOTALL | re.IGNORECASE):
+    tag = m.group(0)[:m.group(0).find('>') + 1]
     body = m.group(1).strip()
-    if body:
+    if not body:
+        continue
+    if re.search(r'ld\+json', tag, re.IGNORECASE):
+        ld.append(body)
+    else:
         bodies.append(body)
 for i, body in enumerate(bodies):
     open(os.path.join(wd, "p3-inline-%d.js" % i), 'w').write(body + '\n')
+for i, body in enumerate(ld):
+    open(os.path.join(wd, "p3-ldjson-%d.json" % i), 'w').write(body + '\n')
 open(sys.argv[2], 'w').write(str(len(bodies)) + '\n')
+open(sys.argv[3], 'w').write(str(len(ld)) + '\n')
 PY
     NINLINE_SERVED="$(cat "$WORKDIR/p3-inline-count.txt" 2>/dev/null || echo 0)"
     if [[ -z "$NINLINE_SERVED" ]]; then NINLINE_SERVED=0; fi
+    NLDJSON_SERVED="$(cat "$WORKDIR/p3-ldjson-count.txt" 2>/dev/null || echo 0)"
+    if [[ -z "$NLDJSON_SERVED" ]]; then NLDJSON_SERVED=0; fi
     INLINE_FAIL_SERVED=0
     for inline_js in "$WORKDIR"/p3-inline-*.js; do
       [[ -e "$inline_js" ]] || continue
@@ -449,10 +485,19 @@ PY
         INLINE_FAIL_SERVED=1
       fi
     done
-    if (( INLINE_FAIL_SERVED )); then
-      fail_msg "P3: $NINLINE_SERVED served inline <script> body(ies) with node --check failure(s) (see info lines above)"
+    LDJSON_FAIL_SERVED=0
+    for ld_json in "$WORKDIR"/p3-ldjson-*.json; do
+      [[ -e "$ld_json" ]] || continue
+      run_gate "$ld_json.check.log" -- python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$ld_json"
+      if [[ "$RC" -ne 0 ]]; then
+        echo "  info: served ld+json FAIL json parse: $ld_json (log: $ld_json.check.log)"
+        LDJSON_FAIL_SERVED=1
+      fi
+    done
+    if (( INLINE_FAIL_SERVED )) || (( LDJSON_FAIL_SERVED )); then
+      fail_msg "P3: served script gate failed ($NINLINE_SERVED inline node --check failure(s)=$INLINE_FAIL_SERVED, $NLDJSON_SERVED ld+json json-parse failure(s)=$LDJSON_FAIL_SERVED; see info lines above)"
     else
-      pass "P3: $NINLINE_SERVED served inline <script> body(ies) node --check clean (no src=)"
+      pass "P3: $NINLINE_SERVED served inline <script> body(ies) node --check clean + $NLDJSON_SERVED ld+json JSON-valid (no src=)"
     fi
   else
     pass "P3: no <script element in served bytes"
