@@ -15,7 +15,7 @@
 #   no-tagged-release — contradiction gate: FAIL if case-insensitive
 #     `no tagged release yet` coexists with the `v* tag builds` paragraph.
 #   pin-consistency — all `v*`/--version pins in README + site/index.html
-#     resolve to a single tag and equal src/Olaf.Cli/Olaf.Cli.csproj
+#     resolve to a single SemVer tag and equal src/Olaf.Cli/Olaf.Cli.csproj
 #     <Version> (normalized leading-v stripped; FAIL lists the distinct
 #     set). `-g` vs `--global` install-flag spelling is INFO-only, never
 #     FAIL (version pins only, never command-string compare).
@@ -38,7 +38,7 @@
 #     `curl -fSL .../releases/download/...` example; gh-download and
 #     private-404 notes become SKIP-with-INFO (never FAIL).
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.4.0"
+VERSION="0.5.0"
 set -euo pipefail
 
 # ---- Canonical root resolution (copy-paste; do not hardcode paths) ----
@@ -313,13 +313,13 @@ if [[ -z "$CSPROJ_VER" ]]; then
   fail_msg "pin-consistency: cannot parse <Version> from src/Olaf.Cli/Olaf.Cli.csproj"
 else
   TAG="v$CSPROJ_VER"
-  PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
-  README_PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$README" || true)"
+  PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+|v[0-9]+\.[0-9]+\.[0-9]+' "$README" || true)"
+  README_PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+|v[0-9]+\.[0-9]+\.[0-9]+' "$README" || true)"
   SITE_PINS=""
   SITE_PIN_LINES=0
   if (( HAVE_SITE )); then
-    SITE_PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$SITE" || true)"
-    SITE_PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+' "$SITE" || true)"
+    SITE_PINS="$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+|v[0-9]+\.[0-9]+\.[0-9]+' "$SITE" || true)"
+    SITE_PIN_LINES="$(grep -cE 'v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+|v[0-9]+\.[0-9]+\.[0-9]+' "$SITE" || true)"
   fi
   ALL_PINS="$(printf '%s\n%s\n' "$PINS" "$SITE_PINS" | grep -E '.+' || true)"
   if [[ -z "$ALL_PINS" ]]; then
