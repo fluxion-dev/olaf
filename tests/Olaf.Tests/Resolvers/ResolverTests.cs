@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net;
 using Olaf.Core;
+using Olaf.Resolvers;
 
 namespace Olaf.Tests.Resolvers;
 
@@ -992,5 +993,217 @@ public sealed class GoResolveHelperTests
         Assert.False(string.IsNullOrWhiteSpace(result.LicenseText));
         Assert.NotNull(result.SourceUrl);
         Assert.Contains("pkg.go.dev", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+/// <summary>
+/// Issue #168: conan deps (fmt/11.0.2, zlib/1.3.1, nlohmann_json/3.11.3)
+/// resolve Unknown even online. Pins the ClearlyDefined conancenter URL
+/// shape (Row A), declared-value outcomes (Rows B/C), the conan-online-miss
+/// reason fork + mismatch vectors (Row D), and the offline zero-HTTP path
+/// (Row E). StubHttpMessageHandler only — no live network.
+/// Trio versions mirror tests/Olaf.Tests/Fixtures/conan/conanfile.txt
+/// (read-only — no new fixtures).
+/// Live CD truth (2026-09-30 probe): 200 + EMPTY BODY for all three
+/// canonical URLs, i.e. the parse-error miss site.
+/// new Dependency(...) sites: src/Olaf.Core/Dependency.cs:9
+/// (Direct =&gt; !IsTransitive); every dep below passes isTransitive:false
+/// so Direct == true.
+/// </summary>
+public sealed class ConanClearlyDefinedTests
+{
+    private static string SingleRequestedUrl(StubHttpMessageHandler handler)
+    {
+        var single = Assert.Single(handler.RequestedUrls);
+        Assert.NotNull(single);
+        return single.ToString();
+    }
+
+    // Row A (3 Facts): exact-URL pins — RequestedUrls must contain
+    // definitions/conan/conancenter/-/{name}/{version} per lib.
+
+    [Fact]
+    public async Task Should_RequestConanCenterUrl_When_Fmt()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "MIT" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "fmt", "11.0.2", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.Contains("definitions/conan/conancenter/-/fmt/11.0.2", SingleRequestedUrl(handler), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Should_RequestConanCenterUrl_When_Zlib()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "Zlib" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "zlib", "1.3.1", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.Contains("definitions/conan/conancenter/-/zlib/1.3.1", SingleRequestedUrl(handler), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Should_RequestConanCenterUrl_When_NlohmannJson()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "MIT" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "nlohmann_json", "3.11.3", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.Contains("definitions/conan/conancenter/-/nlohmann_json/3.11.3", SingleRequestedUrl(handler), StringComparison.Ordinal);
+    }
+
+    // Row B (2 Facts): declared-value pins fmt->MIT, nlohmann_json->MIT.
+
+    [Fact]
+    public async Task Should_ResolveMit_When_ConanFmtDeclaredMit()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "MIT" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "fmt", "11.0.2", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.NotNull(result.SourceUrl);
+        Assert.Contains("clearlydefined", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Should_ResolveMit_When_ConanNlohmannJsonDeclaredMit()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "MIT" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "nlohmann_json", "3.11.3", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("MIT", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.NotNull(result.SourceUrl);
+        Assert.Contains("clearlydefined", result.SourceUrl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Row C (1 Fact): zlib->Zlib declared-value pin (passthrough — pins NOT-a-cause).
+
+    [Fact]
+    public async Task Should_ResolveZlib_When_ConanZlibDeclaredZlib()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "Zlib" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "zlib", "1.3.1", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Zlib", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+    }
+
+    // Row D (1 Fact): fallback-miss reason pin — the live-truth shape
+    // (stubbed 200-empty-body) yields conan-online-miss, never the generic
+    // unsupported-ecosystem string.
+    // REASON-PIN: conan-online-miss
+
+    [Fact]
+    public async Task Should_ReturnConanOnlineMiss_When_ClearlyDefinedBodyEmpty()
+    {
+        // Live-truth shape (2026-09-30 probe): CD returns 200 + EMPTY BODY
+        // for definitions/conan/conancenter/-/{name}/{version} -> the
+        // parse-error miss site, now prefixed conan-online-miss.
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text(string.Empty));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "zlib", "1.3.1", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("conan-online-miss", result.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("unsupported ecosystem", result.Reason, StringComparison.Ordinal);
+    }
+
+    // Row D mismatch vectors (retro-167 mandatory): wrong-shape URL +
+    // 500-vs-404 reason fork must NOT take the conan-online-miss path.
+
+    [Fact]
+    public async Task Should_NotRequestHyphenUrl_When_NlohmannJsonUnderscore_Mismatch()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Json(new { licensed = new { declared = "MIT" } }));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "nlohmann_json", "3.11.3", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Resolved", result.Status);
+        Assert.DoesNotContain(
+            handler.RequestedUrls,
+            u => (u == null ? string.Empty : u.ToString()).Contains("nlohmann-json", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Should_NotPrefixConanOnlineMiss_When_ClearlyDefined500_Mismatch()
+    {
+        // 500 is deliberately unprefixed (registry-error:): only conan
+        // data-misses (404/declared-null/parse-error) carry conan-online-miss.
+        var handler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.ServerError());
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = ResolverTestHelpers.ResolveFallbackResolver("conan", http);
+        var dep = new Dependency("conan", "fmt", "11.0.2", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep); // must not throw
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("registry-error", result.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("conan-online-miss", result.Reason, StringComparison.Ordinal);
+        Assert.Equal(2, handler.CallCount); // ResolverHttpRetry exactly-once retry
+    }
+
+    // Row E (1 Fact): offline zero-HTTP pin — offline mode yields
+    // offline-cache-miss with RequestedUrls empty (value-pinned absence).
+
+    [Fact]
+    public async Task Should_ReturnOfflineCacheMiss_When_ConanOffline_ZeroHttp()
+    {
+        var handler = new StubHttpMessageHandler((req, _) =>
+            throw new HttpRequestException($"offline: unexpected HTTP to {req.RequestUri}"));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new CachingLicenseResolver(http, offline: true);
+        var dep = new Dependency("conan", "conan-offline-miss-xyz-168", "9.9.9", false); // Dependency.cs:9: isTransitive:false => Direct == true
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.NotNull(result.Reason);
+        Assert.StartsWith("offline-cache-miss", result.Reason, StringComparison.Ordinal);
+        Assert.Empty(handler.RequestedUrls);
     }
 }

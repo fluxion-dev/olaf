@@ -131,6 +131,18 @@ public sealed class ScanRunner
                             {
                                 license = fb;
                             }
+                            else if (dep.Ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase)
+                                && fb.Reason is not null
+                                && fb.Reason.StartsWith("conan-online-miss:", StringComparison.Ordinal))
+                            {
+                                // Issue #168: conan has no primary — surface
+                                // the CD online-miss reason instead of the
+                                // generic unsupported-ecosystem Unknown.
+                                // Status stays Unknown (exit-code contract
+                                // intact); only the reason is no longer
+                                // silently dropped for conan.
+                                license = fb;
+                            }
                         }
                         catch (OperationCanceledException)
                         {
