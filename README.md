@@ -11,7 +11,7 @@ Supported ecosystems (13): `npm|nuget|pip|go|cargo|maven|gradle|composer|bundler
 No .NET install required: each `v*` tag builds self-contained single-file
 binaries (`.github/workflows/release.yml`, matrix `linux-x64|osx-arm64|win-x64`)
 and attaches the three bundles to that tag's GitHub Release
-(`v0.1.0-preview.3`: https://github.com/fluxion-dev/olaf/releases/tag/v0.1.0-preview.3):
+(`v0.1.1-preview.1`: https://github.com/fluxion-dev/olaf/releases/tag/v0.1.1-preview.1):
 
 | RID | Binary | Size (attached asset) |
 |-----|--------|----------------------------|
@@ -23,25 +23,25 @@ Download with `curl` (the repo is public, so the asset URLs below fetch
 anonymously) or with `gh`:
 
 ```bash
-curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
+curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.1-preview.1/olaf-linux-x64
 chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
-# 0.1.0-preview.3+...
+# 0.1.1-preview.1+...
 ```
 
 ```bash
-gh release download v0.1.0-preview.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
+gh release download v0.1.1-preview.1 -p 'olaf-linux-x64' -D /tmp/olaf-dl
 chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
-# 0.1.0-preview.3+...
+# 0.1.1-preview.1+...
 ```
 
 Direct asset URLs (the same files `gh` fetches above, byte-identical to
-`gh release view v0.1.0-preview.3 --json assets`):
+`gh release view v0.1.1-preview.1 --json assets`):
 
-- https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-linux-x64
-- https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-osx-arm64
-- https://github.com/fluxion-dev/olaf/releases/download/v0.1.0-preview.3/olaf-win-x64.exe
+- https://github.com/fluxion-dev/olaf/releases/download/v0.1.1-preview.1/olaf-linux-x64
+- https://github.com/fluxion-dev/olaf/releases/download/v0.1.1-preview.1/olaf-osx-arm64
+- https://github.com/fluxion-dev/olaf/releases/download/v0.1.1-preview.1/olaf-win-x64.exe
 
 Your platform is missing from the release assets? Publish from source
 (requires the .NET 10 SDK; `<rid>` is one of the three RIDs above):
@@ -58,7 +58,7 @@ runtime covered by CI.)
 Alternative — .NET tool (needs a .NET runtime to run; install from nuget.org):
 
 ```bash
-dotnet tool install --global olaf --version 0.1.0-preview.3
+dotnet tool install --global olaf --version 0.1.1-preview.1
 olaf --help
 ```
 
@@ -66,11 +66,11 @@ Or from a local pack (same version, no feed needed):
 
 ```bash
 dotnet pack src/Olaf.Cli -c Release
-dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.0-preview.3
+dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.1-preview.1
 olaf --help
 ```
 
-Version is pinned: `--version 0.1.0-preview.3` is required — unpinned install fails for prerelease versions. Tests: 681 passing (`dotnet test`).
+Version is pinned: `--version 0.1.1-preview.1` is required — unpinned install fails for prerelease versions. Tests: 691 passing (`dotnet test`).
 
 ## Usage
 

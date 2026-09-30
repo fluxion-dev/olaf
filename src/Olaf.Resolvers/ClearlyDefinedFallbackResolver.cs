@@ -50,7 +50,7 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
             using var response = await ResolverHttpRetry.GetAsync(_http, definitionUrl, ct).ConfigureAwait(false);
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                return new ResolvedLicense(dependency, null, null, null, "Unknown", $"not-found: no license for '{dependency.Name} {dependency.Version}' in registry or ClearlyDefined.");
+                return ConanOnlineMiss(dependency, $"not-found: no license for '{dependency.Name} {dependency.Version}' in registry or ClearlyDefined.");
             }
 
             if (!response.IsSuccessStatusCode)
@@ -63,7 +63,7 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
             var spdx = SpdxMapper.Normalize(declared);
             if (spdx is null)
             {
-                return new ResolvedLicense(dependency, null, null, null, "Unknown", "license-unknown: ClearlyDefined returned no usable license.");
+                return ConanOnlineMiss(dependency, "license-unknown: ClearlyDefined returned no usable license.");
             }
 
             // Trivial sibling enrichment from the same already-fetched
@@ -86,12 +86,28 @@ public sealed class ClearlyDefinedFallbackResolver : ILicenseResolver
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or ArgumentException)
         {
-            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"parse-error: {ex.Message}");
+            return ConanOnlineMiss(dependency, $"parse-error: {ex.Message}");
         }
         catch (Exception ex)
         {
             return new ResolvedLicense(dependency, null, null, null, "Unknown", $"resolver-error: {ex.Message}");
         }
+    }
+
+    // Issue #168: conan has no primary resolver, so a ClearlyDefined
+    // online data-miss would otherwise surface with the generic
+    // unsupported-ecosystem reason. Tag conan data-misses distinctly
+    // (live evidence 2026-09-30: CD returns 200-empty for
+    // fmt/zlib/nlohmann_json) while keeping the inner reason text so
+    // 404-vs-500 still forks. Non-conan paths pass through unchanged.
+    private static ResolvedLicense ConanOnlineMiss(Dependency dependency, string reason)
+    {
+        if (dependency.Ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ResolvedLicense(dependency, null, null, null, "Unknown", $"conan-online-miss: {reason}");
+        }
+
+        return new ResolvedLicense(dependency, null, null, null, "Unknown", reason);
     }
 
     private static string? BuildDefinitionUrl(Dependency dependency)
