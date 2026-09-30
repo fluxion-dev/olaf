@@ -28,7 +28,17 @@ jobs:
         run: |
           set -e
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            RANGE="origin/${{ github.base_ref }}..HEAD"
+            # Lint the PR head, not the ephemeral checkout merge
+            # (refs/pull/N/merge, "Merge <sha> into <sha>"): that merge
+            # commit is GitHub-generated and would always FAIL. Authored
+            # "Merge branch" commits on the branch stay in range and
+            # are still rejected below.
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            if git cat-file -e "$HEAD_SHA" 2>/dev/null; then
+              RANGE="origin/${{ github.base_ref }}..$HEAD_SHA"
+            else
+              RANGE="origin/${{ github.base_ref }}..HEAD"
+            fi
           else
             RANGE="HEAD~1..HEAD"
           fi
