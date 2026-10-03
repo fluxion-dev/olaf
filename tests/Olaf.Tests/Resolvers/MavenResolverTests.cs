@@ -109,6 +109,72 @@ public sealed class MavenResolverTests
     }
 
     [Fact]
+    public async Task Should_NameLockedChildJar_When_LicensesResolveViaParent()
+    {
+        // Issue #169 (A3): parent-walk rows name the LOCKED child
+        // coordinates, never the parent — even when the parent POM carries
+        // its own homepage <url>.
+        const string childPom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <parent>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava-parent</artifactId>
+                <version>32.1.2-jre</version>
+              </parent>
+              <artifactId>guava</artifactId>
+            </project>
+            """;
+        const string parentPom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava-parent</artifactId>
+              <version>32.1.2-jre</version>
+              <licenses>
+                <license>
+                  <name>Apache License, Version 2.0</name>
+                  <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                </license>
+              </licenses>
+              <url>https://github.com/google/guava</url>
+            </project>
+            """;
+        var handler = new StubHttpMessageHandler((req, _) =>
+            req.RequestUri?.ToString().Contains("guava-parent", StringComparison.Ordinal) == true
+                ? StubHttpMessageHandler.Text(parentPom)
+                : StubHttpMessageHandler.Text(childPom));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("gradle", "com.google.guava:guava", "32.1.2-jre", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Apache-2.0", result.SpdxId);
+        Assert.Equal("Resolved", result.Status);
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://repo1.maven.org/maven2/com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar", result.Enrichment.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task Should_ReturnUnknown_When_ArtifactNotFound()
+    {
+        // Issue #169 (D1): 404 is Unknown with null enrichment, never throws.
+        var handler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.NotFound());
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("maven", "com.example:this-artifact-definitely-does-not-exist-olaf-xyz", "9.9.9", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Unknown", result.Status);
+        Assert.Null(result.SpdxId);
+        Assert.Null(result.Enrichment);
+        Assert.NotNull(result.Reason);
+        Assert.Contains("not-found", result.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Should_ReturnUnknown_When_Central404()
     {
         var handler = new StubHttpMessageHandler((req, _) => StubHttpMessageHandler.NotFound());

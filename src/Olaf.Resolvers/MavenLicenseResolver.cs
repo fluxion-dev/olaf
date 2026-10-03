@@ -67,9 +67,14 @@ public sealed class MavenLicenseResolver : ILicenseResolver
                     var text = SpdxLicenseTexts.GetText(spdx);
                     var source = $"https://mvnrepository.com/artifact/{groupId}/{artifactId}/{version}";
                     // Enrichment reads the same already-fetched POM XML
-                    // (NO-NEW-HTTP): organization/developers -> Supplier, project
-                    // <url> -> DownloadUrl (hash: none in POM -> null).
-                    // Never copies SourceUrl to download.
+                    // (NO-NEW-HTTP): organization/developers -> Supplier;
+                    // DownloadUrl is the canonical repo1 jar constructed from
+                    // the LOCKED dependency coordinates (issue #169;
+                    // decision-B parity with BundlerLicenseResolver.cs:113-117
+                    // + Go precedent GoLicenseResolver.cs:51-58) — never the
+                    // POM project <url> homepage, never verified.
+                    // Never copies SourceUrl to download
+                    // (hash: none in POM -> null).
                     var enrichment = ParseMavenEnrichment(current!, dependency);
                     return new ResolvedLicense(dependency, spdx, text, source, "Resolved", null, enrichment);
                 }
@@ -160,15 +165,28 @@ public sealed class MavenLicenseResolver : ILicenseResolver
                 }
             }
 
-            // Project <url> is a direct child of <project>; license <url>
-            // elements nest under <licenses> and are never read here.
-            var projectUrl = root.Elements().FirstOrDefault(e => e.Name.LocalName == "url")?.Value;
+            // The POM project <url> is a homepage (HTML, not a jar) and must
+            // never feed DownloadUrl (issue #169). DownloadUrl is the
+            // canonical repo1 jar built from the LOCKED dependency
+            // coordinates — never from the POM body, so parent-walk rows
+            // still name the locked child (decision-B parity:
+            // BundlerLicenseResolver.cs:113-117; Go precedent
+            // GoLicenseResolver.cs:51-58). Never verified: NO-NEW-HTTP.
+            string? downloadUrl = null;
+            var (lockedGroup, lockedArtifact) = SplitName(dependency.Name);
+            var lockedVersion = dependency.Version?.Trim();
+            if (lockedGroup is not null && lockedArtifact is not null
+                && !string.IsNullOrWhiteSpace(lockedVersion) && lockedVersion != "*")
+            {
+                var groupPath = lockedGroup.Replace('.', '/');
+                downloadUrl = $"https://repo1.maven.org/maven2/{groupPath}/{Uri.EscapeDataString(lockedArtifact)}/{Uri.EscapeDataString(lockedVersion)}/{Uri.EscapeDataString(lockedArtifact)}-{Uri.EscapeDataString(lockedVersion)}.jar";
+            }
 
             return EnrichmentHelpers.Create(
                 dependency,
                 hashes: null,
                 supplier,
-                projectUrl);
+                downloadUrl);
         }
         catch (XmlException)
         {
