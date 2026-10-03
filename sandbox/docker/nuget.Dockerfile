@@ -2,7 +2,7 @@
 # Toolchain: .NET 10 SDK. Manifests: *.csproj, packages.config, packages.lock.json.
 # Smoke repo: https://github.com/xunit/xunit.git (nested csproj + packages.lock.json, recursive scan).
 # Build from repo root: docker build -f sandbox/docker/nuget.Dockerfile -t olaf-sandbox-nuget .
-ARG OLAF_VERSION=v0.1.1-preview.1
+ARG OLAF_VERSION=v0.1.2-preview.1
 FROM mcr.microsoft.com/dotnet/sdk:10.0
 
 ENV DEBIAN_FRONTEND=noninteractive

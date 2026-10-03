@@ -2,7 +2,7 @@
 # Toolchain: Rust stable + cargo. Manifests: Cargo.toml, Cargo.lock.
 # Smoke repo: https://github.com/BurntSushi/ripgrep.git (Cargo.toml + Cargo.lock).
 # Build from repo root: docker build -f sandbox/docker/cargo.Dockerfile -t olaf-sandbox-cargo .
-ARG OLAF_VERSION=v0.1.1-preview.1
+ARG OLAF_VERSION=v0.1.2-preview.1
 FROM rust:1-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

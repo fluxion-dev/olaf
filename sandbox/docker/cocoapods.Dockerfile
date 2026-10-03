@@ -4,7 +4,7 @@
 # Smoke repo: https://github.com/artsy/eidolon.git (root Podfile + Podfile.lock).
 # Rejected: Alamofire/Alamofire (only Alamofire.podspec, no Podfile).
 # Build from repo root: docker build -f sandbox/docker/cocoapods.Dockerfile -t olaf-sandbox-cocoapods .
-ARG OLAF_VERSION=v0.1.1-preview.1
+ARG OLAF_VERSION=v0.1.2-preview.1
 FROM ruby:3.4-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

@@ -2,7 +2,7 @@
 # Toolchain: Ruby 3.4 + bundler. Manifests: Gemfile, Gemfile.lock, *.gemspec.
 # Smoke repo: https://github.com/jekyll/jekyll.git (Gemfile + jekyll.gemspec).
 # Build from repo root: docker build -f sandbox/docker/bundler.Dockerfile -t olaf-sandbox-bundler .
-ARG OLAF_VERSION=v0.1.1-preview.1
+ARG OLAF_VERSION=v0.1.2-preview.1
 FROM ruby:3.4-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
