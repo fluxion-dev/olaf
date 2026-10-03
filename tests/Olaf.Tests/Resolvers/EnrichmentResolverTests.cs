@@ -211,7 +211,143 @@ public sealed class EnrichmentResolverTests
         Assert.Equal("pkg:maven/com.example/lib@1.0.0", result.Enrichment.Purl);
         Assert.Null(result.Enrichment.Hashes);
         Assert.Equal("Example Org", result.Enrichment.Supplier);
-        Assert.Equal("https://example.com/lib", result.Enrichment.DownloadUrl);
+        Assert.Equal("https://repo1.maven.org/maven2/com/example/lib/1.0.0/lib-1.0.0.jar", result.Enrichment.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task Should_ConstructCanonicalJar_When_PomHasHomepageUrl()
+    {
+        // Issue #169 (A1): the POM project <url> is a homepage, never the jar.
+        const string pom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava</artifactId>
+              <version>32.1.2-jre</version>
+              <licenses>
+                <license>
+                  <name>Apache License, Version 2.0</name>
+                  <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                </license>
+              </licenses>
+              <organization>
+                <name>Google</name>
+              </organization>
+              <url>https://github.com/google/guava</url>
+            </project>
+            """;
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text(pom));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("maven", "com.google.guava:guava", "32.1.2-jre", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Apache-2.0", result.SpdxId);
+        Assert.Equal(1, handler.CallCount);
+        Assert.Single(handler.RequestedUrls);
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://repo1.maven.org/maven2/com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar", result.Enrichment.DownloadUrl);
+        Assert.Equal("Google", result.Enrichment.Supplier);
+    }
+
+    [Fact]
+    public async Task Should_ConstructCanonicalJar_When_EcosystemIsGradle()
+    {
+        // Issue #169 (A2): shared resolver serves the gradle label identically.
+        const string pom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava</artifactId>
+              <version>32.1.2-jre</version>
+              <licenses>
+                <license>
+                  <name>Apache License, Version 2.0</name>
+                  <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                </license>
+              </licenses>
+              <url>https://github.com/google/guava</url>
+            </project>
+            """;
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text(pom));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("gradle", "com.google.guava:guava", "32.1.2-jre", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.Equal("Apache-2.0", result.SpdxId);
+        Assert.Equal(1, handler.CallCount);
+        Assert.Single(handler.RequestedUrls);
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://repo1.maven.org/maven2/com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar", result.Enrichment.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task Should_NotUseHomepage_When_PomUrlIsPresent()
+    {
+        // Issue #169 (B1): value-pinned jar entails homepage absence; the
+        // explicit NotEqual is belt-and-braces — both must agree.
+        const string pom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava</artifactId>
+              <version>32.1.2-jre</version>
+              <licenses>
+                <license>
+                  <name>Apache License, Version 2.0</name>
+                  <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                </license>
+              </licenses>
+              <url>https://github.com/google/guava</url>
+            </project>
+            """;
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text(pom));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("maven", "com.google.guava:guava", "32.1.2-jre", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://repo1.maven.org/maven2/com/google/guava/guava/32.1.2-jre/guava-32.1.2-jre.jar", result.Enrichment.DownloadUrl);
+        Assert.NotEqual("https://github.com/google/guava", result.Enrichment.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task Should_EscapeSegments_When_CoordinatesNeedEncoding()
+    {
+        // Issue #169 (C1): dotted group splits to path; artifact + version
+        // segments are EscapeDataString-encoded.
+        const string pom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>com.example.sub</groupId>
+              <artifactId>lib-core</artifactId>
+              <version>1.0+build 2</version>
+              <licenses>
+                <license>
+                  <name>Apache License, Version 2.0</name>
+                  <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+                </license>
+              </licenses>
+            </project>
+            """;
+        var handler = new StubHttpMessageHandler((req, _) =>
+            StubHttpMessageHandler.Text(pom));
+        using var http = ResolverTestHelpers.CreateClient(handler);
+        var resolver = new MavenLicenseResolver(http);
+        var dep = new Dependency("maven", "com.example.sub:lib-core", "1.0+build 2", false);
+
+        var result = await resolver.ResolveAsync(dep);
+
+        Assert.NotNull(result.Enrichment);
+        Assert.Equal("https://repo1.maven.org/maven2/com/example/sub/lib-core/1.0%2Bbuild%202/lib-core-1.0%2Bbuild%202.jar", result.Enrichment.DownloadUrl);
     }
 
     [Fact]
