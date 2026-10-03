@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "comment": "Single source of truth for olaf sandbox smoke repos. One small, well-known public repo per supported ecosystem. Each repo must contain the listed manifest at (or under) its root so `olaf generate <clone> --offline` finds >= minPackages deps. Verified 2026-10-03 via GitHub contents API.",
+  "olafVersion": "v0.1.1-preview.1",
+  "ecosystems": {
+    "npm": {
+      "repo": "https://github.com/expressjs/express.git",
+      "manifest": "package.json",
+      "minPackages": 1,
+      "note": "Canonical npm web framework; package.json with runtime deps."
+    },
+    "nuget": {
+      "repo": "https://github.com/xunit/xunit.git",
+      "manifest": "src/**/*.csproj + packages.lock.json",
+      "minPackages": 1,
+      "note": "Official .NET test framework; recursive scan finds csproj files and packages.lock.json."
+    },
+    "pip": {
+      "repo": "https://github.com/psf/requests.git",
+      "manifest": "pyproject.toml",
+      "minPackages": 1,
+      "note": "Most popular Python HTTP library; pyproject.toml with dependencies."
+    },
+    "go": {
+      "repo": "https://github.com/spf13/cobra.git",
+      "manifest": "go.mod",
+      "minPackages": 1,
+      "note": "Popular Go CLI library; go.mod with 4 requires."
+    },
+    "cargo": {
+      "repo": "https://github.com/BurntSushi/ripgrep.git",
+      "manifest": "Cargo.toml + Cargo.lock",
+      "minPackages": 1,
+      "note": "Popular Rust grep tool; Cargo.toml with deps and Cargo.lock."
+    },
+    "maven": {
+      "repo": "https://github.com/apache/commons-lang.git",
+      "manifest": "pom.xml",
+      "minPackages": 1,
+      "note": "Canonical Maven library; root pom.xml with test deps."
+    },
+    "gradle": {
+      "repo": "https://github.com/mockito/mockito.git",
+      "manifest": "build.gradle.kts + libs.versions.toml",
+      "minPackages": 1,
+      "note": "Popular mocking framework; Kotlin DSL build files plus version catalog."
+    },
+    "composer": {
+      "repo": "https://github.com/Seldaek/monolog.git",
+      "manifest": "composer.json",
+      "minPackages": 1,
+      "note": "Canonical PHP logger (correct owner is Seldaek, not monolog org); composer.json with require on php/psr-log."
+    },
+    "bundler": {
+      "repo": "https://github.com/jekyll/jekyll.git",
+      "manifest": "Gemfile + jekyll.gemspec",
+      "minPackages": 1,
+      "note": "Well-known Ruby static site generator; Gemfile with gem entries."
+    },
+    "swift": {
+      "repo": "https://github.com/vapor/vapor.git",
+      "manifest": "Package.swift",
+      "minPackages": 1,
+      "note": "Swift server framework; Package.swift with ~24 .package(url:) deps. NOTE: apple/swift-argument-parser was rejected — it is a leaf package with zero .package deps, so olaf correctly reports 0."
+    },
+    "cocoapods": {
+      "repo": "https://github.com/artsy/eidolon.git",
+      "manifest": "Podfile + Podfile.lock",
+      "minPackages": 1,
+      "note": "Classic Objective-C sample app; root Podfile+lock with pods. NOTE: Alamofire/Alamofire was rejected — it ships only Alamofire.podspec (which olaf does not parse) and no Podfile."
+    },
+    "vcpkg": {
+      "repo": "https://github.com/microsoft/terminal.git",
+      "manifest": "vcpkg.json",
+      "minPackages": 1,
+      "note": "Official Windows Terminal; root vcpkg.json with fmt/ms-gsl/jsoncpp/cli11/cmark deps. Depth-1 clone is large (~150MB) but one-time."
+    },
+    "conan": {
+      "repo": "https://github.com/conan-io/examples.git",
+      "manifest": "**/conanfile.txt ([requires])",
+      "minPackages": 1,
+      "note": "Official Conan examples (default branch master); nested consumer conanfile.txt files, e.g. libraries/poco/md5/conanfile.txt requires poco/1.9.4. NOTE: catchorg/Catch2 was rejected — its root conanfile.py is a leaf recipe with no requires block, so olaf correctly reports 0."
+    }
+  }
+}
