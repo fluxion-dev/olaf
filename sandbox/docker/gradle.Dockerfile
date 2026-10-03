@@ -2,7 +2,7 @@
 # Toolchain: Gradle 8 + JDK 21. Manifests: build.gradle, build.gradle.kts, libs.versions.toml.
 # Smoke repo: https://github.com/mockito/mockito.git (Kotlin DSL + version catalog).
 # Build from repo root: docker build -f sandbox/docker/gradle.Dockerfile -t olaf-sandbox-gradle .
-ARG OLAF_VERSION=v0.1.2-preview.1
+ARG OLAF_VERSION=v0.1.3-preview.1
 FROM gradle:8-jdk21
 
 ENV DEBIAN_FRONTEND=noninteractive
