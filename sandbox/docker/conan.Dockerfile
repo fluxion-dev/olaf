@@ -4,7 +4,7 @@
 # Smoke repo: https://github.com/conan-io/examples.git (nested consumer conanfile.txt files).
 # Rejected: catchorg/Catch2 (root conanfile.py is a leaf recipe with no requires block -> olaf reports 0).
 # Build from repo root: docker build -f sandbox/docker/conan.Dockerfile -t olaf-sandbox-conan .
-ARG OLAF_VERSION=v0.1.2-preview.1
+ARG OLAF_VERSION=v0.1.3-preview.1
 FROM python:3.13-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

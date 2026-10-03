@@ -2,7 +2,7 @@
 # Toolchain: Go 1.24. Manifests: go.mod, go.sum.
 # Smoke repo: https://github.com/spf13/cobra.git (go.mod with 4 requires).
 # Build from repo root: docker build -f sandbox/docker/go.Dockerfile -t olaf-sandbox-go .
-ARG OLAF_VERSION=v0.1.2-preview.1
+ARG OLAF_VERSION=v0.1.3-preview.1
 FROM golang:1.24-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
