@@ -15,7 +15,8 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fluxion-dev.github.io/olaf/">
 <meta property="og:site_name" content="olaf">
-<!-- No og:image: site art ships as Vite-hashed bundle assets with no stable image URL. -->
+<!-- Stable logo URL (self-hosted SVG, copied from public/ at build time). -->
+<meta property="og:image" content="https://fluxion-dev.github.io/olaf/logo.svg">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="olaf — license scanner">
 <meta name="twitter:description" content="olaf is a license scanner that scans a project directory, resolves licenses across 13 ecosystems, and writes SBOM/attribution reports.">
@@ -39,6 +40,7 @@
   ]
 }
 </script>
+<link rel="icon" href="./logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./style.css">
 </head>
 <body id="top" class="bg-olaf-canvas text-zinc-200 antialiased">
@@ -47,7 +49,7 @@
 
 <nav aria-label="Primary" class="sticky top-0 z-40 border-b border-olaf-border/80 bg-olaf-canvas/85 backdrop-blur-md">
   <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-6 py-3">
-    <a href="#top" class="mr-auto text-xl font-extrabold tracking-wide text-white no-underline">olaf<span class="text-viking-gold">.</span></a>
+    <a href="#top" class="mr-auto inline-flex items-center gap-2 text-xl font-extrabold tracking-wide text-white no-underline"><img src="./logo.svg" alt="" width="32" height="32" class="h-8 w-8" aria-hidden="true">olaf<span class="text-viking-gold">.</span></a>
     <a class="text-sm text-zinc-300 no-underline hover:text-white hover:underline" href="#problems">Problems</a>
     <a class="text-sm text-zinc-300 no-underline hover:text-white hover:underline" href="#ecosystems">Ecosystems</a>
     <a class="text-sm text-zinc-300 no-underline hover:text-white hover:underline" href="#quickstart">Quickstart</a>
@@ -69,9 +71,6 @@
     <div class="absolute top-24 -right-24 h-64 w-64 rounded-full bg-viking-gold/20 blur-3xl"></div>
   </div>
   <div class="relative mx-auto max-w-6xl">
-    <div class="mb-8 w-full overflow-hidden rounded-2xl border border-olaf-border bg-olaf-surface/70 p-4 shadow-lg shadow-black/30 backdrop-blur scanner-glow md:p-6">
-      <img src="./logo.jpg" alt="Olaf, the viking license scanner mascot" width="1408" height="768" class="mx-auto h-auto max-h-[320px] w-auto max-w-full rounded-xl object-contain ring-1 ring-white/10 md:max-h-[420px]">
-    </div>
     <h1 class="m-0 text-6xl font-extrabold tracking-tight text-white">olaf<span class="text-viking-gold">.</span></h1>
     <p class="mx-auto mt-8 max-w-3xl text-lg text-zinc-300">License scanner: <code class="whitespace-nowrap rounded bg-white/10 px-2 py-0.5 font-mono text-[0.9em] text-white">olaf generate &lt;DIR&gt;</code> scans a project directory, resolves licenses, writes a report to stdout or a file.</p>
     <p class="mx-auto mt-2 max-w-3xl text-2xl font-bold tracking-tight text-white">One Command. 13 Ecosystems. Zero Setup.</p>
