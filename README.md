@@ -15,7 +15,7 @@ and attaches the three bundles to that tag's GitHub Release
 
 | RID | Binary | Size (attached asset) |
 |-----|--------|----------------------------|
-| `linux-x64` | `olaf-linux-x64` | 75,028,777 bytes (~71.6 MiB) |
+| `linux-x64` | `olaf-linux-x64` | 75,028,655 bytes (~71.5 MiB) |
 | `osx-arm64` | `olaf-osx-arm64` | 81,488,793 bytes (~77.7 MiB) |
 | `win-x64` | `olaf-win-x64.exe` | 74,987,238 bytes (~71.5 MiB) |
 
