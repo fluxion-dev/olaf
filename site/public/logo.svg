@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Olaf the viking">
+  <!-- horns -->
+  <path d="M80 66 C62 62 50 48 48 30"/>
+  <path d="M160 66 C178 62 190 48 192 30"/>
+  <!-- helmet dome + ridge + band -->
+  <path d="M74 74 C74 42 166 42 166 74"/>
+  <path d="M120 45 L120 72"/>
+  <path d="M70 74 L170 74"/>
+  <!-- face -->
+  <circle cx="120" cy="108" r="30"/>
+  <circle cx="109" cy="103" r="3.5" fill="currentColor" stroke="none"/>
+  <circle cx="131" cy="103" r="3.5" fill="currentColor" stroke="none"/>
+  <path d="M109 121 Q120 130 131 121"/>
+  <!-- beard -->
+  <path d="M92 120 C92 158 103 184 120 186 C137 184 148 158 148 120"/>
+  <path d="M108 142 C108 155 111 162 115 166"/>
+  <path d="M132 142 C132 155 129 162 125 166"/>
+  <!-- torso -->
+  <path d="M94 188 L80 232 L160 232 L146 188"/>
+  <!-- arms -->
+  <path d="M88 198 L72 230"/>
+  <path d="M152 198 L168 230"/>
+  <!-- belt + buckle -->
+  <path d="M82 216 L158 216"/>
+  <rect x="113" y="209" width="14" height="13" rx="2"/>
+</svg>
