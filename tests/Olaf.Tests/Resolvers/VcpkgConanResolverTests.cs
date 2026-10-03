@@ -6,8 +6,9 @@ namespace Olaf.Tests.Resolvers;
 /// <summary>
 /// Vcpkg (embedded license field from ports vcpkg.json) license resolver
 /// (issue #15). All HTTP is stubbed (no live network); unknown/offline
-/// paths use phantom names. Conan primary deleted in #123 (dead endpoint);
-/// conan ClearlyDefined-fallback coverage lives in FallbackResolverTests.
+/// paths use phantom names. Conan primary (conan-center-index recipe data)
+/// coverage lives in ConanResolverTests; conan ClearlyDefined-fallback
+/// coverage lives in FallbackResolverTests.
 /// </summary>
 public sealed class VcpkgResolverTests
 {

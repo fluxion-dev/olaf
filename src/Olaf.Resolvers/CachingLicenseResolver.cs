@@ -193,11 +193,15 @@ public sealed class CachingLicenseResolver : ILicenseResolver
             return new VcpkgLicenseResolver(_http);
         }
 
-        // Issue #123: no Conan primary — conan.io/center/api 404s for
-        // existing recipes (E2E snapshot 2026-09-28 + live re-probe), so
-        // conan falls through to "unsupported ecosystem" Unknown here while
-        // the ClearlyDefined fallback (conancenter arm, kept) still resolves
-        // online at the ScanRunner callsite.
+        // Conan primary restored off the conan-center-index recipe data
+        // (config.yml versions->folder + conanfile.py license attribute):
+        // the conan.io/center/api endpoint stays dead (see #123) and the
+        // ClearlyDefined fallback (conancenter arm, kept) serves 200-empty.
+        if (dependency.Ecosystem.Equals("conan", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ConanLicenseResolver(_http);
+        }
+
         return null;
     }
 }
