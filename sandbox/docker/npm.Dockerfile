@@ -2,7 +2,7 @@
 # Toolchain: Node 22 + npm. Manifests: package.json, package-lock.json, pnpm-lock.yaml, yarn.lock, bun.lock.
 # Smoke repo: https://github.com/expressjs/express.git (package.json).
 # Build from repo root: docker build -f sandbox/docker/npm.Dockerfile -t olaf-sandbox-npm .
-ARG OLAF_VERSION=v0.1.3-preview.1
+ARG OLAF_VERSION=v0.1.3
 FROM node:22-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

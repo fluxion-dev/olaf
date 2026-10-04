@@ -71,7 +71,7 @@ plus non-empty output.
 
 Every `Dockerfile` installs `git curl ca-certificates jq python3`
 (on top of its toolchain base), downloads the pinned `olaf-linux-x64`
-release binary (`OLAF_VERSION`, default `v0.1.3-preview.1`) to
+release binary (`OLAF_VERSION`, default `v0.1.3`) to
 `/usr/local/bin/olaf`, and bakes in `verify.sh`/`validate.py`/`repos.json`.
 The container `CMD` clones its `repos.json` URL (`git clone --depth 1`)
 and runs the full verification — online resolution plus all 7 formats —

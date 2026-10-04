@@ -2,7 +2,7 @@
 # Toolchain: Maven 3 + Temurin JDK 21. Manifests: pom.xml.
 # Smoke repo: https://github.com/apache/commons-lang.git (root pom.xml).
 # Build from repo root: docker build -f sandbox/docker/maven.Dockerfile -t olaf-sandbox-maven .
-ARG OLAF_VERSION=v0.1.3-preview.1
+ARG OLAF_VERSION=v0.1.3
 FROM maven:3-eclipse-temurin-21
 
 ENV DEBIAN_FRONTEND=noninteractive

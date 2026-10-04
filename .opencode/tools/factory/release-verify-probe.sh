@@ -52,8 +52,8 @@ Options:
 Positional form '$(basename "$0") <v*>' is accepted as --tag.
 
 Examples:
-  $(basename "$0") --tag v0.1.0-preview.1
-  $(basename "$0") v0.1.0-preview.1 --timeout 600 --keep-temp
+  $(basename "$0") --tag v0.1.3
+  $(basename "$0") v0.1.3 --timeout 600 --keep-temp
 
 Pre-tag DRY-RUN: no tag/release/run exists yet, so each arm FAILs cleanly
 with a "no <thing>" line (exit 1) proving absence detection. Full green
@@ -86,7 +86,7 @@ if [[ -z "$TAG" ]]; then
 fi
 case "$TAG" in
   v*) ;;
-  *) echo "Invalid --tag '$TAG': must start with 'v' (e.g. v0.1.0-preview.1)." >&2; exit 2 ;;
+  *) echo "Invalid --tag '$TAG': must start with 'v' (e.g. v0.1.3)." >&2; exit 2 ;;
 esac
 if ! [[ "$TIMEOUT_SECS" =~ ^[0-9]+$ ]] || [[ "$TIMEOUT_SECS" -eq 0 ]]; then
   echo "Invalid --timeout '$TIMEOUT_SECS': must be a positive integer." >&2; exit 2

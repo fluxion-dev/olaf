@@ -3,7 +3,7 @@
 # Manifests: composer.json, composer.lock.
 # Smoke repo: https://github.com/Seldaek/monolog.git (composer.json; correct owner is Seldaek).
 # Build from repo root: docker build -f sandbox/docker/composer.Dockerfile -t olaf-sandbox-composer .
-ARG OLAF_VERSION=v0.1.3-preview.1
+ARG OLAF_VERSION=v0.1.3
 FROM php:8.3-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
