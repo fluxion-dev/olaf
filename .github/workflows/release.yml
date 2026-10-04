@@ -92,14 +92,9 @@ jobs:
             exit 1
           fi
           ls -la ./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64 ./bundles/olaf-win-x64/olaf-win-x64.exe
-      - name: Create GitHub Release (prerelease iff preview)
+      - name: Create GitHub Release
         run: |
-          if [[ "${{ github.ref_name }}" == *-* ]]; then
-            PRE="--prerelease"
-          else
-            PRE=""
-          fi
-          gh release create "${{ github.ref_name }}" $PRE ./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64 ./bundles/olaf-win-x64/olaf-win-x64.exe
+          gh release create "${{ github.ref_name }}" --latest ./bundles/olaf-linux-x64/olaf-linux-x64 ./bundles/olaf-osx-arm64/olaf-osx-arm64 ./bundles/olaf-win-x64/olaf-win-x64.exe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

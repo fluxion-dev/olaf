@@ -5,7 +5,7 @@
 # Manifests: vcpkg.json.
 # Smoke repo: https://github.com/microsoft/terminal.git (root vcpkg.json).
 # Build from repo root: docker build -f sandbox/docker/vcpkg.Dockerfile -t olaf-sandbox-vcpkg .
-ARG OLAF_VERSION=v0.1.3-preview.1
+ARG OLAF_VERSION=v0.1.3
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

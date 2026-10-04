@@ -4,11 +4,11 @@
 # SemVer 2.0-compliant <Version> driven by a Conventional Commits type:
 #   Arms:
 #     S1 semver-valid — src/Olaf.Cli/Olaf.Cli.csproj <Version> parses as
-#       SemVer 2.0 MAJOR.MINOR.PATCH with optional -prerelease/+build
-#       (no leading zeros, numeric identifiers only where numeric).
+#       stable SemVer MAJOR.MINOR.PATCH with optional +build (no -prerelease;
+#       preview track retired; no leading zeros).
 #     S2 pin-consistency — all version pins in README.md + site/index.html
-#       (when present) resolve to a single SemVer value == csproj <Version>
-#       (leading-v stripped; full SemVer, not preview-only).
+#       (when present) resolve to a single stable SemVer value == csproj
+#       <Version> (leading-v stripped).
 #     C1 conventional-shape — every subject in a commit range (or a single
 #       --title/--commit message) matches Conventional Commits:
 #       type(scope)!?: subject  where type in
@@ -16,16 +16,12 @@
 #       Scope is optional lowercase/dash/underscore/slash. Breaking is
 #       `!` before the colon OR `BREAKING CHANGE:` in the body.
 #     B1 bump-mapping — the csproj delta base->current matches the declared
-#       --type under the factory SemVer rule (pre-1.0 preview series):
-#       feat=>MINOR, fix/patch/docs/chore/...=>PATCH, BREAKING=>MINOR while
-#       MAJOR==0 else MAJOR. Core moves with lower reset; the prerelease
-#       counter resets to .1 on a core move (e.g. fix: 0.1.0-preview.3 ->
-#       0.1.1-preview.1; feat: 0.1.0-preview.3 -> 0.2.0-preview.1), or the
-#       bump graduates to stable (no hyphen). A same-core preview-counter
-#       step (0.1.0-preview.3 -> 0.1.0-preview.4) is the LEGACY shape and
-#       FAILs by design — use a core bump instead.
+#       --type under stable SemVer (0.x: breaking=>MINOR else MAJOR;
+#       feat=>MINOR; fix/patch/docs/chore/...=>PATCH). Core moves with lower
+#       reset (e.g. fix: 0.1.2 -> 0.1.3; feat: 0.1.3 -> 0.2.0). Prerelease
+#       versions (hyphen) FAIL by design — the preview track is retired.
 # Rules: repo-relative, idempotent, no secrets, exit 0/1/2.
-VERSION="0.1.0"
+VERSION="0.2.0"
 set -euo pipefail
 
 REPO_ROOT=""
@@ -57,7 +53,7 @@ Options:
 
 Examples:
   semver-probe.sh
-  semver-probe.sh --base-version 0.1.0-preview.3 --type feat
+  semver-probe.sh --base-version 0.1.2 --type feat
   semver-probe.sh --range main..HEAD
   semver-probe.sh --title "feat(parsers): add foo (closes #123)"
 
@@ -151,27 +147,26 @@ else
   if python3 - "$CSPROJ_VER" <<'PY' 2>/dev/null
 import re, sys
 v = sys.argv[1]
-pat = r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-((0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
+pat = r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
 sys.exit(0 if re.match(pat, v) else 1)
 PY
   then
-    pass "S1: csproj $CSPROJ_VER is valid SemVer 2.0"
+    pass "S1: csproj $CSPROJ_VER is valid stable SemVer"
   else
-    fail_msg "S1: csproj $CSPROJ_VER is NOT valid SemVer 2.0 (want MAJOR.MINOR.PATCH[-prerelease][+build], no leading zeros)"
+    fail_msg "S1: csproj $CSPROJ_VER is NOT valid stable SemVer (want MAJOR.MINOR.PATCH[+build], no -prerelease, no leading zeros)"
   fi
 fi
 
 # ---- S2: pins resolve to single SemVer == csproj ----
 # Pin scope is olaf product pins only (not every SemVer-like string in
-# HTML): preview pins allow optional leading v
-# (`v?X.Y.Z-preview.N`), stable pins require leading v (`vX.Y.Z`) so
-# dependency versions (1.1.9, bare 0.1.0) never count. Build-metadata
-# placeholders (`0.1.0-preview.3+...`) match on the prefix only.
+# HTML): stable pins require leading v (`vX.Y.Z`) so bare dependency
+# versions (1.1.9, bare 0.1.0) never count. Build-metadata placeholders
+# (`0.1.3+...`) match on the v-prefixed URL pins only.
 echo "-- S2 pin-consistency --"
 if [[ -z "${CSPROJ_VER:-}" ]]; then
   fail_msg "S2: SKIP — no csproj version from S1"
 else
-  PIN_RE='v?[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+|v[0-9]+\.[0-9]+\.[0-9]+'
+  PIN_RE='v[0-9]+\.[0-9]+\.[0-9]+'
   PINS="$(grep -oE "$PIN_RE" "$README" || true)"
   SITE_PINS=""
   if [[ -f "$SITE" ]]; then
@@ -271,15 +266,11 @@ def pre(v):
     return m.group(1) if m else ""
 b, c = core(base), core(cur)
 bp, cp = pre(base), pre(cur)
+if bp or cp:
+    print(f"preview track retired: prerelease versions are not accepted (base {base}, current {cur}); use stable MAJOR.MINOR.PATCH", file=sys.stderr)
+    sys.exit(1)
 if (b, bp) == (c, cp):
     print(f"no bump: base {base} == current {cur}", file=sys.stderr)
-    sys.exit(1)
-def preview_num(v):
-    m = re.match(r'^\d+\.\d+\.\d+-preview\.(\d+)', v)
-    return int(m.group(1)) if m else None
-bn, cn = preview_num(base), preview_num(cur)
-if b == c and bn is not None and cn is not None and cn == bn + 1:
-    print(f"legacy preview-counter bump: base {base} -> current {cur} carries no SemVer core change; want fix->PATCH+preview.1 (e.g. 0.1.0-preview.3->0.1.1-preview.1) or feat->MINOR+preview.1", file=sys.stderr)
     sys.exit(1)
 # Expected core transition per type (0.x breaking rule: MINOR, not MAJOR).
 want = None
@@ -298,17 +289,8 @@ elif want == "patch":
 else:
     core_ok = False
 if not core_ok:
-    print(f"bump mismatch: base {base} -> current {cur} is not a {want} bump for type {typ} (want major=+1.0.0 minor=+0.1.0 patch=+0.0.1 with lower resets; preview counter resets to .1 on core move)", file=sys.stderr)
+    print(f"bump mismatch: base {base} -> current {cur} is not a {want} bump for type {typ} (want major=+1.0.0 minor=+0.1.0 patch=+0.0.1 with lower resets)", file=sys.stderr)
     sys.exit(1)
-# Prerelease discipline on a core move: current must be stable (no hyphen,
-# graduating out of preview) or a reset preview counter (preview.1).
-if cp:
-    if cn is None:
-        print(f"bump mismatch: current prerelease '{cp}' is not the canonical preview.N reset (want preview.1 or stable)", file=sys.stderr)
-        sys.exit(1)
-    if cn != 1:
-        print(f"bump mismatch: current preview counter is .{cn}, want .1 on a core {want} move (base {base} -> current {cur})", file=sys.stderr)
-        sys.exit(1)
 print(f"{want} bump ok: {base} -> {cur} for type {typ}")
 PY
   then

@@ -2,7 +2,7 @@
 # Toolchain: Python 3.13 + pip. Manifests: requirements.txt, pyproject.toml, poetry.lock, Pipfile.lock, uv.lock, environment.yml.
 # Smoke repo: https://github.com/psf/requests.git (pyproject.toml).
 # Build from repo root: docker build -f sandbox/docker/pip.Dockerfile -t olaf-sandbox-pip .
-ARG OLAF_VERSION=v0.1.3-preview.1
+ARG OLAF_VERSION=v0.1.3
 FROM python:3.13-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

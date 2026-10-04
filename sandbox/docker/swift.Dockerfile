@@ -3,7 +3,7 @@
 # Smoke repo: https://github.com/vapor/vapor.git (Package.swift with ~24 .package deps).
 # Rejected: apple/swift-argument-parser (leaf package, zero .package deps -> olaf reports 0).
 # Build from repo root: docker build -f sandbox/docker/swift.Dockerfile -t olaf-sandbox-swift .
-ARG OLAF_VERSION=v0.1.3-preview.1
+ARG OLAF_VERSION=v0.1.3
 FROM swift:6.1-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

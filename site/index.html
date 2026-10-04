@@ -25,7 +25,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "olaf",
-  "version": "0.1.3-preview.1",
+  "version": "0.1.3",
   "url": "https://fluxion-dev.github.io/olaf/",
   "author": {
     "@type": "Person",
@@ -34,9 +34,9 @@
   "license": "MIT",
   "operatingSystem": ["Windows", "macOS", "Linux"],
   "downloadUrl": [
-    "https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-linux-x64",
-    "https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-osx-arm64",
-    "https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-win-x64.exe"
+    "https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-linux-x64",
+    "https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-osx-arm64",
+    "https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-win-x64.exe"
   ]
 }
 </script>
@@ -89,7 +89,7 @@
     <span id="copy-status" role="status" aria-live="polite" class="mt-2 block min-h-5 text-sm text-cyber-cyan"></span>
 
     <div class="mt-8 flex flex-col items-center justify-center gap-2.5 sm:flex-row sm:flex-wrap">
-      <a class="inline-flex items-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-linux-x64">
+      <a class="inline-flex items-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-linux-x64">
         <!-- lucide:download -->
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
         Download
@@ -103,7 +103,7 @@
 
     <div class="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2">
       <a class="no-underline" href="https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml"><img class="inline h-5 align-middle" src="https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-      <a class="no-underline" href="https://github.com/fluxion-dev/olaf/releases"><img class="inline h-5 align-middle" src="https://img.shields.io/github/v/release/fluxion-dev/olaf?include_prereleases" alt="Release"></a>
+      <a class="no-underline" href="https://github.com/fluxion-dev/olaf/releases"><img class="inline h-5 align-middle" src="https://img.shields.io/github/v/release/fluxion-dev/olaf" alt="Release"></a>
       <a class="no-underline" href="https://github.com/fluxion-dev/olaf"><img class="inline h-5 align-middle" src="https://img.shields.io/github/license/fluxion-dev/olaf" alt="License"></a>
       <a class="no-underline" href="https://github.com/fluxion-dev/olaf"><img class="inline h-5 align-middle" src="https://img.shields.io/badge/.NET-10-512BD4" alt=".NET 10"></a>
     </div>
@@ -223,7 +223,7 @@ olaf generate &lt;DIR&gt; [--format &lt;fmt&gt;] [--out &lt;file&gt;] [--force] 
   <p class="text-zinc-300">Help and version both exit <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">0</code>:</p>
 <pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">olaf generate --help
 olaf --version
-<span class="text-zinc-500"># 0.1.3-preview.1+...</span>
+<span class="text-zinc-500"># 0.1.3+...</span>
 </code></pre>
 </div>
 </section>
@@ -244,53 +244,53 @@ olaf --version
   </div>
 
   <div id="panel-binary" role="tabpanel" aria-labelledby="tab-binary" class="rounded-b-xl rounded-tr-xl border border-olaf-border bg-olaf-surface/70 p-6 md:p-8 space-y-6 backdrop-blur">
-<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-linux-x64
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">curl -fSL -o /tmp/olaf-dl/olaf-linux-x64 https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-linux-x64
 chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
-<span class="text-zinc-500"># 0.1.3-preview.1+...</span>
+<span class="text-zinc-500"># 0.1.3+...</span>
 </code></pre>
-<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">gh release download v0.1.3-preview.1 -p 'olaf-linux-x64' -D /tmp/olaf-dl
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">gh release download v0.1.3 -p 'olaf-linux-x64' -D /tmp/olaf-dl
 chmod +x /tmp/olaf-dl/olaf-linux-x64
 /tmp/olaf-dl/olaf-linux-x64 --version
-<span class="text-zinc-500"># 0.1.3-preview.1+...</span>
+<span class="text-zinc-500"># 0.1.3+...</span>
 </code></pre>
   </div>
   <div id="panel-global" role="tabpanel" aria-labelledby="tab-global" hidden class="rounded-b-xl rounded-tr-xl border border-olaf-border bg-olaf-surface/70 p-6 md:p-8 space-y-6 backdrop-blur">
     <h3 class="mb-2 mt-1 text-xl font-semibold text-white">Install from NuGet (.NET tool)</h3>
-    <p class="text-zinc-300">olaf on NuGet is a .NET CLI tool, not a library — you install it with <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">dotnet tool install</code> and run it as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf</code>, you never reference it from a project. A .NET runtime is required to run it, and the <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--version 0.1.3-preview.1</code> pin is required — unpinned installs fail for prerelease versions. Global install:</p>
-<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet tool install -g olaf --version 0.1.3-preview.1
+    <p class="text-zinc-300">olaf on NuGet is a .NET CLI tool, not a library — you install it with <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">dotnet tool install</code> and run it as <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf</code>, you never reference it from a project. A .NET runtime is required to run it, and pinning <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--version 0.1.3</code> keeps installs reproducible. Global install:</p>
+<pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet tool install -g olaf --version 0.1.3
 olaf --version
-<span class="text-zinc-500"># 0.1.3-preview.1+...</span>
+<span class="text-zinc-500"># 0.1.3+...</span>
 </code></pre>
   </div>
   <div id="panel-local" role="tabpanel" aria-labelledby="tab-local" hidden class="rounded-b-xl rounded-tr-xl border border-olaf-border bg-olaf-surface/70 p-6 md:p-8 space-y-6 backdrop-blur">
     <p class="text-zinc-300">Repo-pinned local install for solutions and CI (restores the pinned version per repo via a tool manifest):</p>
 <pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-canvas p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet new tool-manifest
-dotnet tool install olaf --version 0.1.3-preview.1
+dotnet tool install olaf --version 0.1.3
 dotnet tool run olaf --version
-<span class="text-zinc-500"># 0.1.3-preview.1+...</span>
+<span class="text-zinc-500"># 0.1.3+...</span>
 </code></pre>
   </div>
 
   <!-- No download attribute on the buttons below: the cross-origin redirect to objects.githubusercontent.com ignores it, and GitHub already sends an attachment disposition. -->
   <div class="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-linux-x64">
+    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-linux-x64">
       <!-- lucide:download -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
       Download for Linux (x64)
     </a>
-    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-osx-arm64">
+    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-osx-arm64">
       <!-- lucide:download -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
       Download for macOS (arm64)
     </a>
-    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3-preview.1/olaf-win-x64.exe">
+    <a class="inline-flex items-center justify-center gap-2 rounded-xl bg-viking-blue px-5 py-2.5 text-center font-semibold text-white no-underline transition hover:bg-viking-blue/80" href="https://github.com/fluxion-dev/olaf/releases/download/v0.1.3/olaf-win-x64.exe">
       <!-- lucide:download -->
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
       Download for Windows (x64)
     </a>
   </div>
-  <p class="text-[0.95rem] text-zinc-400">Prefer to browse? <a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf/releases">All releases on GitHub</a> (current: <a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf/releases/tag/v0.1.3-preview.1">v0.1.3-preview.1</a>).</p>
+  <p class="text-[0.95rem] text-zinc-400">Prefer to browse? <a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf/releases">All releases on GitHub</a> (current: <a class="text-cyber-cyan hover:underline" href="https://github.com/fluxion-dev/olaf/releases/tag/v0.1.3">v0.1.3</a>).</p>
   <ul class="list-disc pl-6 text-[0.95rem] text-zinc-400">
     <li class="mb-1.5">Linux and macOS: <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">chmod +x</code> the binary after downloading, then run <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">--version</code> to verify.</li>
     <li class="mb-1.5">Windows: download the <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">.exe</code> and run it directly — no <code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">chmod</code> needed.</li>
@@ -303,9 +303,9 @@ dotnet tool run olaf --version
     <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">osx-arm64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-osx-arm64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">81,467,641 bytes (~77.7 MiB)</td></tr>
     <tr><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">win-x64</code></td><td class="border-b border-olaf-border px-3 py-2 text-left"><code class="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">olaf-win-x64.exe</code></td><td class="border-b border-olaf-border px-3 py-2 text-left text-zinc-300">74,966,246 bytes (~71.5 MiB)</td></tr>
   </table>
-  <p class="text-zinc-300">Prefer the .NET toolchain? Install the pinned prerelease as a global tool (the pin is required — unpinned installs fail for prereleases):</p>
+  <p class="text-zinc-300">Prefer the .NET toolchain? Install the pinned stable release as a global tool:</p>
 <pre class="overflow-x-auto rounded-xl border border-olaf-border bg-olaf-surface p-4 text-[0.88rem] leading-relaxed text-zinc-200"><code class="bg-transparent p-0 font-mono">dotnet pack src/Olaf.Cli -c Release
-dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.3-preview.1
+dotnet tool install --global --add-source ./src/Olaf.Cli/bin/Release olaf --version 0.1.3
 olaf --help
 </code></pre>
 </div>

@@ -72,12 +72,12 @@ jobs:
             esac
           done < /tmp/subjects.txt
           exit $FAIL
-      - name: Validate csproj version is SemVer
+      - name: Validate csproj version is stable SemVer
         run: |
           VER=$(grep -oE '<Version>[^<]+</Version>' src/Olaf.Cli/Olaf.Cli.csproj | head -1 | sed -E 's|</?Version>||g')
           echo "csproj Version: $VER"
           python3 - "$VER" <<'PY'
           import re, sys
-          pat = r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-((0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
+          pat = r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
           sys.exit(0 if re.match(pat, sys.argv[1]) else 1)
           PY
