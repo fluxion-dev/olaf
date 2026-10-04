@@ -1,6 +1,6 @@
 # olaf
 
-[![CI](https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml/badge.svg)](https://github.com/fluxion-dev/olaf/actions) [![Release](https://img.shields.io/github/v/release/fluxion-dev/olaf?include_prereleases=true)](https://github.com/fluxion-dev/olaf/releases) [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE) [![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
+[![CI](https://github.com/fluxion-dev/olaf/actions/workflows/ci.yml/badge.svg)](https://github.com/fluxion-dev/olaf/actions) [![Release](https://img.shields.io/github/v/release/fluxion-dev/olaf?include_prereleases)](https://github.com/fluxion-dev/olaf/releases) [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE) [![.NET](https://img.shields.io/badge/.NET-10-512BD4)](https://dotnet.microsoft.com/)
 
 License scanner: `olaf generate <DIR>` scans a project directory, resolves licenses, writes a report to stdout or a file.
 
